@@ -1311,16 +1311,21 @@ const app = {
 
   /* ---------- sheets (악보) ---------- */
   setSheetTab(tab){
-    const prevTab = state.sheetTab;
-    state.sheetTab = tab;
-    document.getElementById('subtab-dl').classList.toggle('active', tab==='dl');
-    document.getElementById('subtab-make').classList.toggle('active', tab==='make');
-    document.getElementById('sheets-dl-view').style.display = tab==='dl' ? '' : 'none';
-    document.getElementById('sheets-make-view').style.display = tab==='make' ? '' : 'none';
-    state.detail.sheets = null;
-    this.renderSheets();
-    if(prevTab==='make' && tab!=='make') this.stopScoreMakerSession(false);
-    if(tab==='make') this.startScoreMakerSession();
+    try{
+      const prevTab = state.sheetTab;
+      state.sheetTab = tab;
+      document.getElementById('subtab-dl').classList.toggle('active', tab==='dl');
+      document.getElementById('subtab-make').classList.toggle('active', tab==='make');
+      document.getElementById('sheets-dl-view').style.display = tab==='dl' ? '' : 'none';
+      document.getElementById('sheets-make-view').style.display = tab==='make' ? '' : 'none';
+      state.detail.sheets = null;
+      this.renderSheets();
+      if(prevTab==='make' && tab!=='make') this.stopScoreMakerSession(false);
+      if(tab==='make') this.startScoreMakerSession();
+    }catch(e){
+      console.error('setSheetTab 오류', e);
+      alert('탭 전환 중 오류가 발생했습니다: ' + (e && e.message ? e.message : String(e)));
+    }
   },
   renderSheetTabs(){
     document.getElementById('subtab-dl').classList.toggle('active', state.sheetTab==='dl');
@@ -1491,8 +1496,24 @@ const app = {
     const statusEl = document.getElementById('scoreMakerStatus');
     const blockedEl = document.getElementById('scoreMakerBlocked');
     const iframeEl = document.getElementById('scoreMakerFrame');
-    if(!statusEl || !blockedEl || !iframeEl) return;
+    if(!statusEl || !blockedEl || !iframeEl){
+      console.error('악보 제작 도구: 필요한 화면 요소를 찾지 못했습니다', {statusEl, blockedEl, iframeEl});
+      alert('악보 제작 도구를 불러오는 중 문제가 발생했습니다 (요소를 찾을 수 없음). 페이지를 새로고침해 주세요.');
+      return;
+    }
+    try{
+      await this._startScoreMakerSessionInner(statusEl, blockedEl, iframeEl);
+    }catch(e){
+      console.error('악보 제작 도구 오류', e);
+      statusEl.style.display = '';
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '⚠ 오류가 발생했습니다: ' + (e && e.message ? e.message : String(e));
+      iframeEl.style.display = '';
+      if(!iframeEl.src) iframeEl.src = 'score-maker.html';
+    }
+  },
 
+  async _startScoreMakerSessionInner(statusEl, blockedEl, iframeEl){
     if(state.currentUser){
       // 로그인한 회원: 시간 제한 없음
       if(scoreMakerState.timerHandle){ clearInterval(scoreMakerState.timerHandle); scoreMakerState.timerHandle = null; }

@@ -64,9 +64,11 @@ button{font-family:inherit;}
   border:2px solid var(--gold);
   display:flex; align-items:center; justify-content:center;
   color:var(--gold-bright); font-family:'Nanum Myeongjo',serif; font-weight:800;
-  font-size:15px; letter-spacing:0; border-radius:3px;
+  font-size:15px; letter-spacing:0; border-radius:50%;
   box-shadow: inset 0 0 0 2px rgba(220,181,106,0.15);
+  overflow:hidden;
 }
+.seal-img{ width:100%; height:100%; object-fit:cover; }
 .brand-text .kr{font-size:19px; font-weight:800; letter-spacing:2px;}
 .brand-text .hanja{font-size:11px; color:var(--ink-soft); letter-spacing:4px; margin-top:1px;}
 
@@ -419,7 +421,7 @@ footer{
 <header class="site-header">
   <div class="header-inner">
     <div class="brand" onclick="app.go('home')">
-      <div class="seal">墨絃</div>
+      <div class="seal"><img src="logo.png" alt="타로당 로고" class="seal-img"></div>
       <div class="brand-text">
         <div class="kr">타로당</div>
         <div class="hanja">芋 頭 堂 · TARODANG</div>
@@ -751,9 +753,9 @@ if(FIREBASE_CONFIGURED){
 const HERO_TAGLINES = [
   '타로수가 선명하게<br><em>고쟁</em>을 핥고 있었다.',
   '<em>고쟁</em> 위로<br>고양이가 걸어 다닙니다.',
-  '<em>고쟁~</em> 야~호',
-  '새벽 3시에 <em>고쟁</em>치는<br>사람이 어딨냐구!!',
-  '이 <em>고쟁</em>은 제 겁니다.'
+  '<em>고쟁~</em><br> 야~호.',
+  '새벽 3시에 <em>고쟁</em>치는<br>사람이 어딨냐구!.',
+  '이 <em>고쟁</em>은 <br>제 겁니다.'
 ];
 
 const NAV_ITEMS = [

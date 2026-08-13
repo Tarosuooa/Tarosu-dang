@@ -415,7 +415,7 @@ footer{
   <section class="hero" id="heroSection">
     <div class="hero-inner">
       <span class="eyebrow">GUZHENG · 古筝 · 스물한 줄의 이야기</span>
-      <h1>타로수가 선명하게<br><em>고쟁</em>을 핥고 있었다.</h1>
+      <h1 id="heroTagline">타로수가 선명하게<br><em>고쟁</em>을 핥고 있었다.</h1>
       <p class="tagline">취미 고쟁러 '타로수'의 공간입니다. <br>저의 연주 영상 및 자작 악보를 담았습니다.</p>
       <p style="margin-top:6px; font-size:12px; color:var(--ink-soft);">instagram @tarosu_gzh</p>
     </div>
@@ -699,6 +699,18 @@ if(FIREBASE_CONFIGURED){
     console.error('Firebase 초기화 실패', e);
   }
 }
+
+/* =====================================================================
+   ▼▼▼ 홈 화면 큰 문구 (5개 중 접속할 때마다 무작위로 하나 표시) ▼▼▼
+   각 항목은 그대로 화면에 HTML로 들어갑니다. 줄바꿈은 <br>, 강조는 <em>강조할 단어</em>로 표시할 수 있어요.
+   ===================================================================== */
+const HERO_TAGLINES = [
+  '타로수가 선명하게<br><em>고쟁</em>을 핥고 있었다.',
+  '<em>고쟁</em> 위로<br>고양이가 걸어 다닙니다.',
+  '<em>고쟁~</em> 야~호',
+  '새벽 3시에 <em>고쟁</em> 치는<br>사람이 어딨냐구!!',
+  '이 <em>고쟁</em>은 <br>이제 제 겁니다.'
+];
 
 const NAV_ITEMS = [
   {id:'home', label:'홈'},
@@ -1102,6 +1114,7 @@ function applyNavState(s){
   if(navBtn) navBtn.classList.add('active');
   document.getElementById('heroSection').style.display = state.page==='home' ? '' : 'none';
   document.querySelector('main').classList.toggle('no-hero', state.page!=='home');
+  if(state.page==='home') app.pickRandomHeroTagline();
 
   document.getElementById('subtab-dl').classList.toggle('active', state.sheetTab==='dl');
   document.getElementById('subtab-make').classList.toggle('active', state.sheetTab==='make');
@@ -1208,6 +1221,28 @@ const app = {
     });
   },
 
+  pickRandomHeroTagline(){
+    const el = document.getElementById('heroTagline');
+    if(!el || !HERO_TAGLINES.length) return;
+
+    const SEEN_KEY = 'tarodang_hero_seen_first';
+    let hasSeenFirst = false;
+    try{ hasSeenFirst = sessionStorage.getItem(SEEN_KEY) === '1'; }catch(e){ /* 세션 저장소 접근 불가 시 항상 첫 문구로 처리 */ }
+
+    let idx;
+    if(!hasSeenFirst){
+      // 이번 접속(세션)에서 처음 홈에 도달했을 때는 무조건 첫 번째 문구
+      idx = 0;
+      try{ sessionStorage.setItem(SEEN_KEY, '1'); }catch(e){}
+    }else{
+      // 그 이후로는 새로고침하거나 다른 게시판에 갔다가 돌아올 때마다
+      // 나머지 문구 중 하나가 매번 균등한 확률로 무작위 선택됨
+      const restCount = HERO_TAGLINES.length - 1;
+      idx = restCount > 0 ? 1 + Math.floor(Math.random() * restCount) : 0;
+    }
+    el.innerHTML = HERO_TAGLINES[idx];
+  },
+
   go(page, skipPush){
     if(page==='mypage' && !state.currentUser){ showToast('로그인이 필요합니다'); return; }
     const leavingScoreMaker = (state.page==='sheets' && state.sheetTab==='make' && page!=='sheets');
@@ -1221,6 +1256,7 @@ const app = {
     if(navBtn) navBtn.classList.add('active');
     document.getElementById('heroSection').style.display = page==='home' ? '' : 'none';
     document.querySelector('main').classList.toggle('no-hero', page!=='home');
+    if(page==='home') this.pickRandomHeroTagline();
     state.detail.notice = null; state.detail.download = null; state.detail.inquiry = null;
     state.detail.sheets = null;
     this.renderAll();

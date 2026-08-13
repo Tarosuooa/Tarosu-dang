@@ -462,7 +462,22 @@ footer{
   <div class="page" id="page-inquiry">
     <div class="section-title"><h2>문의</h2><span class="hanja-sub">問議</span></div>
     <div class="divider"></div>
-    <p style="font-size:13.5px; color:var(--ink-soft); margin:-12px 0 20px;">받은 문의와 답변을 운영자가 정리하여 게시하는 공간입니다. 개인적인 문의는 방명록을 이용해 남겨주세요.</p>
+
+    <div class="form-box">
+      <h3 style="font-size:16px; margin-bottom:4px;">문의 보내기</h3>
+      <p class="field-hint" style="margin:0 0 12px;">문의를 보내면 관리자의 이메일로 바로 전달돼요. 로그인한 회원만 이용할 수 있어요.</p>
+      <div id="iqLoginNotice" class="field-hint" style="display:none; margin-bottom:12px;">로그인 후 이용해주세요</div>
+      <div id="iqFormFields">
+        <label>내 이메일 (답변받으실 주소)</label>
+        <input type="text" id="iqEmail" placeholder="you@example.com">
+        <label>제목</label>
+        <input type="text" id="iqTitle" maxlength="100" placeholder="문의 제목을 입력하세요">
+        <label>내용</label>
+        <textarea id="iqContent" maxlength="2000" placeholder="문의하실 내용을 입력하세요"></textarea>
+        <div class="form-actions"><button class="btn" id="iqSendBtn" onclick="app.sendInquiryEmail()">전송</button></div>
+      </div>
+    </div>
+
     <div id="inquiry-list-view">
       <div class="toolbar" id="inquiry-toolbar"></div>
       <div class="list-box" id="inquiry-list"></div>
@@ -659,6 +674,8 @@ const firebaseConfig = {
 
 const ADMIN_TOKEN = "tarodang-secure-token-2026";
 const ADMIN_PW = "YUtou0808";
+// '문의' 게시판에서 회원이 보낸 문의 이메일을 받을 주소입니다. 실제 관리자 이메일로 바꿔주세요.
+const ADMIN_CONTACT_EMAIL = "tarosu.ooa@gmail.com";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxBYwITDr719_F6jP5oBdQfnyb45rVXrxPCaZgroX1uGJ0vYygFFj9GwfDqRDW1LnU1/exec";
 const GAS_CONFIGURED = GAS_WEB_APP_URL !== "YOUR_APPS_SCRIPT_WEB_APP_URL";
 
@@ -879,7 +896,7 @@ function buildRteHtml(editorId, placeholder){
        onmousedown="event.preventDefault()" onclick="app.rteSelectColor('${editorId}', this)"></button>`
   ).join('');
   const sizeBtns = RTE_SIZES.map(s =>
-    `<button type="button" class="rte-size-btn" data-size="${s.px}" style="font-size:${s.px};" onmousedown="event.preventDefault()" onclick="app.rteSelectSize('${editorId}', this)">${s.label}</button>`
+    `<button type="button" class="rte-size-btn" data-size="${s.px}" onmousedown="event.preventDefault()" onclick="app.rteSelectSize('${editorId}', this)">${s.label}</button>`
   ).join('');
   return `
     <div class="rte-toolbar">
@@ -1185,11 +1202,13 @@ const app = {
     this.renderHome();
     this.renderBoard('notice');
     this.renderBoard('download');
+    this.renderBoard('inquiry');
     this.renderFaq();
     this.renderGuestbook();
     this.renderSheetTabs();
     this.renderSheets();
     this.renderMyPage();
+    this.renderInquiryForm();
     this.updateAuthArea();
   },
 
@@ -1259,34 +1278,37 @@ const app = {
     const activeSwatch = toolbar ? toolbar.querySelector('.rte-swatch.active') : null;
     const activeSize = toolbar ? toolbar.querySelector('.rte-size-btn.active') : null;
     const color = activeSwatch ? activeSwatch.dataset.color : null;
-    const size = activeSize ? activeSize.dataset.size : null;
-    if(!color && !size){ showToast('적용할 색상이나 글씨 크기를 먼저 선택해주세요'); return; }
+    const sizePx = activeSize ? activeSize.dataset.size : null;
+    if(!color && !sizePx){ showToast('적용할 색상이나 글씨 크기를 먼저 선택해주세요'); return; }
 
-    el.focus();
-    restoreRteSelection(editorId);
+    // 선택이 살아있지 않으면(포커스가 옮겨갔다면) 마지막으로 저장해둔 선택 영역을 복원
     const sel = window.getSelection();
+    const liveOk = sel.rangeCount && !sel.getRangeAt(0).collapsed && el.contains(sel.getRangeAt(0).commonAncestorContainer);
+    if(!liveOk) restoreRteSelection(editorId);
     if(!sel.rangeCount || sel.getRangeAt(0).collapsed){
       showToast('먼저 글씨를 드래그해서 선택해주세요');
       return;
     }
-    const range = sel.getRangeAt(0);
-    const span = document.createElement('span');
-    if(color) span.style.color = color;
-    if(size) span.style.fontSize = size;
-    try{
-      const content = range.extractContents();
-      span.appendChild(content);
-      range.insertNode(span);
-      // 새로 감싼 영역을 다시 선택 상태로 만들어 연속 적용도 가능하게 한다
-      const newRange = document.createRange();
-      newRange.selectNodeContents(span);
-      sel.removeAllRanges();
-      sel.addRange(newRange);
-      saveRteSelection(editorId);
-    }catch(e){
-      console.error('서식 적용 실패', e);
-      showToast('서식 적용에 실패했습니다');
+
+    el.focus();
+    // 굵게/기울임/밑줄과 동일하게 브라우저 내장 명령을 사용해 안정적으로 적용한다
+    if(color){
+      document.execCommand('styleWithCSS', false, true);
+      document.execCommand('foreColor', false, color);
+      document.execCommand('styleWithCSS', false, false);
     }
+    if(sizePx){
+      document.execCommand('fontSize', false, '7'); // 임시로 <font size="7">를 만든 뒤 아래에서 치환
+      el.querySelectorAll('font[size]').forEach(f => {
+        const span = document.createElement('span');
+        span.style.fontSize = sizePx;
+        if(f.style && f.style.color) span.style.color = f.style.color;
+        else if(color) span.style.color = color;
+        while(f.firstChild) span.appendChild(f.firstChild);
+        f.replaceWith(span);
+      });
+    }
+    saveRteSelection(editorId);
   },
 
   updateAuthArea(){
@@ -1582,6 +1604,56 @@ const app = {
     showToast('삭제되었습니다');
     this.renderBoard(name);
     if(name==='notice') this.renderHome();
+  },
+
+  /* ---------- inquiry: 회원이 관리자 이메일로 문의 보내기 ---------- */
+  renderInquiryForm(){
+    const noticeEl = document.getElementById('iqLoginNotice');
+    const fieldsEl = document.getElementById('iqFormFields');
+    if(!noticeEl || !fieldsEl) return;
+    if(state.currentUser){
+      noticeEl.style.display = 'none';
+      fieldsEl.style.display = '';
+      const emailEl = document.getElementById('iqEmail');
+      if(emailEl && !emailEl.value) emailEl.value = state.currentUser.email;
+    }else{
+      noticeEl.style.display = '';
+      fieldsEl.style.display = 'none';
+    }
+  },
+  async sendInquiryEmail(){
+    if(!state.currentUser){ showToast('로그인 후 이용해주세요'); return; }
+    if(!GAS_CONFIGURED){ showToast('이메일 발송 기능이 아직 설정되지 않았습니다'); return; }
+    const email = document.getElementById('iqEmail').value.trim();
+    const title = document.getElementById('iqTitle').value.trim();
+    const content = document.getElementById('iqContent').value.trim();
+    if(!validEmail(email)){ showToast('올바른 이메일 주소를 입력해주세요'); return; }
+    if(!title || !content){ showToast('제목과 내용을 입력해주세요'); return; }
+
+    const btn = document.getElementById('iqSendBtn');
+    btn.disabled = true; btn.textContent = '전송 중...';
+    try{
+      const res = await fetch(GAS_WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({
+          type: 'inquiry',
+          to: ADMIN_CONTACT_EMAIL,
+          replyTo: email,
+          title, content,
+          nickname: state.currentUser.nickname
+        })
+      });
+      const result = await res.json().catch(()=>null);
+      if(result && result.status !== 'ok'){ throw new Error(result.message || '발송 실패'); }
+      showToast('문의가 전송되었습니다');
+      document.getElementById('iqTitle').value = '';
+      document.getElementById('iqContent').value = '';
+    }catch(e){
+      console.error(e);
+      showToast('문의 전송에 실패했습니다. Apps Script 설정을 확인해주세요');
+    }
+    btn.disabled = false; btn.textContent = '전송';
   },
 
   renderFaq(){

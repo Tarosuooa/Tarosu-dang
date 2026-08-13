@@ -114,18 +114,26 @@ main.no-hero{padding-top:44px;}
 
 .strings-wrap{
   position:absolute; right:-40px; top:0; bottom:0; width:56%;
-  pointer-events:none; opacity:0.9;
+  opacity:0.9;
 }
 .strings-wrap svg{width:100%; height:100%;}
 .string-line{
   stroke:var(--gold); stroke-width:1.1; opacity:0.55;
   transform-origin:center;
   animation:pluck 4.2s ease-in-out infinite;
+  pointer-events:none;
+  transition:opacity .15s, stroke-width .15s;
 }
-.bridge{fill:var(--wood); opacity:0.8;}
+.string-line.teal{ stroke:#127C77; }
+.string-line.plucked{ opacity:1; stroke-width:2.4; }
+.string-hit{
+  stroke:transparent; stroke-width:16;
+  cursor:pointer; pointer-events:auto;
+}
+.bridge{fill:var(--wood); opacity:0.8; pointer-events:none;}
 @keyframes pluck{
-  0%, 100%{transform:translateX(0);}
-  50%{transform:translateX(2.2px);}
+  0%, 100%{transform:translateY(0);}
+  50%{transform:translateY(2.2px);}
 }
 @media (prefers-reduced-motion: reduce){
   .string-line{animation:none;}
@@ -230,6 +238,22 @@ main.no-hero{padding-top:44px;}
   outline:none; overflow-wrap:break-word;
 }
 .rte-editor:empty:before{ content:attr(data-placeholder); color:#a9a094; }
+.rte-toolbar{flex-wrap:wrap; row-gap:6px;}
+.rte-sep{width:1px; align-self:stretch; background:var(--paper-deep); margin:2px 2px;}
+.rte-size-row{display:flex; align-items:center; gap:6px; flex-wrap:wrap;}
+.rte-size-btn{
+  height:auto; min-height:28px; padding:3px 12px; border-radius:2px;
+  border:1px solid var(--paper-deep); background:#fff; cursor:pointer;
+  font-family:'Noto Sans KR',sans-serif; white-space:nowrap; line-height:1.3;
+}
+.rte-size-btn:hover{border-color:var(--wood);}
+.rte-size-btn.active{background:var(--wood); border-color:var(--wood); color:#fff;}
+.rte-swatch-row{display:flex; gap:4px;}
+.rte-swatch{
+  width:22px; height:22px; padding:0; border-radius:50%; cursor:pointer;
+  border:1px solid rgba(0,0,0,0.15); box-shadow:0 0 0 1px transparent;
+}
+.rte-swatch.active{box-shadow:0 0 0 2px var(--wood);}
 
 /* ---------- faq ---------- */
 .faq-item{border-bottom:1px solid var(--paper-deep);}
@@ -253,7 +277,7 @@ main.no-hero{padding-top:44px;}
 .gb-entry:last-child{border-bottom:none;}
 .gb-author{font-weight:700; font-size:14.5px;}
 .gb-date{font-size:11.5px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif; margin-left:8px;}
-.gb-text{margin-top:5px; font-size:14.5px; word-break:break-word;}
+.gb-text{margin-top:5px; font-size:14.5px; word-break:break-word; white-space:pre-wrap;}
 
 /* ---------- modal ---------- */
 .modal-overlay{
@@ -330,6 +354,7 @@ footer{
 }
 .badge.official{background:#E5D9F2; color:#5B2C82; font-weight:700;}
 .badge.member{background:#EFDFC7; color:#6B4226; font-weight:700;}
+.badge.new{background:#F7DAD3; color:#8C3B2E; font-weight:800; vertical-align:2px;}
 .sheet-fields{display:grid; grid-template-columns:1fr 1fr; gap:0 16px;}
 .sheet-fields > div{min-width:0;}
 @media (max-width:600px){.sheet-fields{grid-template-columns:1fr;}}
@@ -390,12 +415,8 @@ footer{
 
   <!-- HOME -->
   <div class="page" id="page-home">
-    <div class="section-title"><h2>최근 공지</h2><span class="hanja-sub">最近 · 公告</span></div>
-    <div class="divider"></div>
-    <div class="list-box" id="homeNoticePreview"></div>
-
-    <div style="margin-top:40px; display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px;">
-      <div class="card" style="cursor:pointer" onclick="app.go('notice')"><h3 style="font-size:16px;">공지사항</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로당의 새로운 소식을 확인하세요</p></div>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px;">
+      <div class="card" style="cursor:pointer" onclick="app.go('notice')"><h3 style="font-size:16px;">공지사항 <span id="homeNoticeNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로당의 새로운 소식을 확인하세요</p></div>
       <div class="card" style="cursor:pointer" onclick="app.goSheetsTab('dl')"><h3 style="font-size:16px;">악보 다운로드</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로수와 회원들이 올린 악보를 받아보세요</p></div>
       <div class="card" style="cursor:pointer" onclick="app.goSheetsTab('make')"><h3 style="font-size:16px;">악보 제작</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">숫자 악보 편집기로 직접 악보를 만들어보세요</p></div>
     </div>
@@ -457,7 +478,8 @@ footer{
       <label>이름</label>
       <input type="text" id="gbAuthor" maxlength="20" placeholder="이름을 남겨주세요">
       <label>메시지</label>
-      <div id="gbTextWrap"></div>
+      <textarea id="gbText" maxlength="1000" placeholder="한 줄의 인사를 남겨주세요"></textarea>
+      <div class="field-hint" id="gbCharCount" style="text-align:right;">0/200자 (공백 제외)</div>
       <div class="form-actions"><button class="btn" onclick="app.submitGuestbook()">글 남기기</button></div>
     </div>
     <div class="list-box" id="guestbook-list"></div>
@@ -701,6 +723,49 @@ function nowStr(){
   return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()) + ' ' +
     pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
 }
+function isRecentDate(dateStr){
+  if(!dateStr) return false;
+  const t = new Date(String(dateStr).replace(' ', 'T')).getTime();
+  if(isNaN(t)) return false;
+  return (Date.now() - t) < 30*24*60*60*1000;
+}
+
+/* ---------- 방명록: 공백 제외 200자 제한 ---------- */
+const GUESTBOOK_MAX_CHARS = 200;
+function countNonWhitespace(str){
+  return ((str || '').match(/\S/g) || []).length;
+}
+function limitNonWhitespace(str, limit){
+  let count = 0;
+  for(let i=0; i<str.length; i++){
+    if(!/\s/.test(str[i])){
+      count++;
+      if(count > limit) return str.slice(0, i);
+    }
+  }
+  return str;
+}
+function updateGuestbookCharCount(){
+  const textEl = document.getElementById('gbText');
+  const countEl = document.getElementById('gbCharCount');
+  if(!textEl || !countEl) return;
+  countEl.textContent = countNonWhitespace(textEl.value) + '/' + GUESTBOOK_MAX_CHARS + '자 (공백 제외)';
+}
+function initGuestbookCharLimit(){
+  const textEl = document.getElementById('gbText');
+  if(!textEl) return;
+  textEl.addEventListener('input', () => {
+    const limited = limitNonWhitespace(textEl.value, GUESTBOOK_MAX_CHARS);
+    if(limited !== textEl.value){
+      const pos = textEl.selectionStart;
+      textEl.value = limited;
+      textEl.selectionStart = textEl.selectionEnd = Math.min(pos, limited.length);
+    }
+    updateGuestbookCharCount();
+  });
+  updateGuestbookCharCount();
+}
+
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function validPassword(pw){
   const SYMBOLS = "!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?~`";
@@ -723,8 +788,12 @@ function sanitizeRichHtml(html){
         }
         Array.from(child.attributes).forEach(attr => {
           if(child.tagName === 'SPAN' && attr.name === 'style'){
-            const m = attr.value.match(/color\s*:\s*(#[0-9a-fA-F]{3,8}|rgb\([^)]+\))/);
-            if(m) child.setAttribute('style', 'color:' + m[1] + ';'); else child.removeAttribute('style');
+            const colorMatch = attr.value.match(/color\s*:\s*(#[0-9a-fA-F]{3,8}|rgb\([^)]+\))/i);
+            const sizeMatch = attr.value.match(/font-size\s*:\s*([\d.]+(?:px|em|rem|%))/i);
+            let cleaned = '';
+            if(colorMatch) cleaned += 'color:' + colorMatch[1] + ';';
+            if(sizeMatch) cleaned += 'font-size:' + sizeMatch[1] + ';';
+            if(cleaned) child.setAttribute('style', cleaned); else child.removeAttribute('style');
           } else {
             child.removeAttribute(attr.name);
           }
@@ -742,13 +811,86 @@ function richTextHasContent(html){
   wrapper.innerHTML = html || '';
   return wrapper.textContent.trim().length > 0;
 }
+
+/* ---------- rich text editor: 팔레트 + 적용 버튼 + 선택영역 보존 ---------- */
+const RTE_RAINBOW = [
+  {label:'빨강', hex:'#E53935'},
+  {label:'주황', hex:'#FB8C00'},
+  {label:'노랑', hex:'#F2C40C'},
+  {label:'초록', hex:'#43A047'},
+  {label:'파랑', hex:'#1E88E5'},
+  {label:'남색', hex:'#3949AB'},
+  {label:'보라', hex:'#8E24AA'}
+];
+const RTE_SIZES = [
+  {label:'작게', px:'12px'},
+  {label:'보통', px:'14.5px'},
+  {label:'크게', px:'18px'},
+  {label:'아주 크게', px:'24px'}
+];
+const rteSavedRange = {}; // editorId -> Range (마지막으로 편집창에서 선택했던 영역)
+
+function saveRteSelection(editorId){
+  const sel = window.getSelection();
+  if(!sel.rangeCount) return;
+  const el = document.getElementById(editorId);
+  if(!el) return;
+  const range = sel.getRangeAt(0);
+  if(el.contains(range.commonAncestorContainer)){
+    rteSavedRange[editorId] = range.cloneRange();
+  }
+}
+function restoreRteSelection(editorId){
+  const el = document.getElementById(editorId);
+  if(!el) return;
+  el.focus();
+  const saved = rteSavedRange[editorId];
+  if(saved){
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    try{ sel.addRange(saved); }catch(e){}
+  }
+}
+
+// 편집창 안에서 선택이 바뀔 때마다 저장 (색상 팔레트를 눌러도 선택이 유지되도록)
+document.addEventListener('mouseup', (e)=>{
+  if(e.target.closest && e.target.closest('.rte-editor')) saveRteSelection(e.target.closest('.rte-editor').id);
+});
+document.addEventListener('keyup', (e)=>{
+  if(e.target.closest && e.target.closest('.rte-editor')) saveRteSelection(e.target.closest('.rte-editor').id);
+});
+
+// Enter 키를 직접 처리해 빈 줄이 사라지지 않고 항상 한 줄씩 정확히 내려가게 한다
+document.addEventListener('keydown', (e)=>{
+  if(e.key !== 'Enter' || e.shiftKey) return;
+  const editor = e.target.closest && e.target.closest('.rte-editor');
+  if(!editor) return;
+  e.preventDefault();
+  document.execCommand('insertLineBreak');
+});
+
 function buildRteHtml(editorId, placeholder){
+  const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const monoHex = isDark ? '#FFFFFF' : '#000000';
+  const monoLabel = isDark ? '흰색' : '검정';
+  const swatches = RTE_RAINBOW.concat([{label:monoLabel, hex:monoHex}]).map(c =>
+    `<button type="button" class="rte-swatch" data-color="${c.hex}" title="${c.label}"
+       style="background:${c.hex}${c.hex==='#FFFFFF' ? ';border:1px solid var(--paper-deep)' : ''}"
+       onmousedown="event.preventDefault()" onclick="app.rteSelectColor('${editorId}', this)"></button>`
+  ).join('');
+  const sizeBtns = RTE_SIZES.map(s =>
+    `<button type="button" class="rte-size-btn" data-size="${s.px}" style="font-size:${s.px};" onmousedown="event.preventDefault()" onclick="app.rteSelectSize('${editorId}', this)">${s.label}</button>`
+  ).join('');
   return `
     <div class="rte-toolbar">
-      <button type="button" title="굵게" onclick="app.rteExec('${editorId}','bold')"><b>B</b></button>
-      <button type="button" class="i-btn" title="기울임" onclick="app.rteExec('${editorId}','italic')">I</button>
-      <button type="button" class="u-btn" title="밑줄" onclick="app.rteExec('${editorId}','underline')">U</button>
-      <input type="color" title="글자 색상" value="#231d17" onchange="app.rteColor('${editorId}', this.value)">
+      <button type="button" title="굵게" onmousedown="event.preventDefault()" onclick="app.rteExec('${editorId}','bold')"><b>B</b></button>
+      <button type="button" class="i-btn" title="기울임" onmousedown="event.preventDefault()" onclick="app.rteExec('${editorId}','italic')">I</button>
+      <button type="button" class="u-btn" title="밑줄" onmousedown="event.preventDefault()" onclick="app.rteExec('${editorId}','underline')">U</button>
+      <span class="rte-sep"></span>
+      <div class="rte-size-row">${sizeBtns}</div>
+      <span class="rte-sep"></span>
+      <div class="rte-swatch-row">${swatches}</div>
+      <button type="button" class="btn small" onmousedown="event.preventDefault()" onclick="app.rteApplyStyle('${editorId}')">적용</button>
     </div>
     <div class="rte-editor" id="${editorId}" contenteditable="true" data-placeholder="${escapeHtml(placeholder||'')}"></div>`;
 }
@@ -780,6 +922,33 @@ function ensureScoreMakerFrameLoaded(iframeEl, loggedIn){
   scoreMakerState.frameSrcSet = true;
   iframeEl.src = 'score-maker.html' + (loggedIn ? '?loggedin=1' : '');
 }
+/* ---------- 홈 화면 고쟁 줄 소리 ---------- */
+const GUZHENG_NOTE_FREQ = {
+  'A3':220.00, 'B3':246.94, 'D4':293.66, 'E4':329.63, 'F#4':369.99,
+  'A4':440.00, 'B4':493.88, 'D5':587.33, 'E5':659.25, 'F#5':739.99,
+  'A5':880.00, 'B5':987.77, 'D6':1174.66
+};
+let heroAudioCtx = null;
+async function playGuzhengNote(note){
+  const freq = GUZHENG_NOTE_FREQ[note];
+  if(!freq) return;
+  try{
+    if(!heroAudioCtx) heroAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(heroAudioCtx.state === 'suspended') await heroAudioCtx.resume();
+    const now = heroAudioCtx.currentTime;
+    const osc = heroAudioCtx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, now);
+    const gain = heroAudioCtx.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.35, now + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.5);
+    osc.connect(gain).connect(heroAudioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 1.6);
+  }catch(e){ console.error('고쟁 소리 재생 실패', e); }
+}
+
 async function fetchPublicIP(){
   try{
     const res = await fetch('https://api.ipify.org?format=json');
@@ -943,7 +1112,7 @@ const app = {
     await loadSheets();
     updateStorageWarning();
     this.renderAll();
-    document.getElementById('gbTextWrap').innerHTML = buildRteHtml('gbText', '한 줄의 인사를 남겨주세요');
+    initGuestbookCharLimit();
     this.go('home', true);
     try{ history.replaceState(captureNavState(), ''); }catch(e){}
   },
@@ -958,14 +1127,32 @@ const app = {
   buildStrings(){
     const svg = document.querySelector('.strings-wrap svg');
     const n = 13;
+    // 맨 위부터 순서대로: A3,B3,D4,E4,F#4,A4,B4,D5,E5,F#5,A5,B5,D6
+    const NOTES = ['A3','B3','D4','E4','F#4','A4','B4','D5','E5','F#5','A5','B5','D6'];
+    const TEAL_NOTES = new Set(['A3','A4','A5']);
+    const X1 = 10, X2 = 480;
     let html = '';
     for(let i=0;i<n;i++){
-      const x = 20 + i*36;
-      html += `<line class="string-line" x1="${x}" y1="10" x2="${x}" y2="390" style="animation-delay:${(i*0.18).toFixed(2)}s"></line>`;
-      const bridgeY = 40 + i*22;
-      html += `<polygon class="bridge" points="${x-7},${bridgeY} ${x+7},${bridgeY} ${x},${bridgeY+12}"></polygon>`;
+      const y = 20 + i*28;
+      const note = NOTES[i]; // i=0(맨 위) -> A3, i=12(맨 아래) -> D6
+      const isTeal = TEAL_NOTES.has(note);
+      // 실제로 보이는 얇은 줄과, 클릭이 잘 되도록 위에 겹쳐놓는 투명한 넓은 히트 영역을 함께 만든다
+      html += `<line class="string-line${isTeal ? ' teal' : ''}" data-note="${note}" x1="${X1}" y1="${y}" x2="${X2}" y2="${y}" style="animation-delay:${(i*0.18).toFixed(2)}s"></line>`;
+      html += `<line class="string-hit" data-note="${note}" x1="${X1}" y1="${y}" x2="${X2}" y2="${y}"></line>`;
+      const bridgeX = 30 + i*34;
+      html += `<polygon class="bridge" points="${bridgeX-7},${y} ${bridgeX+7},${y} ${bridgeX},${y+12}"></polygon>`;
     }
     svg.innerHTML = html;
+    svg.querySelectorAll('.string-hit').forEach(hit => {
+      hit.addEventListener('click', () => {
+        playGuzhengNote(hit.dataset.note);
+        const line = svg.querySelector('.string-line[data-note="' + hit.dataset.note + '"]');
+        if(line){
+          line.classList.add('plucked');
+          setTimeout(() => line.classList.remove('plucked'), 260);
+        }
+      });
+    });
   },
 
   go(page, skipPush){
@@ -1053,14 +1240,53 @@ const app = {
   rteExec(editorId, cmd){
     const el = document.getElementById(editorId);
     if(!el) return;
-    el.focus();
+    restoreRteSelection(editorId);
     document.execCommand(cmd, false, null);
+    saveRteSelection(editorId);
   },
-  rteColor(editorId, color){
+  rteSelectColor(editorId, btnEl){
+    const toolbar = btnEl.closest('.rte-toolbar');
+    toolbar.querySelectorAll('.rte-swatch').forEach(b => b.classList.toggle('active', b === btnEl));
+  },
+  rteSelectSize(editorId, btnEl){
+    const toolbar = btnEl.closest('.rte-toolbar');
+    toolbar.querySelectorAll('.rte-size-btn').forEach(b => b.classList.toggle('active', b === btnEl));
+  },
+  rteApplyStyle(editorId){
     const el = document.getElementById(editorId);
     if(!el) return;
+    const toolbar = el.previousElementSibling;
+    const activeSwatch = toolbar ? toolbar.querySelector('.rte-swatch.active') : null;
+    const activeSize = toolbar ? toolbar.querySelector('.rte-size-btn.active') : null;
+    const color = activeSwatch ? activeSwatch.dataset.color : null;
+    const size = activeSize ? activeSize.dataset.size : null;
+    if(!color && !size){ showToast('적용할 색상이나 글씨 크기를 먼저 선택해주세요'); return; }
+
     el.focus();
-    document.execCommand('foreColor', false, color);
+    restoreRteSelection(editorId);
+    const sel = window.getSelection();
+    if(!sel.rangeCount || sel.getRangeAt(0).collapsed){
+      showToast('먼저 글씨를 드래그해서 선택해주세요');
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    const span = document.createElement('span');
+    if(color) span.style.color = color;
+    if(size) span.style.fontSize = size;
+    try{
+      const content = range.extractContents();
+      span.appendChild(content);
+      range.insertNode(span);
+      // 새로 감싼 영역을 다시 선택 상태로 만들어 연속 적용도 가능하게 한다
+      const newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+      saveRteSelection(editorId);
+    }catch(e){
+      console.error('서식 적용 실패', e);
+      showToast('서식 적용에 실패했습니다');
+    }
   },
 
   updateAuthArea(){
@@ -1231,16 +1457,11 @@ const app = {
   },
 
   renderHome(){
-    const box = document.getElementById('homeNoticePreview');
-    const items = state.data.notice.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||'')).slice(0,3);
-    if(items.length===0){ box.innerHTML = `<div class="empty-note">아직 등록된 공지가 없습니다</div>`; return; }
-    box.innerHTML = items.map(p => `
-      <div class="post-row" onclick="app.openDetail('notice','${p.id}')">
-        <div>
-          <div class="post-title">${escapeHtml(p.title)}</div>
-          <div class="post-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</div>
-        </div>
-      </div>`).join('');
+    const badgeEl = document.getElementById('homeNoticeNewBadge');
+    if(badgeEl){
+      const hasNew = state.data.notice.some(p => isRecentDate(p.date));
+      badgeEl.style.display = hasNew ? 'inline-block' : 'none';
+    }
   },
 
   renderBoard(name){
@@ -1257,7 +1478,7 @@ const app = {
       items.map(p => `
         <div class="post-row">
           <div style="flex:1;cursor:pointer" onclick="app.openDetail('${name}','${p.id}')">
-            <div class="post-title">${escapeHtml(p.title)}</div>
+            <div class="post-title">${name==='notice' && isRecentDate(p.date) ? '<span class="badge new">NEW</span>' : ''}${escapeHtml(p.title)}</div>
             <div class="post-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</div>
           </div>
           ${state.isAdmin ? `
@@ -1280,7 +1501,7 @@ const app = {
         detailWrap.innerHTML = `
           <div class="back-link" onclick="app.closeDetail('${name}')">← 목록으로</div>
           <div class="detail-view">
-            <h3>${escapeHtml(post.title)}</h3>
+            <h3>${name==='notice' && isRecentDate(post.date) ? '<span class="badge new">NEW</span>' : ''}${escapeHtml(post.title)}</h3>
             <div class="post-meta">${escapeHtml(post.author)} · ${escapeHtml(post.date)}</div>
             <div class="detail-body">${sanitizeRichHtml(post.content)}</div>
             ${cfg.hasLink && post.link ? `<a class="dl-link" href="${escapeHtml(post.link)}" target="_blank" rel="noopener">자료 링크 열기 ↗</a>` : ''}
@@ -1435,7 +1656,7 @@ const app = {
       <div class="gb-entry">
         <div>
           <span class="gb-author">${escapeHtml(g.author)}</span><span class="gb-date">${escapeHtml(g.date)}</span>
-          <div class="gb-text">${sanitizeRichHtml(g.text)}</div>
+          <div class="gb-text">${escapeHtml(g.text)}</div>
         </div>
         ${state.isAdmin ? `<button class="btn danger small" onclick="app.deleteGuestbook('${g.id}')">삭제</button>` : ''}
       </div>`).join('');
@@ -1444,11 +1665,13 @@ const app = {
     const authorEl = document.getElementById('gbAuthor');
     const textEl = document.getElementById('gbText');
     const author = authorEl.value.trim() || '익명';
-    const text = sanitizeRichHtml(textEl ? textEl.innerHTML : '');
-    if(!richTextHasContent(text)){ showToast('메시지를 입력해주세요'); return; }
+    const text = (textEl ? textEl.value : '').trim();
+    if(!text){ showToast('메시지를 입력해주세요'); return; }
+    if(countNonWhitespace(text) > GUESTBOOK_MAX_CHARS){ showToast(`메시지는 공백 제외 ${GUESTBOOK_MAX_CHARS}자까지 입력할 수 있어요`); return; }
     state.data.guestbook.unshift({id:uid(), author, text, date:nowStr()});
     await saveBoard('guestbook');
-    authorEl.value=''; textEl.innerHTML='';
+    authorEl.value=''; textEl.value='';
+    updateGuestbookCharCount();
     showToast('방명록에 등록되었습니다');
     this.renderGuestbook();
   },
@@ -1806,7 +2029,6 @@ document.getElementById('liPassword')?.addEventListener('keydown', (e)=>{ if(e.k
   });
 })();
 
-try{ document.execCommand('defaultParagraphSeparator', false, 'br'); }catch(e){}
 
 app.init();
 </script>

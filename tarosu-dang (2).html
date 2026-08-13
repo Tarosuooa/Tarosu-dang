@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>타로수 공방 芋頭酥工坊</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<!-- Firebase (회원가입/로그인/저장/파일업로드) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<!-- 이메일 인증번호 발송은 Google Apps Script 웹앱으로 처리합니다 (별도 SDK 불필요) -->
+<style>
+:root{
+  --paper:#f1e9d8;
+  --paper-dark:#e6dabf;
+  --paper-deep:#d9c9a3;
+  --ink:#231d17;
+  --ink-soft:#564a3d;
+  --wood:#7a3324;
+  --wood-deep:#4b1f17;
+  --gold:#b8903f;
+  --gold-bright:#dcb56a;
+  --jade:#3f5e52;
+  --string:#c9c2ac;
+  --danger:#8c3b2e;
+  --shadow: 0 6px 24px rgba(35,29,23,0.14);
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  background:
+    radial-gradient(ellipse at top left, rgba(184,144,63,0.06), transparent 55%),
+    radial-gradient(ellipse at bottom right, rgba(122,51,36,0.05), transparent 55%),
+    var(--paper);
+  color:var(--ink);
+  font-family:'Gowun Batang', 'Noto Sans KR', serif;
+  line-height:1.7;
+  min-height:100vh;
+}
+::selection{background:var(--gold-bright); color:var(--ink);}
+h1,h2,h3,h4{font-family:'Nanum Myeongjo', serif; margin:0; color:var(--ink);}
+a{color:inherit;}
+button{font-family:inherit;}
+
+/* ---------- layout shell ---------- */
+.site-header{
+  position:sticky; top:0; z-index:50;
+  background:rgba(241,233,216,0.92);
+  backdrop-filter:blur(6px);
+  border-bottom:1px solid var(--paper-deep);
+}
+.header-inner{
+  max-width:1080px; margin:0 auto; padding:16px 28px;
+  display:flex; align-items:center; justify-content:space-between; gap:20px;
+}
+.brand{display:flex; align-items:center; gap:12px; cursor:pointer;}
+.seal{
+  width:38px; height:38px; flex:none;
+  background:var(--wood-deep);
+  border:2px solid var(--gold);
+  display:flex; align-items:center; justify-content:center;
+  color:var(--gold-bright); font-family:'Nanum Myeongjo',serif; font-weight:800;
+  font-size:15px; letter-spacing:0; border-radius:3px;
+  box-shadow: inset 0 0 0 2px rgba(220,181,106,0.15);
+}
+.brand-text .kr{font-size:19px; font-weight:800; letter-spacing:2px;}
+.brand-text .hanja{font-size:11px; color:var(--ink-soft); letter-spacing:4px; margin-top:1px;}
+
+nav{display:flex; align-items:center; gap:2px; flex-wrap:wrap;}
+.nav-btn{
+  background:none; border:none; padding:10px 14px; cursor:pointer;
+  font-size:14.5px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif;
+  letter-spacing:0.5px; position:relative; transition:color .2s;
+}
+.nav-btn::after{
+  content:""; position:absolute; left:14px; right:14px; bottom:5px; height:1px;
+  background:var(--gold); transform:scaleX(0); transform-origin:center;
+  transition:transform .25s ease;
+}
+.nav-btn:hover{color:var(--ink);}
+.nav-btn:hover::after{transform:scaleX(1);}
+.nav-btn.active{color:var(--wood); font-weight:700;}
+.nav-btn.active::after{transform:scaleX(1); background:var(--wood);}
+
+.admin-pill{
+  border:1px solid var(--gold); background:transparent; color:var(--wood);
+  padding:8px 16px; border-radius:20px; font-size:13px; cursor:pointer;
+  font-family:'Noto Sans KR',sans-serif; letter-spacing:0.5px; white-space:nowrap;
+  transition:background .2s, color .2s;
+}
+.admin-pill:hover{background:var(--wood); color:var(--paper); border-color:var(--wood);}
+.admin-pill.on{background:var(--jade); border-color:var(--jade); color:var(--paper);}
+
+main{max-width:1080px; margin:0 auto; padding:0 28px 100px;}
+
+/* ---------- hero / signature strings ---------- */
+.hero{
+  position:relative; padding:64px 0 40px; overflow:hidden;
+  border-bottom:1px solid var(--paper-deep); margin-bottom:48px;
+}
+.hero-inner{position:relative; z-index:2; max-width:640px;}
+.hero .eyebrow{
+  font-family:'Noto Sans KR',sans-serif; font-size:12.5px; letter-spacing:4px;
+  color:var(--wood); text-transform:uppercase; margin-bottom:14px; display:block;
+}
+.hero h1{font-size:44px; line-height:1.35; font-weight:800;}
+.hero h1 em{font-style:normal; color:var(--wood); border-bottom:2px solid var(--gold);}
+.hero p.tagline{margin-top:18px; font-size:16.5px; color:var(--ink-soft); max-width:480px;}
+
+.strings-wrap{
+  position:absolute; right:-40px; top:0; bottom:0; width:56%;
+  pointer-events:none; opacity:0.9;
+}
+.strings-wrap svg{width:100%; height:100%;}
+.string-line{
+  stroke:var(--gold); stroke-width:1.1; opacity:0.55;
+  transform-origin:center;
+  animation:pluck 4.2s ease-in-out infinite;
+}
+.bridge{fill:var(--wood); opacity:0.8;}
+@keyframes pluck{
+  0%, 100%{transform:translateX(0);}
+  50%{transform:translateX(2.2px);}
+}
+@media (prefers-reduced-motion: reduce){
+  .string-line{animation:none;}
+}
+
+/* ---------- sections / cards ---------- */
+.page{display:none;}
+.page.active{display:block; animation:fadeIn .35s ease;}
+@keyframes fadeIn{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
+
+.section-title{
+  display:flex; align-items:baseline; gap:12px; margin-bottom:28px;
+}
+.section-title h2{font-size:26px; font-weight:800;}
+.section-title .hanja-sub{font-size:13px; color:var(--ink-soft); letter-spacing:3px;}
+.divider{
+  height:1px; background:linear-gradient(to right, var(--gold), transparent);
+  margin:6px 0 28px; width:100%;
+}
+
+.card{
+  background:#fbf7ec; border:1px solid var(--paper-deep); border-radius:2px;
+  padding:22px 24px; margin-bottom:14px; box-shadow:var(--shadow);
+  position:relative;
+}
+.card::before{
+  content:""; position:absolute; left:0; top:16px; bottom:16px; width:3px;
+  background:var(--gold);
+}
+.post-row{
+  display:flex; justify-content:space-between; align-items:flex-start; gap:16px;
+  padding:16px 20px; border-bottom:1px solid var(--paper-deep); cursor:pointer;
+  transition:background .15s;
+}
+.post-row:hover{background:var(--paper-dark);}
+.post-row:last-child{border-bottom:none;}
+.post-title{font-weight:700; font-size:16px; margin-bottom:4px;}
+.post-meta{font-size:12.5px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif;}
+.list-box{background:#fbf7ec; border:1px solid var(--paper-deep); border-radius:2px; box-shadow:var(--shadow);}
+.empty-note{padding:40px 20px; text-align:center; color:var(--ink-soft); font-size:14.5px;}
+
+.detail-view{background:#fbf7ec; border:1px solid var(--paper-deep); padding:30px 32px; box-shadow:var(--shadow);}
+.detail-view h3{font-size:22px; margin-bottom:8px;}
+.detail-view .post-meta{margin-bottom:20px;}
+.detail-body{white-space:pre-wrap; font-size:15.5px; color:var(--ink);}
+.back-link{
+  display:inline-block; margin-bottom:18px; font-size:13.5px; color:var(--wood);
+  cursor:pointer; font-family:'Noto Sans KR',sans-serif;
+}
+.back-link:hover{text-decoration:underline;}
+
+.dl-link{
+  margin-top:10px; display:inline-block; font-size:13.5px; padding:7px 14px;
+  border:1px solid var(--jade); color:var(--jade); border-radius:16px;
+  font-family:'Noto Sans KR',sans-serif; text-decoration:none;
+}
+
+/* ---------- forms ---------- */
+.toolbar{display:flex; justify-content:flex-end; margin-bottom:16px; gap:10px;}
+.btn{
+  font-family:'Noto Sans KR',sans-serif; font-size:13.5px; padding:9px 18px;
+  border-radius:3px; cursor:pointer; border:1px solid var(--wood); background:var(--wood);
+  color:var(--paper); transition:opacity .2s;
+}
+.btn:hover{opacity:0.85;}
+.btn.ghost{background:transparent; color:var(--wood);}
+.btn.danger{background:var(--danger); border-color:var(--danger);}
+.btn.small{padding:5px 11px; font-size:12px;}
+
+.form-box{
+  background:#fbf7ec; border:1px solid var(--gold); padding:22px; margin-bottom:22px;
+}
+.form-box label{display:block; font-size:12.5px; color:var(--ink-soft); margin:12px 0 5px; font-family:'Noto Sans KR',sans-serif;}
+.form-box input[type=text], .form-box input[type=password], .form-box textarea{
+  width:100%; padding:10px 12px; border:1px solid var(--paper-deep); background:#fff;
+  font-family:'Gowun Batang',serif; font-size:14.5px; border-radius:2px; resize:vertical;
+}
+.form-box textarea{min-height:120px;}
+.form-actions{margin-top:16px; display:flex; gap:10px;}
+
+.admin-row-actions{display:flex; gap:6px; flex:none;}
+
+/* ---------- faq ---------- */
+.faq-item{border-bottom:1px solid var(--paper-deep);}
+.faq-item:last-child{border-bottom:none;}
+.faq-q{
+  padding:18px 20px; display:flex; justify-content:space-between; align-items:center;
+  cursor:pointer; font-weight:700; font-size:15.5px;
+}
+.faq-q .mark{color:var(--gold); font-family:'Nanum Myeongjo',serif; font-size:18px;}
+.faq-a{
+  max-height:0; overflow:hidden; transition:max-height .3s ease;
+  padding:0 20px; color:var(--ink-soft); font-size:14.5px;
+}
+.faq-a.open{max-height:400px; padding:0 20px 20px;}
+
+/* ---------- guestbook ---------- */
+.gb-entry{
+  padding:16px 20px; border-bottom:1px solid var(--paper-deep);
+  display:flex; justify-content:space-between; gap:16px; align-items:flex-start;
+}
+.gb-entry:last-child{border-bottom:none;}
+.gb-author{font-weight:700; font-size:14.5px;}
+.gb-date{font-size:11.5px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif; margin-left:8px;}
+.gb-text{margin-top:5px; font-size:14.5px; white-space:pre-wrap;}
+
+/* ---------- modal ---------- */
+.modal-overlay{
+  position:fixed; inset:0; background:rgba(35,29,23,0.55); z-index:100;
+  display:none; align-items:center; justify-content:center;
+}
+.modal-overlay.show{display:flex;}
+.modal-box{
+  background:var(--paper); border:1px solid var(--gold); width:340px; padding:28px;
+  box-shadow:var(--shadow); text-align:center;
+}
+.modal-box h3{font-size:18px; margin-bottom:6px;}
+.modal-box p.sub{font-size:12.5px; color:var(--ink-soft); margin-bottom:18px; font-family:'Noto Sans KR',sans-serif;}
+.modal-box input{
+  width:100%; padding:11px 12px; border:1px solid var(--paper-deep); text-align:center;
+  letter-spacing:2px; font-size:15px; margin-bottom:14px;
+}
+.modal-err{color:var(--danger); font-size:12.5px; height:16px; margin-bottom:6px; font-family:'Noto Sans KR',sans-serif;}
+.modal-actions{display:flex; gap:8px;}
+.modal-actions .btn{flex:1;}
+
+.toast{
+  position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+  background:var(--ink); color:var(--paper); padding:12px 22px; border-radius:3px;
+  font-size:13.5px; font-family:'Noto Sans KR',sans-serif; opacity:0; z-index:200;
+  transition:opacity .25s, transform .25s; pointer-events:none;
+}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+footer{
+  border-top:1px solid var(--paper-deep); margin-top:60px; padding:30px 28px;
+  text-align:center; color:var(--ink-soft); font-size:12.5px; font-family:'Noto Sans KR',sans-serif;
+}
+
+@media (max-width:720px){
+  .hero h1{font-size:32px;}
+  .strings-wrap{display:none;}
+  .header-inner{flex-wrap:wrap;}
+  nav{order:3; width:100%; justify-content:flex-start; overflow-x:auto;}
+}
+
+/* ---------- auth area ---------- */
+.auth-area{display:flex; align-items:center; gap:8px;}
+.pill{
+  border:1px solid var(--gold); background:transparent; color:var(--wood);
+  padding:8px 16px; border-radius:20px; font-size:13px; cursor:pointer;
+  font-family:'Noto Sans KR',sans-serif; letter-spacing:0.5px; white-space:nowrap;
+  transition:background .2s, color .2s;
+}
+.pill:hover{background:var(--wood); color:var(--paper); border-color:var(--wood);}
+.pill.solid{background:var(--wood); color:var(--paper);}
+.pill.solid:hover{opacity:0.85;}
+.user-chip{font-size:13px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif; white-space:nowrap;}
+.user-chip strong{color:var(--wood);}
+
+/* ---------- sheets / subtabs ---------- */
+.subtabs{display:flex; gap:6px; margin-bottom:22px; border-bottom:1px solid var(--paper-deep);}
+.subtab-btn{
+  background:none; border:none; padding:10px 18px; cursor:pointer; font-size:14.5px;
+  color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif; border-bottom:2px solid transparent;
+  margin-bottom:-1px; transition:color .2s, border-color .2s;
+}
+.subtab-btn.active{color:var(--wood); font-weight:700; border-color:var(--wood);}
+.category-filter{display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap;}
+.cat-btn{
+  border:1px solid var(--paper-deep); background:#fbf7ec; color:var(--ink-soft);
+  padding:6px 14px; border-radius:16px; font-size:12.5px; cursor:pointer;
+  font-family:'Noto Sans KR',sans-serif; transition:all .15s;
+}
+.cat-btn.active{background:var(--wood); border-color:var(--wood); color:var(--paper);}
+.badge{
+  display:inline-block; font-size:11px; padding:2px 9px; border-radius:10px;
+  font-family:'Noto Sans KR',sans-serif; margin-right:8px; vertical-align:middle;
+}
+.badge.official{background:var(--jade); color:#fff;}
+.badge.member{background:var(--gold); color:#fff;}
+.sheet-fields{display:grid; grid-template-columns:1fr 1fr; gap:0 16px;}
+.sheet-fields > div{min-width:0;}
+@media (max-width:600px){.sheet-fields{grid-template-columns:1fr;}}
+.form-box input[type=file]{
+  width:100%; padding:9px 10px; border:1px solid var(--paper-deep); background:#fff;
+  font-family:'Noto Sans KR',sans-serif; font-size:13px; border-radius:2px;
+}
+.field-hint{font-size:11.5px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif; margin-top:4px;}
+
+/* ---------- wider modal for signup ---------- */
+.modal-box.wide{width:380px; text-align:left;}
+.modal-box.wide h3{text-align:center;}
+.modal-box.wide p.sub{text-align:center;}
+.modal-box.wide label{display:block; font-size:12.5px; color:var(--ink-soft); margin:12px 0 5px; font-family:'Noto Sans KR',sans-serif;}
+.modal-box.wide input{text-align:left; letter-spacing:normal; margin-bottom:0;}
+.verify-row{display:flex; gap:8px; align-items:stretch;}
+.verify-row input{flex:1; margin-bottom:0;}
+.verify-row .btn{white-space:nowrap; flex:none;}
+.switch-link{
+  text-align:center; margin-top:16px; font-size:12.5px; color:var(--ink-soft);
+  font-family:'Noto Sans KR',sans-serif;
+}
+.switch-link a{color:var(--wood); cursor:pointer; text-decoration:underline;}
+
+</style>
+<body>
+
+<div id="storageWarning" style="display:none; background:var(--danger); color:#fff; text-align:center; padding:10px 16px; font-size:13px; font-family:'Noto Sans KR',sans-serif; position:sticky; top:0; z-index:60;">
+  ⚠ Firebase / 이메일 인증(Apps Script) 설정이 아직 완료되지 않았습니다. 코드 상단의 설정값을 채워주세요. 지금은 글이 저장되지 않고 새로고침하면 사라집니다.
+</div>
+<header class="site-header">
+  <div class="header-inner">
+    <div class="brand" onclick="app.go('home')">
+      <div class="seal">墨絃</div>
+      <div class="brand-text">
+        <div class="kr">타로당</div>
+        <div class="hanja">芋 頭 堂 · TARODANG</div>
+      </div>
+    </div>
+    <nav id="nav"></nav>
+    <div class="auth-area" id="authArea">
+      <button class="pill" onclick="app.openLoginModal()">로그인</button>
+      <button class="pill solid" onclick="app.openSignupModal()">회원가입</button>
+    </div>
+    <button class="admin-pill" id="adminPill" onclick="app.onAdminPillClick()">관리자 로그인</button>
+  </div>
+</header>
+
+<main>
+
+  <section class="hero" id="heroSection">
+    <div class="hero-inner">
+      <span class="eyebrow">GUZHENG · 古筝 · 스물한 줄의 이야기</span>
+      <h1>타로수가 선명하게<br><em>고쟁</em>을 핥고 있었다.</h1>
+      <p class="tagline">취미 고쟁러 '타로수'의 공간입니다. <br>저의 연주 영상 및 자작 악보를 담았습니다.</p>
+    </div>
+    <div class="strings-wrap"><svg viewBox="0 0 500 400" preserveAspectRatio="none"></svg></div>
+  </section>
+
+  <!-- HOME -->
+  <div class="page" id="page-home">
+    <div class="section-title"><h2>최근 공지</h2><span class="hanja-sub">最近 · 公告</span></div>
+    <div class="divider"></div>
+    <div class="list-box" id="homeNoticePreview"></div>
+    <div style="margin-top:40px; display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px;">
+      <div class="card" style="cursor:pointer" onclick="app.go('download')"><h3 style="font-size:16px;">다운로드</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">악보와 자료를 내려받으세요</p></div>
+      <div class="card" style="cursor:pointer" onclick="app.go('faq')"><h3 style="font-size:16px;">FAQ</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">자주 묻는 질문 모음</p></div>
+      <div class="card" style="cursor:pointer" onclick="app.go('guestbook')"><h3 style="font-size:16px;">방명록</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">한 줄의 인사를 남겨주세요</p></div>
+    </div>
+  </div>
+
+  <!-- NOTICE -->
+  <div class="page" id="page-notice">
+    <div class="section-title"><h2>공지사항</h2><span class="hanja-sub">告知</span></div>
+    <div class="divider"></div>
+    <div id="notice-list-view">
+      <div class="toolbar" id="notice-toolbar"></div>
+      <div class="list-box" id="notice-list"></div>
+    </div>
+    <div id="notice-detail-view" style="display:none;"></div>
+  </div>
+
+  <!-- DOWNLOAD -->
+  <div class="page" id="page-download">
+    <div class="section-title"><h2>다운로드</h2><span class="hanja-sub">資料室</span></div>
+    <div class="divider"></div>
+    <div id="download-list-view">
+      <div class="toolbar" id="download-toolbar"></div>
+      <div class="list-box" id="download-list"></div>
+    </div>
+    <div id="download-detail-view" style="display:none;"></div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="page" id="page-faq">
+    <div class="section-title"><h2>FAQ</h2><span class="hanja-sub">問答</span></div>
+    <div class="divider"></div>
+    <div class="toolbar" id="faq-toolbar"></div>
+    <div class="list-box" id="faq-list"></div>
+  </div>
+
+  <!-- INQUIRY -->
+  <div class="page" id="page-inquiry">
+    <div class="section-title"><h2>문의</h2><span class="hanja-sub">問議</span></div>
+    <div class="divider"></div>
+    <p style="font-size:13.5px; color:var(--ink-soft); margin:-12px 0 20px;">받은 문의와 답변을 운영자가 정리하여 게시하는 공간입니다. 개인적인 문의는 방명록을 이용해 남겨주세요.</p>
+    <div id="inquiry-list-view">
+      <div class="toolbar" id="inquiry-toolbar"></div>
+      <div class="list-box" id="inquiry-list"></div>
+    </div>
+    <div id="inquiry-detail-view" style="display:none;"></div>
+  </div>
+
+  <!-- GUESTBOOK -->
+  <div class="page" id="page-guestbook">
+    <div class="section-title"><h2>방명록</h2><span class="hanja-sub">芳名錄</span></div>
+    <div class="divider"></div>
+    <div class="form-box">
+      <label>이름</label>
+      <input type="text" id="gbAuthor" maxlength="20" placeholder="이름을 남겨주세요">
+      <label>메시지</label>
+      <textarea id="gbText" maxlength="500" placeholder="한 줄의 인사를 남겨주세요"></textarea>
+      <div class="form-actions"><button class="btn" onclick="app.submitGuestbook()">글 남기기</button></div>
+    </div>
+    <div class="list-box" id="guestbook-list"></div>
+  </div>
+
+
+  <!-- SHEETS (악보) -->
+  <div class="page" id="page-sheets">
+    <div class="section-title"><h2>악보</h2><span class="hanja-sub">樂譜</span></div>
+    <div class="divider"></div>
+
+    <div class="subtabs">
+      <button class="subtab-btn" id="subtab-dl" onclick="app.setSheetTab('dl')">악보 다운로드</button>
+      <button class="subtab-btn" id="subtab-make" onclick="app.setSheetTab('make')">악보 제작</button>
+    </div>
+
+    <!-- 악보 다운로드 -->
+    <div id="sheets-dl-view">
+      <div class="category-filter" id="sheetCategoryFilter">
+        <button class="cat-btn active" data-cat="전체" onclick="app.setSheetCategory('전체')">전체</button>
+        <button class="cat-btn" data-cat="타로수 제작" onclick="app.setSheetCategory('타로수 제작')">타로수 제작</button>
+        <button class="cat-btn" data-cat="회원 제작" onclick="app.setSheetCategory('회원 제작')">회원 제작</button>
+      </div>
+      <div id="sheets-dl-list-view">
+        <div class="toolbar" id="sheets-toolbar"></div>
+        <div class="list-box" id="sheets-list"></div>
+      </div>
+      <div id="sheets-detail-view" style="display:none;"></div>
+    </div>
+
+    <!-- 악보 제작 (관리자 작성 게시판) -->
+    <div id="sheets-make-view" style="display:none;">
+      <p style="font-size:13.5px; color:var(--ink-soft); margin:-4px 0 20px;">타로수가 진행 중인 악보 제작 소식과 커스텀 제작 안내를 올리는 공간입니다.</p>
+      <div id="sheetmake-list-view">
+        <div class="toolbar" id="sheetmake-toolbar"></div>
+        <div class="list-box" id="sheetmake-list"></div>
+      </div>
+      <div id="sheetmake-detail-view" style="display:none;"></div>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  © 묵현당 墨絃堂 · 이 사이트의 게시물은 관리자만 작성할 수 있으며, 방명록은 누구나 남기실 수 있습니다.
+</footer>
+
+<!-- admin login modal -->
+<div class="modal-overlay" id="adminModal">
+  <div class="modal-box">
+    <h3>관리자 로그인</h3>
+    <p class="sub">비밀번호를 입력해주세요 (대소문자 구분)</p>
+    <input type="password" id="adminPwInput" placeholder="••••••••">
+    <div class="modal-err" id="adminErr"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="app.closeAdminModal()">취소</button>
+      <button class="btn" onclick="app.tryAdminLogin()">로그인</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- signup modal -->
+<div class="modal-overlay" id="signupModal">
+  <div class="modal-box wide">
+    <h3>회원가입</h3>
+    <p class="sub">묵현당 · 타로당 회원이 되어보세요</p>
+
+    <label>닉네임</label>
+    <input type="text" id="suNickname" maxlength="20" placeholder="닉네임">
+
+    <label>이메일</label>
+    <div class="verify-row">
+      <input type="text" id="suEmail" placeholder="you@example.com">
+      <button class="btn small" onclick="app.sendVerificationCode()" id="suSendBtn">인증번호 받기</button>
+    </div>
+
+    <label>인증번호 (6자리)</label>
+    <div class="verify-row">
+      <input type="text" id="suCode" maxlength="6" placeholder="숫자 6자리" inputmode="numeric">
+      <button class="btn small ghost" onclick="app.checkVerificationCode()">확인</button>
+    </div>
+    <div class="field-hint" id="suCodeStatus"></div>
+
+    <label>비밀번호</label>
+    <input type="password" id="suPassword" placeholder="영문+숫자 조합 4~13자">
+    <div class="field-hint">영문과 숫자를 모두 포함해 4~13자로 입력해주세요</div>
+
+    <label>비밀번호 확인</label>
+    <input type="password" id="suPassword2" placeholder="비밀번호를 다시 입력">
+
+    <div class="modal-err" id="suErr" style="height:auto; margin-top:10px;"></div>
+    <div class="modal-actions" style="margin-top:8px;">
+      <button class="btn ghost" onclick="app.closeSignupModal()">취소</button>
+      <button class="btn" onclick="app.submitSignup()">가입하기</button>
+    </div>
+    <div class="switch-link">이미 계정이 있으신가요? <a onclick="app.closeSignupModal(); app.openLoginModal()">로그인</a></div>
+  </div>
+</div>
+
+<!-- login modal -->
+<div class="modal-overlay" id="loginModal">
+  <div class="modal-box wide">
+    <h3>로그인</h3>
+    <p class="sub">이메일과 비밀번호를 입력해주세요</p>
+    <label>이메일</label>
+    <input type="text" id="liEmail" placeholder="you@example.com">
+    <label>비밀번호</label>
+    <input type="password" id="liPassword" placeholder="비밀번호">
+    <div class="modal-err" id="liErr" style="height:auto; margin-top:10px;"></div>
+    <div class="modal-actions" style="margin-top:8px;">
+      <button class="btn ghost" onclick="app.closeLoginModal()">취소</button>
+      <button class="btn" onclick="app.submitLogin()">로그인</button>
+    </div>
+    <div class="switch-link">계정이 없으신가요? <a onclick="app.closeLoginModal(); app.openSignupModal()">회원가입</a></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+
+<script>
+/* =====================================================================
+   ▼▼▼ Firebase 설정 ▼▼▼
+   Firebase 콘솔 > 프로젝트 설정 > 내 앱 > 웹 앱에서 복사한 값입니다.
+   ===================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyBB_bvFce5LwuNN32-M3-BlUluff9vEhKc",
+  authDomain: "tarosu-dang.firebaseapp.com",
+  projectId: "tarosu-dang",
+  storageBucket: "tarosu-dang.firebasestorage.app",
+  messagingSenderId: "912231980098",
+  appId: "1:912231980098:web:e86c6b44252814b7a521db",
+  measurementId: "G-P3CPQM1G77"
+};
+
+// 공지사항/다운로드/FAQ/문의 게시판 글쓰기를 허용하는 토큰입니다.
+// 아래 채팅에서 안내하는 Firestore 보안 규칙의 문자열과 반드시 동일해야 합니다.
+const ADMIN_TOKEN = "tarodang-secure-token-2026";
+const ADMIN_PW = "YUtou0808"; // 관리자 로그인(위 게시판 전용) 비밀번호, 대소문자 구분
+
+// '악보 > 악보 다운로드'에서 '타로수 제작' 카테고리로 글을 올릴 수 있는 계정의 이메일입니다.
+// 본인이 회원가입할 이메일 주소로 바꿔주세요. Firestore 규칙에도 동일하게 넣어야 합니다.
+const ADMIN_EMAIL = "tarosu.ooa@gmail.com";
+
+/* =====================================================================
+   ▼▼▼ Google Apps Script 설정 (회원가입 인증번호 이메일 발송용, 무료) ▼▼▼
+   본인 구글 계정으로 Apps Script를 만들어 웹 앱으로 배포한 뒤,
+   그 배포 URL을 아래에 붙여넣어 주세요. (자세한 방법은 채팅 안내 참고)
+   ===================================================================== */
+const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxBYwITDr719_F6jP5oBdQfnyb45rVXrxPCaZgroX1uGJ0vYygFFj9GwfDqRDW1LnU1/exec";
+const GAS_CONFIGURED = GAS_WEB_APP_URL !== "YOUR_APPS_SCRIPT_WEB_APP_URL";
+
+const FIREBASE_CONFIGURED = firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY";
+let db = null, auth = null;
+if(FIREBASE_CONFIGURED){
+  try{
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    auth = firebase.auth();
+  }catch(e){
+    console.error('Firebase 초기화 실패', e);
+  }
+}
+
+const NAV_ITEMS = [
+  {id:'home', label:'홈'},
+  {id:'notice', label:'공지사항'},
+  {id:'download', label:'다운로드'},
+  {id:'sheets', label:'악보'},
+  {id:'faq', label:'FAQ'},
+  {id:'inquiry', label:'문의'},
+  {id:'guestbook', label:'방명록'},
+];
+
+const BOARD_CONFIG = {
+  notice:   {label:'공지', hasLink:false},
+  download: {label:'자료', hasLink:true},
+  inquiry:  {label:'문의', hasLink:false},
+};
+
+const SEED = {
+  notice: [
+    {id:'seed-n1', title:'타로당에 오신 것을 환영합니다', author:'관리자', date:'2026-08-01', content:'타로당을 열었습니다. 앞으로 공지사항은 이곳에서 안내드리겠습니다. 자주 들러주세요.'}
+  ],
+  download: [
+    {id:'seed-d1', title:'입문자를 위한 조현표(調絃表)', author:'관리자', date:'2026-08-01', content:'처음 고쟁을 접하시는 분들을 위한 기본 조현표입니다. 필요하신 분은 아래 링크를 참고해주세요.', link:''}
+  ],
+  faq: [
+    {id:'seed-f1', question:'고쟁은 어떤 악기인가요?', answer:'고쟁(古筝)은 오동나무 몸통에 여러 줄을 얹어 손가락으로 뜯어 연주하는 중국의 전통 현악기입니다. 대개 21현을 사용합니다.'},
+    {id:'seed-f2', question:'게시판에는 누가 글을 쓸 수 있나요?', answer:'공지사항, 다운로드, FAQ, 문의 게시판은 관리자만 작성할 수 있습니다. 방명록은 누구나 자유롭게 남길 수 있습니다. 악보 게시판의 회원 제작 카테고리는 로그인한 회원이라면 누구나 올릴 수 있습니다.'}
+  ],
+  guestbook: [],
+  sheetmake: [
+    {id:'seed-sm1', title:'악보 제작 안내', author:'관리자', date:'2026-08-01', content:'원하시는 곡의 커스텀 악보 제작을 원하시면 방명록이나 문의를 통해 남겨주세요.'}
+  ]
+};
+
+const state = {
+  page: 'home',
+  isAdmin: false,
+  currentUser: null, // {uid, email, nickname}
+  sheetTab: 'dl',
+  sheetCategory: '전체',
+  data: { notice: [], download: [], faq: [], inquiry: [], guestbook: [], sheets: [], sheetmake: [] },
+  detail: { notice: null, download: null, inquiry: null, sheets: null, sheetmake: null },
+  pendingSignup: null, // {email, code, expiresAt, verified}
+};
+
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
+function todayStr(){ const d=new Date(); return d.toISOString().slice(0,10); }
+function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function validPassword(pw){ return /^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{4,13}$/.test(pw); }
+function validEmail(em){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em); }
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._tm);
+  showToast._tm = setTimeout(()=>t.classList.remove('show'), 2400);
+}
+
+/* ---------- generic board storage (Firestore, shared) ---------- */
+let storageAvailable = FIREBASE_CONFIGURED;
+const PROTECTED_BOARDS = ['notice','download','faq','inquiry','sheetmake'];
+
+async function loadBoard(name){
+  if(!db){ storageAvailable = false; state.data[name] = SEED[name] ? SEED[name].slice() : []; return; }
+  try{
+    const docSnap = await db.collection('content').doc(name).get();
+    if(docSnap.exists && docSnap.data().posts){
+      state.data[name] = docSnap.data().posts;
+      return;
+    }
+    state.data[name] = SEED[name] ? SEED[name].slice() : [];
+    await saveBoard(name);
+  }catch(e){
+    console.error('loadBoard error', name, e);
+    storageAvailable = false;
+    state.data[name] = SEED[name] ? SEED[name].slice() : [];
+  }
+}
+
+async function saveBoard(name){
+  if(!db){
+    storageAvailable = false; updateStorageWarning();
+    showToast('⚠ Firebase가 설정되지 않아 이 글은 저장되지 않습니다');
+    return false;
+  }
+  try{
+    const payload = { posts: state.data[name] };
+    if(PROTECTED_BOARDS.includes(name)) payload.adminToken = ADMIN_TOKEN;
+    await db.collection('content').doc(name).set(payload);
+    storageAvailable = true; updateStorageWarning();
+    return true;
+  }catch(e){
+    console.error('saveBoard error', name, e);
+    updateStorageWarning();
+    showToast(e && e.code==='permission-denied' ? '⚠ 저장 권한이 없습니다 (Firestore 규칙 확인)' : '⚠ 저장에 실패했습니다');
+    return false;
+  }
+}
+
+/* ---------- sheets storage (separate collection, per-document) ---------- */
+async function loadSheets(){
+  if(!db){ state.data.sheets = []; return; }
+  try{
+    const snap = await db.collection('sheets').orderBy('date','desc').get();
+    state.data.sheets = snap.docs.map(d => ({id:d.id, ...d.data()}));
+  }catch(e){
+    console.error('loadSheets error', e);
+    state.data.sheets = [];
+  }
+}
+
+function updateStorageWarning(){
+  const banner = document.getElementById('storageWarning');
+  if(banner) banner.style.display = (FIREBASE_CONFIGURED && storageAvailable) ? 'none' : 'block';
+}
+
+/* ---------- app ---------- */
+const app = {
+  async init(){
+    this.buildNav();
+    this.buildStrings();
+    updateStorageWarning();
+    if(auth){
+      auth.onAuthStateChanged(async (user)=>{
+        if(user){
+          let nickname = user.displayName || '회원';
+          try{
+            const udoc = await db.collection('users').doc(user.uid).get();
+            if(udoc.exists && udoc.data().nickname) nickname = udoc.data().nickname;
+          }catch(e){}
+          state.currentUser = { uid: user.uid, email: user.email, nickname };
+        }else{
+          state.currentUser = null;
+        }
+        this.updateAuthArea();
+        this.renderAll();
+      });
+    }
+    await Promise.all(['notice','download','faq','inquiry','guestbook','sheetmake'].map(loadBoard));
+    await loadSheets();
+    updateStorageWarning();
+    this.renderAll();
+    this.go('home');
+  },
+
+  buildNav(){
+    const nav = document.getElementById('nav');
+    nav.innerHTML = NAV_ITEMS.map(it =>
+      `<button class="nav-btn" id="nav-${it.id}" onclick="app.go('${it.id}')">${it.label}</button>`
+    ).join('');
+  },
+
+  buildStrings(){
+    const svg = document.querySelector('.strings-wrap svg');
+    const n = 13;
+    let html = '';
+    for(let i=0;i<n;i++){
+      const x = 20 + i*36;
+      html += `<line class="string-line" x1="${x}" y1="10" x2="${x}" y2="390" style="animation-delay:${(i*0.18).toFixed(2)}s"></line>`;
+      const bridgeY = 40 + i*22;
+      html += `<polygon class="bridge" points="${x-7},${bridgeY} ${x+7},${bridgeY} ${x},${bridgeY+12}"></polygon>`;
+    }
+    svg.innerHTML = html;
+  },
+
+  go(page){
+    state.page = page;
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.getElementById('page-'+page).classList.add('active');
+    document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+    const navBtn = document.getElementById('nav-'+page);
+    if(navBtn) navBtn.classList.add('active');
+    document.getElementById('heroSection').style.display = page==='home' ? '' : 'none';
+    state.detail.notice = null; state.detail.download = null; state.detail.inquiry = null;
+    state.detail.sheets = null; state.detail.sheetmake = null;
+    this.renderAll();
+    window.scrollTo({top:0, behavior:'smooth'});
+  },
+
+  renderAll(){
+    this.renderHome();
+    this.renderBoard('notice');
+    this.renderBoard('download');
+    this.renderBoard('inquiry');
+    this.renderFaq();
+    this.renderGuestbook();
+    this.renderSheetTabs();
+    this.renderSheets();
+    this.renderSheetMake();
+    this.updateAdminPill();
+    this.updateAuthArea();
+  },
+
+  /* ---------- admin (legacy password gate for notice/download/faq/inquiry/sheetmake) ---------- */
+  onAdminPillClick(){
+    if(state.isAdmin){
+      state.isAdmin = false;
+      showToast('관리자 로그아웃 되었습니다');
+      this.renderAll();
+    }else{
+      document.getElementById('adminModal').classList.add('show');
+      document.getElementById('adminPwInput').value = '';
+      document.getElementById('adminErr').textContent = '';
+      setTimeout(()=>document.getElementById('adminPwInput').focus(), 50);
+    }
+  },
+  closeAdminModal(){ document.getElementById('adminModal').classList.remove('show'); },
+  tryAdminLogin(){
+    const val = document.getElementById('adminPwInput').value;
+    if(val === ADMIN_PW){
+      state.isAdmin = true;
+      this.closeAdminModal();
+      showToast('관리자로 로그인되었습니다');
+      this.renderAll();
+    }else{
+      document.getElementById('adminErr').textContent = '비밀번호가 올바르지 않습니다';
+    }
+  },
+  updateAdminPill(){
+    const pill = document.getElementById('adminPill');
+    if(state.isAdmin){ pill.textContent = '관리자 (로그아웃)'; pill.classList.add('on'); }
+    else{ pill.textContent = '관리자 로그인'; pill.classList.remove('on'); }
+  },
+
+  /* ---------- member auth (Firebase Auth) ---------- */
+  updateAuthArea(){
+    const box = document.getElementById('authArea');
+    if(state.currentUser){
+      box.innerHTML = `
+        <span class="user-chip"><strong>${escapeHtml(state.currentUser.nickname)}</strong>님</span>
+        <button class="pill" onclick="app.logout()">로그아웃</button>`;
+    }else{
+      box.innerHTML = `
+        <button class="pill" onclick="app.openLoginModal()">로그인</button>
+        <button class="pill solid" onclick="app.openSignupModal()">회원가입</button>`;
+    }
+  },
+  async logout(){
+    if(auth) await auth.signOut();
+    showToast('로그아웃 되었습니다');
+  },
+
+  openLoginModal(){
+    document.getElementById('loginModal').classList.add('show');
+    document.getElementById('liEmail').value='';
+    document.getElementById('liPassword').value='';
+    document.getElementById('liErr').textContent='';
+  },
+  closeLoginModal(){ document.getElementById('loginModal').classList.remove('show'); },
+  async submitLogin(){
+    if(!auth){ showToast('Firebase가 설정되지 않았습니다'); return; }
+    const email = document.getElementById('liEmail').value.trim();
+    const pw = document.getElementById('liPassword').value;
+    const errEl = document.getElementById('liErr');
+    if(!email || !pw){ errEl.textContent='이메일과 비밀번호를 입력해주세요'; return; }
+    try{
+      await auth.signInWithEmailAndPassword(email, pw);
+      this.closeLoginModal();
+      showToast('로그인되었습니다');
+    }catch(e){
+      errEl.textContent = '이메일 또는 비밀번호가 올바르지 않습니다';
+    }
+  },
+
+  openSignupModal(){
+    document.getElementById('signupModal').classList.add('show');
+    ['suNickname','suEmail','suCode','suPassword','suPassword2'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('suErr').textContent='';
+    document.getElementById('suCodeStatus').textContent='';
+    state.pendingSignup = null;
+  },
+  closeSignupModal(){ document.getElementById('signupModal').classList.remove('show'); },
+
+  async sendVerificationCode(){
+    const email = document.getElementById('suEmail').value.trim();
+    const errEl = document.getElementById('suErr');
+    errEl.textContent='';
+    if(!validEmail(email)){ errEl.textContent='올바른 이메일 주소를 입력해주세요'; return; }
+    if(!GAS_CONFIGURED){ errEl.textContent='이메일 인증 발송이 아직 설정되지 않았습니다'; return; }
+    const code = String(Math.floor(100000 + Math.random()*900000));
+    const sendBtn = document.getElementById('suSendBtn');
+    sendBtn.disabled = true; sendBtn.textContent='전송 중...';
+    try{
+      const res = await fetch(GAS_WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // GAS의 CORS preflight 회피를 위해 text/plain 사용
+        body: JSON.stringify({ to: email, code })
+      });
+      const result = await res.json().catch(()=>null);
+      if(result && result.status !== 'ok'){ throw new Error(result.message || '발송 실패'); }
+      state.pendingSignup = { email, code, expiresAt: Date.now() + 5*60*1000, verified:false };
+      document.getElementById('suCodeStatus').textContent = '인증번호를 전송했습니다 (5분 이내 입력)';
+      showToast('인증번호를 이메일로 전송했습니다');
+    }catch(e){
+      console.error(e);
+      errEl.textContent = '인증번호 전송에 실패했습니다. Apps Script 배포 설정을 확인해주세요';
+    }
+    sendBtn.disabled = false; sendBtn.textContent='인증번호 받기';
+  },
+  checkVerificationCode(){
+    const input = document.getElementById('suCode').value.trim();
+    const statusEl = document.getElementById('suCodeStatus');
+    if(!state.pendingSignup){ statusEl.textContent='먼저 인증번호를 받아주세요'; return; }
+    if(Date.now() > state.pendingSignup.expiresAt){ statusEl.textContent='인증번호가 만료되었습니다. 다시 받아주세요'; return; }
+    if(input === state.pendingSignup.code){
+      state.pendingSignup.verified = true;
+      statusEl.textContent = '✓ 인증되었습니다';
+      statusEl.style.color = 'var(--jade)';
+    }else{
+      statusEl.textContent = '인증번호가 일치하지 않습니다';
+      statusEl.style.color = 'var(--danger)';
+    }
+  },
+  async submitSignup(){
+    if(!auth){ showToast('Firebase가 설정되지 않았습니다'); return; }
+    const nickname = document.getElementById('suNickname').value.trim();
+    const email = document.getElementById('suEmail').value.trim();
+    const pw = document.getElementById('suPassword').value;
+    const pw2 = document.getElementById('suPassword2').value;
+    const errEl = document.getElementById('suErr');
+    errEl.textContent='';
+
+    if(!nickname){ errEl.textContent='닉네임을 입력해주세요'; return; }
+    if(!validEmail(email)){ errEl.textContent='올바른 이메일 주소를 입력해주세요'; return; }
+    if(!state.pendingSignup || state.pendingSignup.email !== email || !state.pendingSignup.verified){
+      errEl.textContent='이메일 인증을 먼저 완료해주세요'; return;
+    }
+    if(!validPassword(pw)){ errEl.textContent='비밀번호는 영문+숫자를 포함해 4~13자로 입력해주세요'; return; }
+    if(pw !== pw2){ errEl.textContent='비밀번호가 일치하지 않습니다'; return; }
+
+    try{
+      const cred = await auth.createUserWithEmailAndPassword(email, pw);
+      await cred.user.updateProfile({ displayName: nickname });
+      await db.collection('users').doc(cred.user.uid).set({ nickname, email, createdAt: todayStr() });
+      this.closeSignupModal();
+      showToast('회원가입이 완료되었습니다. 환영합니다!');
+    }catch(e){
+      console.error(e);
+      if(e.code === 'auth/email-already-in-use') errEl.textContent='이미 가입된 이메일입니다';
+      else errEl.textContent='가입에 실패했습니다: ' + (e.message || '알 수 없는 오류');
+    }
+  },
+
+  /* ---------- home ---------- */
+  renderHome(){
+    const box = document.getElementById('homeNoticePreview');
+    const items = state.data.notice.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||'')).slice(0,3);
+    if(items.length===0){ box.innerHTML = `<div class="empty-note">아직 등록된 공지가 없습니다</div>`; return; }
+    box.innerHTML = items.map(p => `
+      <div class="post-row" onclick="app.openDetail('notice','${p.id}')">
+        <div>
+          <div class="post-title">${escapeHtml(p.title)}</div>
+          <div class="post-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</div>
+        </div>
+      </div>`).join('');
+  },
+
+  /* ---------- generic boards (notice / download / inquiry) ---------- */
+  renderBoard(name){
+    const listEl = document.getElementById(name+'-list');
+    const toolbarEl = document.getElementById(name+'-toolbar');
+    const cfg = BOARD_CONFIG[name];
+
+    toolbarEl.innerHTML = state.isAdmin
+      ? `<button class="btn" onclick="app.openForm('${name}')">+ 새 글 작성</button>`
+      : '';
+
+    const items = state.data[name].slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    listEl.innerHTML = items.length===0 ? `<div class="empty-note">등록된 글이 없습니다</div>` :
+      items.map(p => `
+        <div class="post-row">
+          <div style="flex:1;cursor:pointer" onclick="app.openDetail('${name}','${p.id}')">
+            <div class="post-title">${escapeHtml(p.title)}</div>
+            <div class="post-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</div>
+          </div>
+          ${state.isAdmin ? `
+            <div class="admin-row-actions">
+              <button class="btn ghost small" onclick="event.stopPropagation();app.openForm('${name}','${p.id}')">수정</button>
+              <button class="btn danger small" onclick="event.stopPropagation();app.deletePost('${name}','${p.id}')">삭제</button>
+            </div>` : ''}
+        </div>`).join('');
+
+    const existingForm = document.getElementById(name+'-form');
+    if(existingForm) existingForm.remove();
+
+    const detailWrap = document.getElementById(name+'-detail-view');
+    const listWrap = document.getElementById(name+'-list-view');
+    const d = state.detail[name];
+    if(d){
+      const post = state.data[name].find(p=>p.id===d);
+      listWrap.style.display='none'; detailWrap.style.display='';
+      if(post){
+        detailWrap.innerHTML = `
+          <div class="back-link" onclick="app.closeDetail('${name}')">← 목록으로</div>
+          <div class="detail-view">
+            <h3>${escapeHtml(post.title)}</h3>
+            <div class="post-meta">${escapeHtml(post.author)} · ${escapeHtml(post.date)}</div>
+            <div class="detail-body">${escapeHtml(post.content)}</div>
+            ${cfg.hasLink && post.link ? `<a class="dl-link" href="${escapeHtml(post.link)}" target="_blank" rel="noopener">자료 링크 열기 ↗</a>` : ''}
+          </div>`;
+      }
+    }else{
+      listWrap.style.display=''; detailWrap.style.display='none'; detailWrap.innerHTML='';
+    }
+  },
+
+  openDetail(name, id){ state.detail[name] = id; this.renderBoard(name); window.scrollTo({top:0, behavior:'smooth'}); },
+  closeDetail(name){ state.detail[name] = null; this.renderBoard(name); },
+
+  openForm(name, editId){
+    if(!state.isAdmin) return;
+    const cfg = BOARD_CONFIG[name];
+    const existing = editId ? state.data[name].find(p=>p.id===editId) : null;
+    const toolbarEl = document.getElementById(name+'-toolbar');
+    let form = document.getElementById(name+'-form');
+    if(form) form.remove();
+
+    form = document.createElement('div');
+    form.className = 'form-box';
+    form.id = name+'-form';
+    form.innerHTML = `
+      <label>제목</label>
+      <input type="text" id="${name}-f-title" value="${existing ? escapeHtml(existing.title) : ''}" maxlength="100">
+      <label>내용</label>
+      <textarea id="${name}-f-content" maxlength="3000">${existing ? escapeHtml(existing.content) : ''}</textarea>
+      ${cfg.hasLink ? `<label>다운로드 링크 (URL)</label><input type="text" id="${name}-f-link" value="${existing && existing.link ? escapeHtml(existing.link) : ''}" placeholder="https://...">` : ''}
+      <div class="form-actions">
+        <button class="btn" onclick="app.savePost('${name}', ${existing ? `'${existing.id}'` : 'null'})">${existing ? '수정 완료' : '등록'}</button>
+        <button class="btn ghost" onclick="document.getElementById('${name}-form').remove()">취소</button>
+      </div>`;
+    toolbarEl.insertAdjacentElement('afterend', form);
+    document.getElementById(name+'-f-title').focus();
+  },
+
+  async savePost(name, editId){
+    const title = document.getElementById(name+'-f-title').value.trim();
+    const content = document.getElementById(name+'-f-content').value.trim();
+    const linkEl = document.getElementById(name+'-f-link');
+    const link = linkEl ? linkEl.value.trim() : undefined;
+    if(!title || !content){ showToast('제목과 내용을 입력해주세요'); return; }
+
+    if(editId){
+      const post = state.data[name].find(p=>p.id===editId);
+      post.title = title; post.content = content;
+      if(link!==undefined) post.link = link;
+    }else{
+      state.data[name].unshift({ id: uid(), title, content, author:'관리자', date: todayStr(), ...(link!==undefined ? {link} : {}) });
+    }
+    await saveBoard(name);
+    const f = document.getElementById(name+'-form'); if(f) f.remove();
+    showToast(editId ? '수정되었습니다' : '등록되었습니다');
+    this.renderBoard(name);
+    if(name==='notice') this.renderHome();
+  },
+
+  async deletePost(name, id){
+    if(!state.isAdmin) return;
+    if(!confirm('이 글을 삭제하시겠습니까?')) return;
+    state.data[name] = state.data[name].filter(p=>p.id!==id);
+    await saveBoard(name);
+    showToast('삭제되었습니다');
+    this.renderBoard(name);
+    if(name==='notice') this.renderHome();
+  },
+
+  /* ---------- faq ---------- */
+  renderFaq(){
+    const toolbarEl = document.getElementById('faq-toolbar');
+    toolbarEl.innerHTML = state.isAdmin ? `<button class="btn" onclick="app.openFaqForm()">+ 새 질문 추가</button>` : '';
+    const existingForm = document.getElementById('faq-form');
+    if(existingForm) existingForm.remove();
+
+    const listEl = document.getElementById('faq-list');
+    if(state.data.faq.length===0){ listEl.innerHTML = `<div class="empty-note">등록된 FAQ가 없습니다</div>`; return; }
+    listEl.innerHTML = state.data.faq.map(f => `
+      <div class="faq-item">
+        <div class="faq-q" onclick="app.toggleFaq('${f.id}')">
+          <span><span class="mark">問 ·</span> ${escapeHtml(f.question)}</span>
+          ${state.isAdmin ? `<span class="admin-row-actions" onclick="event.stopPropagation()">
+              <button class="btn ghost small" onclick="app.openFaqForm('${f.id}')">수정</button>
+              <button class="btn danger small" onclick="app.deleteFaq('${f.id}')">삭제</button>
+            </span>` : `<span class="mark">＋</span>`}
+        </div>
+        <div class="faq-a" id="faq-a-${f.id}"><strong style="color:var(--jade)">答 ·</strong> ${escapeHtml(f.answer)}</div>
+      </div>`).join('');
+  },
+  toggleFaq(id){ document.getElementById('faq-a-'+id).classList.toggle('open'); },
+  openFaqForm(editId){
+    if(!state.isAdmin) return;
+    const existing = editId ? state.data.faq.find(f=>f.id===editId) : null;
+    const toolbarEl = document.getElementById('faq-toolbar');
+    let form = document.getElementById('faq-form');
+    if(form) form.remove();
+    form = document.createElement('div');
+    form.className='form-box'; form.id='faq-form';
+    form.innerHTML = `
+      <label>질문</label>
+      <input type="text" id="faq-f-q" value="${existing?escapeHtml(existing.question):''}" maxlength="150">
+      <label>답변</label>
+      <textarea id="faq-f-a" maxlength="1000">${existing?escapeHtml(existing.answer):''}</textarea>
+      <div class="form-actions">
+        <button class="btn" onclick="app.saveFaq(${existing?`'${existing.id}'`:'null'})">${existing?'수정 완료':'등록'}</button>
+        <button class="btn ghost" onclick="document.getElementById('faq-form').remove()">취소</button>
+      </div>`;
+    toolbarEl.insertAdjacentElement('afterend', form);
+    document.getElementById('faq-f-q').focus();
+  },
+  async saveFaq(editId){
+    const q = document.getElementById('faq-f-q').value.trim();
+    const a = document.getElementById('faq-f-a').value.trim();
+    if(!q || !a){ showToast('질문과 답변을 입력해주세요'); return; }
+    if(editId){ const item = state.data.faq.find(f=>f.id===editId); item.question=q; item.answer=a; }
+    else{ state.data.faq.push({id:uid(), question:q, answer:a}); }
+    await saveBoard('faq');
+    const f=document.getElementById('faq-form'); if(f) f.remove();
+    showToast(editId?'수정되었습니다':'등록되었습니다');
+    this.renderFaq();
+  },
+  async deleteFaq(id){
+    if(!state.isAdmin) return;
+    if(!confirm('이 FAQ를 삭제하시겠습니까?')) return;
+    state.data.faq = state.data.faq.filter(f=>f.id!==id);
+    await saveBoard('faq');
+    showToast('삭제되었습니다');
+    this.renderFaq();
+  },
+
+  /* ---------- guestbook ---------- */
+  renderGuestbook(){
+    const listEl = document.getElementById('guestbook-list');
+    const items = state.data.guestbook.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    if(items.length===0){ listEl.innerHTML = `<div class="empty-note">아직 방명록이 없습니다. 첫 인사를 남겨보세요!</div>`; return; }
+    listEl.innerHTML = items.map(g => `
+      <div class="gb-entry">
+        <div>
+          <span class="gb-author">${escapeHtml(g.author)}</span><span class="gb-date">${escapeHtml(g.date)}</span>
+          <div class="gb-text">${escapeHtml(g.text)}</div>
+        </div>
+        ${state.isAdmin ? `<button class="btn danger small" onclick="app.deleteGuestbook('${g.id}')">삭제</button>` : ''}
+      </div>`).join('');
+  },
+  async submitGuestbook(){
+    const authorEl = document.getElementById('gbAuthor');
+    const textEl = document.getElementById('gbText');
+    const author = authorEl.value.trim() || '익명';
+    const text = textEl.value.trim();
+    if(!text){ showToast('메시지를 입력해주세요'); return; }
+    state.data.guestbook.unshift({id:uid(), author, text, date:todayStr()});
+    await saveBoard('guestbook');
+    authorEl.value=''; textEl.value='';
+    showToast('방명록에 등록되었습니다');
+    this.renderGuestbook();
+  },
+  async deleteGuestbook(id){
+    if(!state.isAdmin) return;
+    if(!confirm('이 글을 삭제하시겠습니까?')) return;
+    state.data.guestbook = state.data.guestbook.filter(g=>g.id!==id);
+    await saveBoard('guestbook');
+    showToast('삭제되었습니다');
+    this.renderGuestbook();
+  },
+
+  /* ---------- sheets (악보) ---------- */
+  setSheetTab(tab){
+    state.sheetTab = tab;
+    document.getElementById('subtab-dl').classList.toggle('active', tab==='dl');
+    document.getElementById('subtab-make').classList.toggle('active', tab==='make');
+    document.getElementById('sheets-dl-view').style.display = tab==='dl' ? '' : 'none';
+    document.getElementById('sheets-make-view').style.display = tab==='make' ? '' : 'none';
+    state.detail.sheets = null; state.detail.sheetmake = null;
+    this.renderSheets(); this.renderSheetMake();
+  },
+  renderSheetTabs(){
+    document.getElementById('subtab-dl').classList.toggle('active', state.sheetTab==='dl');
+    document.getElementById('subtab-make').classList.toggle('active', state.sheetTab==='make');
+    document.getElementById('sheets-dl-view').style.display = state.sheetTab==='dl' ? '' : 'none';
+    document.getElementById('sheets-make-view').style.display = state.sheetTab==='make' ? '' : 'none';
+  },
+
+  setSheetCategory(cat){
+    state.sheetCategory = cat;
+    document.querySelectorAll('#sheetCategoryFilter .cat-btn').forEach(b=>{
+      b.classList.toggle('active', b.dataset.cat === cat);
+    });
+    this.renderSheets();
+  },
+
+  canWriteMemberSheet(){ return !!state.currentUser; },
+  canWriteOfficialSheet(){ return !!(state.currentUser && state.currentUser.email === ADMIN_EMAIL); },
+
+  renderSheets(){
+    const toolbarEl = document.getElementById('sheets-toolbar');
+    const canOfficial = this.canWriteOfficialSheet();
+    const canMember = this.canWriteMemberSheet();
+    let toolbarHtml = '';
+    if(canMember || canOfficial){
+      toolbarHtml = `<button class="btn" onclick="app.openSheetForm()">+ 악보 올리기</button>`;
+    }else{
+      toolbarHtml = `<span class="field-hint" style="margin:0;">악보를 올리려면 로그인이 필요합니다</span>`;
+    }
+    toolbarEl.innerHTML = toolbarHtml;
+
+    const listEl = document.getElementById('sheets-list');
+    const items = state.data.sheets.filter(s => state.sheetCategory==='전체' || s.category===state.sheetCategory);
+    listEl.innerHTML = items.length===0 ? `<div class="empty-note">등록된 악보가 없습니다</div>` :
+      items.map(s => `
+        <div class="post-row">
+          <div style="flex:1;cursor:pointer" onclick="app.openDetail('sheets','${s.id}')">
+            <div class="post-title">
+              <span class="badge ${s.category==='타로수 제작' ? 'official' : 'member'}">${escapeHtml(s.category)}</span>
+              ${escapeHtml(s.title)}
+            </div>
+            <div class="post-meta">${escapeHtml(s.songName || '')} · ${escapeHtml(s.authorNickname)} · ${escapeHtml(s.date)}</div>
+          </div>
+          ${(state.currentUser && state.currentUser.uid === s.authorUid) ? `
+            <div class="admin-row-actions">
+              <button class="btn danger small" onclick="event.stopPropagation();app.deleteSheet('${s.id}')">삭제</button>
+            </div>` : ''}
+        </div>`).join('');
+
+    const existingForm = document.getElementById('sheets-form');
+    if(existingForm) existingForm.remove();
+
+    const detailWrap = document.getElementById('sheets-detail-view');
+    const listWrap = document.getElementById('sheets-dl-list-view');
+    const filterBox = document.getElementById('sheetCategoryFilter');
+    const d = state.detail.sheets;
+    if(d){
+      const post = state.data.sheets.find(p=>p.id===d);
+      listWrap.style.display='none'; filterBox.style.display='none'; detailWrap.style.display='';
+      if(post){
+        detailWrap.innerHTML = `
+          <div class="back-link" onclick="app.closeDetail('sheets')">← 목록으로</div>
+          <div class="detail-view">
+            <span class="badge ${post.category==='타로수 제작' ? 'official' : 'member'}">${escapeHtml(post.category)}</span>
+            <h3 style="margin-top:8px;">${escapeHtml(post.title)}</h3>
+            <div class="post-meta">${escapeHtml(post.authorNickname)} · ${escapeHtml(post.date)}</div>
+            <div class="sheet-fields" style="margin-bottom:16px; font-size:14px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif;">
+              <div>곡명: ${escapeHtml(post.songName || '-')}</div>
+              <div>가수/작곡가: ${escapeHtml(post.artistName || '-')}</div>
+            </div>
+            <div class="detail-body">${escapeHtml(post.content)}</div>
+            ${post.link ? `<a class="dl-link" href="${escapeHtml(post.link)}" target="_blank" rel="noopener">악보 링크 열기 ↗</a>` : ''}
+          </div>`;
+      }
+    }else{
+      listWrap.style.display=''; filterBox.style.display=''; detailWrap.style.display='none'; detailWrap.innerHTML='';
+    }
+  },
+
+  openSheetForm(){
+    const canOfficial = this.canWriteOfficialSheet();
+    const canMember = this.canWriteMemberSheet();
+    if(!canOfficial && !canMember){ showToast('로그인 후 이용해주세요'); return; }
+
+    const toolbarEl = document.getElementById('sheets-toolbar');
+    let form = document.getElementById('sheets-form');
+    if(form) form.remove();
+    form = document.createElement('div');
+    form.className = 'form-box';
+    form.id = 'sheets-form';
+    form.innerHTML = `
+      ${canOfficial ? `
+        <label>카테고리</label>
+        <select id="sf-category" style="width:100%; padding:10px 12px; border:1px solid var(--paper-deep); font-family:'Gowun Batang',serif; font-size:14.5px;">
+          <option value="회원 제작">회원 제작</option>
+          <option value="타로수 제작">타로수 제작</option>
+        </select>` : ''}
+      <label>제목</label>
+      <input type="text" id="sf-title" maxlength="100">
+      <div class="sheet-fields">
+        <div><label>곡명</label><input type="text" id="sf-song" maxlength="80"></div>
+        <div><label>가수 및 작곡가</label><input type="text" id="sf-artist" maxlength="80"></div>
+      </div>
+      <label>내용</label>
+      <textarea id="sf-content" maxlength="2000" placeholder="악보에 대한 설명을 적어주세요"></textarea>
+      <label>악보 링크 (URL)</label>
+      <input type="text" id="sf-link" placeholder="https://drive.google.com/... 등 PDF가 있는 주소">
+      <div class="field-hint">구글 드라이브, 원드라이브 등에 PDF를 올린 뒤 공유 링크를 붙여넣어주세요 (선택 입력)</div>
+      <div class="form-actions">
+        <button class="btn" onclick="app.saveSheet()">등록</button>
+        <button class="btn ghost" onclick="document.getElementById('sheets-form').remove()">취소</button>
+      </div>`;
+    toolbarEl.insertAdjacentElement('afterend', form);
+    document.getElementById('sf-title').focus();
+  },
+
+  async saveSheet(){
+    if(!state.currentUser){ showToast('로그인 후 이용해주세요'); return; }
+    const catEl = document.getElementById('sf-category');
+    const category = catEl ? catEl.value : '회원 제작';
+    if(category==='타로수 제작' && !this.canWriteOfficialSheet()){ showToast('타로수 제작 카테고리는 관리자 계정만 등록할 수 있습니다'); return; }
+
+    const title = document.getElementById('sf-title').value.trim();
+    const songName = document.getElementById('sf-song').value.trim();
+    const artistName = document.getElementById('sf-artist').value.trim();
+    const content = document.getElementById('sf-content').value.trim();
+    const link = document.getElementById('sf-link').value.trim();
+
+    if(!title || !content){ showToast('제목과 내용을 입력해주세요'); return; }
+
+    const saveBtn = event.target;
+    saveBtn.disabled = true; saveBtn.textContent = '등록 중...';
+    try{
+      const docData = {
+        title, content, songName, artistName, category, link,
+        authorUid: state.currentUser.uid,
+        authorNickname: state.currentUser.nickname,
+        date: todayStr()
+      };
+      await db.collection('sheets').add(docData);
+      await loadSheets();
+      const f = document.getElementById('sheets-form'); if(f) f.remove();
+      showToast('악보가 등록되었습니다');
+      this.renderSheets();
+    }catch(e){
+      console.error(e);
+      showToast('등록에 실패했습니다: ' + (e.message || '오류'));
+      saveBtn.disabled = false; saveBtn.textContent = '등록';
+    }
+  },
+
+  async deleteSheet(id){
+    if(!state.currentUser) return;
+    if(!confirm('이 악보를 삭제하시겠습니까?')) return;
+    try{
+      await db.collection('sheets').doc(id).delete();
+      await loadSheets();
+      showToast('삭제되었습니다');
+      this.renderSheets();
+    }catch(e){
+      console.error(e);
+      showToast('삭제에 실패했습니다 (권한을 확인해주세요)');
+    }
+  },
+
+  /* ---------- sheet-make board (관리자 전용, notice와 동일 패턴) ---------- */
+  renderSheetMake(){
+    const listEl = document.getElementById('sheetmake-list');
+    const toolbarEl = document.getElementById('sheetmake-toolbar');
+    toolbarEl.innerHTML = state.isAdmin ? `<button class="btn" onclick="app.openSheetMakeForm()">+ 새 글 작성</button>` : '';
+
+    const items = state.data.sheetmake.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    listEl.innerHTML = items.length===0 ? `<div class="empty-note">등록된 글이 없습니다</div>` :
+      items.map(p => `
+        <div class="post-row">
+          <div style="flex:1;cursor:pointer" onclick="app.openDetail('sheetmake','${p.id}')">
+            <div class="post-title">${escapeHtml(p.title)}</div>
+            <div class="post-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</div>
+          </div>
+          ${state.isAdmin ? `
+            <div class="admin-row-actions">
+              <button class="btn ghost small" onclick="event.stopPropagation();app.openSheetMakeForm('${p.id}')">수정</button>
+              <button class="btn danger small" onclick="event.stopPropagation();app.deletePost('sheetmake','${p.id}')">삭제</button>
+            </div>` : ''}
+        </div>`).join('');
+
+    const existingForm = document.getElementById('sheetmake-form');
+    if(existingForm) existingForm.remove();
+
+    const detailWrap = document.getElementById('sheetmake-detail-view');
+    const listWrap = document.getElementById('sheetmake-list-view');
+    const d = state.detail.sheetmake;
+    if(d){
+      const post = state.data.sheetmake.find(p=>p.id===d);
+      listWrap.style.display='none'; detailWrap.style.display='';
+      if(post){
+        detailWrap.innerHTML = `
+          <div class="back-link" onclick="app.closeDetail('sheetmake')">← 목록으로</div>
+          <div class="detail-view">
+            <h3>${escapeHtml(post.title)}</h3>
+            <div class="post-meta">${escapeHtml(post.author)} · ${escapeHtml(post.date)}</div>
+            <div class="detail-body">${escapeHtml(post.content)}</div>
+          </div>`;
+      }
+    }else{
+      listWrap.style.display=''; detailWrap.style.display='none'; detailWrap.innerHTML='';
+    }
+  },
+  openSheetMakeForm(editId){
+    if(!state.isAdmin) return;
+    const existing = editId ? state.data.sheetmake.find(p=>p.id===editId) : null;
+    const toolbarEl = document.getElementById('sheetmake-toolbar');
+    let form = document.getElementById('sheetmake-form');
+    if(form) form.remove();
+    form = document.createElement('div');
+    form.className = 'form-box'; form.id = 'sheetmake-form';
+    form.innerHTML = `
+      <label>제목</label>
+      <input type="text" id="sm-f-title" value="${existing?escapeHtml(existing.title):''}" maxlength="100">
+      <label>내용</label>
+      <textarea id="sm-f-content" maxlength="3000">${existing?escapeHtml(existing.content):''}</textarea>
+      <div class="form-actions">
+        <button class="btn" onclick="app.saveSheetMake(${existing?`'${existing.id}'`:'null'})">${existing?'수정 완료':'등록'}</button>
+        <button class="btn ghost" onclick="document.getElementById('sheetmake-form').remove()">취소</button>
+      </div>`;
+    toolbarEl.insertAdjacentElement('afterend', form);
+    document.getElementById('sm-f-title').focus();
+  },
+  async saveSheetMake(editId){
+    const title = document.getElementById('sm-f-title').value.trim();
+    const content = document.getElementById('sm-f-content').value.trim();
+    if(!title || !content){ showToast('제목과 내용을 입력해주세요'); return; }
+    if(editId){
+      const post = state.data.sheetmake.find(p=>p.id===editId);
+      post.title = title; post.content = content;
+    }else{
+      state.data.sheetmake.unshift({ id: uid(), title, content, author:'관리자', date: todayStr() });
+    }
+    await saveBoard('sheetmake');
+    const f = document.getElementById('sheetmake-form'); if(f) f.remove();
+    showToast(editId ? '수정되었습니다' : '등록되었습니다');
+    this.renderSheetMake();
+  }
+};
+
+document.getElementById('adminModal').addEventListener('click', (e)=>{ if(e.target.id==='adminModal') app.closeAdminModal(); });
+document.getElementById('signupModal').addEventListener('click', (e)=>{ if(e.target.id==='signupModal') app.closeSignupModal(); });
+document.getElementById('loginModal').addEventListener('click', (e)=>{ if(e.target.id==='loginModal') app.closeLoginModal(); });
+document.getElementById('adminPwInput')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') app.tryAdminLogin(); });
+document.getElementById('liPassword')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') app.submitLogin(); });
+
+app.init();
+</script>
+
+</html>

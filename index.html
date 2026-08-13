@@ -350,7 +350,6 @@ footer{
       <button class="pill" onclick="app.openLoginModal()">로그인</button>
       <button class="pill solid" onclick="app.openSignupModal()">회원가입</button>
     </div>
-    <button class="admin-pill" id="adminPill" onclick="app.onAdminPillClick()">관리자 로그인</button>
   </div>
 </header>
 
@@ -472,8 +471,11 @@ footer{
 </main>
 
 <footer>
-  © 묵현당 墨絃堂 · 이 사이트의 게시물은 관리자만 작성할 수 있으며, 방명록은 누구나 남기실 수 있습니다.
+  © 타로당 芋頭堂 · 이 사이트의 게시물은 관리자만 작성할 수 있으며, 방명록은 누구나 남기실 수 있습니다.
 </footer>
+
+<!-- 관리자 로그인 숨김 트리거: 화면 왼쪽 하단을 Ctrl(또는 Cmd)을 누른 채 5번 클릭 -->
+<div id="adminHotspot" aria-hidden="true" style="position:fixed; left:0; bottom:0; width:48px; height:48px; z-index:40;"></div>
 
 <!-- admin login modal -->
 <div class="modal-overlay" id="adminModal">
@@ -485,6 +487,18 @@ footer{
     <div class="modal-actions">
       <button class="btn ghost" onclick="app.closeAdminModal()">취소</button>
       <button class="btn" onclick="app.tryAdminLogin()">로그인</button>
+    </div>
+  </div>
+</div>
+
+<!-- 관리자 계정 등록 확인 모달 -->
+<div class="modal-overlay" id="adminRegisterModal">
+  <div class="modal-box">
+    <h3>관리자로 등록</h3>
+    <p class="sub">이 계정을 관리자로 등록하시겠습니까?</p>
+    <div class="modal-actions">
+      <button class="btn ghost" onclick="app.declineAdminRegister()">아니오</button>
+      <button class="btn" onclick="app.confirmAdminRegister()">예</button>
     </div>
   </div>
 </div>
@@ -571,14 +585,14 @@ const ADMIN_PW = "YUtou0808"; // 관리자 로그인(위 게시판 전용) 비�
 
 // '악보 > 악보 다운로드'에서 '타로수 제작' 카테고리로 글을 올릴 수 있는 계정의 이메일입니다.
 // 본인이 회원가입할 이메일 주소로 바꿔주세요. Firestore 규칙에도 동일하게 넣어야 합니다.
-const ADMIN_EMAIL = "tarosu.ooa@gmail.com";
+const ADMIN_EMAIL = "YOUR_ADMIN_EMAIL@example.com";
 
 /* =====================================================================
    ▼▼▼ Google Apps Script 설정 (회원가입 인증번호 이메일 발송용, 무료) ▼▼▼
    본인 구글 계정으로 Apps Script를 만들어 웹 앱으로 배포한 뒤,
    그 배포 URL을 아래에 붙여넣어 주세요. (자세한 방법은 채팅 안내 참고)
    ===================================================================== */
-const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxBYwITDr719_F6jP5oBdQfnyb45rVXrxPCaZgroX1uGJ0vYygFFj9GwfDqRDW1LnU1/exec";
+const GAS_WEB_APP_URL = "YOUR_APPS_SCRIPT_WEB_APP_URL";
 const GAS_CONFIGURED = GAS_WEB_APP_URL !== "YOUR_APPS_SCRIPT_WEB_APP_URL";
 
 const FIREBASE_CONFIGURED = firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY";
@@ -719,11 +733,15 @@ const app = {
       auth.onAuthStateChanged(async (user)=>{
         if(user){
           let nickname = user.displayName || '회원';
+          let isAdminAccount = false;
           try{
             const udoc = await db.collection('users').doc(user.uid).get();
-            if(udoc.exists && udoc.data().nickname) nickname = udoc.data().nickname;
+            if(udoc.exists){
+              if(udoc.data().nickname) nickname = udoc.data().nickname;
+              isAdminAccount = !!udoc.data().isAdmin;
+            }
           }catch(e){}
-          state.currentUser = { uid: user.uid, email: user.email, nickname };
+          state.currentUser = { uid: user.uid, email: user.email, nickname, isAdmin: isAdminAccount };
         }else{
           state.currentUser = null;
         }
@@ -782,12 +800,11 @@ const app = {
     this.renderSheetTabs();
     this.renderSheets();
     this.renderSheetMake();
-    this.updateAdminPill();
     this.updateAuthArea();
   },
 
   /* ---------- admin (legacy password gate for notice/download/faq/inquiry/sheetmake) ---------- */
-  onAdminPillClick(){
+  onAdminHotspotTrigger(){
     if(state.isAdmin){
       state.isAdmin = false;
       showToast('관리자 로그아웃 되었습니다');
@@ -800,21 +817,36 @@ const app = {
     }
   },
   closeAdminModal(){ document.getElementById('adminModal').classList.remove('show'); },
-  tryAdminLogin(){
+  async tryAdminLogin(){
     const val = document.getElementById('adminPwInput').value;
     if(val === ADMIN_PW){
       state.isAdmin = true;
       this.closeAdminModal();
       showToast('관리자로 로그인되었습니다');
       this.renderAll();
+      // 로그인된 회원 계정이 있고 아직 관리자로 등록되지 않았다면 등록 여부를 묻는다
+      if(state.currentUser && !state.currentUser.isAdmin){
+        document.getElementById('adminRegisterModal').classList.add('show');
+      }
     }else{
       document.getElementById('adminErr').textContent = '비밀번호가 올바르지 않습니다';
     }
   },
-  updateAdminPill(){
-    const pill = document.getElementById('adminPill');
-    if(state.isAdmin){ pill.textContent = '관리자 (로그아웃)'; pill.classList.add('on'); }
-    else{ pill.textContent = '관리자 로그인'; pill.classList.remove('on'); }
+  declineAdminRegister(){
+    document.getElementById('adminRegisterModal').classList.remove('show');
+  },
+  async confirmAdminRegister(){
+    if(!state.currentUser || !db) return;
+    try{
+      await db.collection('users').doc(state.currentUser.uid).set({ isAdmin: true }, { merge: true });
+      state.currentUser.isAdmin = true;
+      document.getElementById('adminRegisterModal').classList.remove('show');
+      showToast('관리자 계정으로 등록되었습니다');
+      this.updateAuthArea();
+    }catch(e){
+      console.error(e);
+      showToast('관리자 등록에 실패했습니다');
+    }
   },
 
   /* ---------- member auth (Firebase Auth) ---------- */
@@ -822,7 +854,7 @@ const app = {
     const box = document.getElementById('authArea');
     if(state.currentUser){
       box.innerHTML = `
-        <span class="user-chip"><strong>${escapeHtml(state.currentUser.nickname)}</strong>님</span>
+        <span class="user-chip"><strong>${escapeHtml(state.currentUser.nickname)}</strong>님${state.currentUser.isAdmin ? ' <strong style="color:var(--wood)">(관리자)</strong>' : ''}</span>
         <button class="pill" onclick="app.logout()">로그아웃</button>`;
     }else{
       box.innerHTML = `
@@ -1414,6 +1446,23 @@ document.getElementById('signupModal').addEventListener('click', (e)=>{ if(e.tar
 document.getElementById('loginModal').addEventListener('click', (e)=>{ if(e.target.id==='loginModal') app.closeLoginModal(); });
 document.getElementById('adminPwInput')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') app.tryAdminLogin(); });
 document.getElementById('liPassword')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') app.submitLogin(); });
+
+// 관리자 로그인 숨김 트리거: 왼쪽 하단을 Ctrl(또는 Cmd)+클릭 5번
+(function(){
+  let hotspotCount = 0;
+  let hotspotTimer = null;
+  const hotspot = document.getElementById('adminHotspot');
+  hotspot.addEventListener('click', (e)=>{
+    if(!e.ctrlKey && !e.metaKey) return;
+    hotspotCount++;
+    clearTimeout(hotspotTimer);
+    hotspotTimer = setTimeout(()=>{ hotspotCount = 0; }, 3000);
+    if(hotspotCount >= 5){
+      hotspotCount = 0;
+      app.onAdminHotspotTrigger();
+    }
+  });
+})();
 
 app.init();
 </script>

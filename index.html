@@ -637,7 +637,6 @@ const firebaseConfig = {
 
 const ADMIN_TOKEN = "tarodang-secure-token-2026";
 const ADMIN_PW = "YUtou0808";
-const ADMIN_EMAIL = "tarosu.ooa@gmail.com";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxBYwITDr719_F6jP5oBdQfnyb45rVXrxPCaZgroX1uGJ0vYygFFj9GwfDqRDW1LnU1/exec";
 const GAS_CONFIGURED = GAS_WEB_APP_URL !== "YOUR_APPS_SCRIPT_WEB_APP_URL";
 
@@ -1496,15 +1495,12 @@ const app = {
     pushNavState();
   },
 
-  canWriteMemberSheet(){ return !!state.currentUser; },
-  canWriteOfficialSheet(){ return !!(state.currentUser && state.currentUser.email === ADMIN_EMAIL); },
+  canWriteSheet(){ return !!state.currentUser; },
 
   renderSheets(){
     const toolbarEl = document.getElementById('sheets-toolbar');
-    const canOfficial = this.canWriteOfficialSheet();
-    const canMember = this.canWriteMemberSheet();
     let toolbarHtml = '';
-    if(canMember || canOfficial){
+    if(this.canWriteSheet()){
       toolbarHtml = `<button class="btn" onclick="app.openSheetForm()">+ 악보 올리기</button>`;
     }else{
       toolbarHtml = `<span class="field-hint" style="margin:0;">악보를 올리려면 로그인이 필요합니다</span>`;
@@ -1560,9 +1556,7 @@ const app = {
   },
 
   openSheetForm(){
-    const canOfficial = this.canWriteOfficialSheet();
-    const canMember = this.canWriteMemberSheet();
-    if(!canOfficial && !canMember){ showToast('로그인 후 이용해주세요'); return; }
+    if(!this.canWriteSheet()){ showToast('로그인 후 이용해주세요'); return; }
 
     const toolbarEl = document.getElementById('sheets-toolbar');
     let form = document.getElementById('sheets-form');
@@ -1571,16 +1565,6 @@ const app = {
     form.className = 'form-box';
     form.id = 'sheets-form';
     form.innerHTML = `
-      ${canOfficial ? `
-        <label>카테고리</label>
-        <div style="display:flex; gap:20px; padding:4px 0 4px;">
-          <label style="display:flex; align-items:center; gap:6px; font-size:14px; font-family:'Noto Sans KR',sans-serif; cursor:pointer;">
-            <input type="checkbox" id="sf-cat-admin" checked onchange="app.syncSheetCategoryCheckbox('admin')"> 관리자 제작
-          </label>
-          <label style="display:flex; align-items:center; gap:6px; font-size:14px; font-family:'Noto Sans KR',sans-serif; cursor:pointer;">
-            <input type="checkbox" id="sf-cat-member" onchange="app.syncSheetCategoryCheckbox('member')"> 회원 제작
-          </label>
-        </div>` : ''}
       <label>제목</label>
       <input type="text" id="sf-title" maxlength="100">
       <div class="sheet-fields">
@@ -1601,22 +1585,10 @@ const app = {
     document.getElementById('sf-title').focus();
   },
 
-  syncSheetCategoryCheckbox(which){
-    const adminBox = document.getElementById('sf-cat-admin');
-    const memberBox = document.getElementById('sf-cat-member');
-    if(!adminBox || !memberBox) return;
-    if(which === 'admin' && adminBox.checked) memberBox.checked = false;
-    if(which === 'member' && memberBox.checked) adminBox.checked = false;
-    if(!adminBox.checked && !memberBox.checked){
-      if(which === 'admin') memberBox.checked = true; else adminBox.checked = true;
-    }
-  },
-
   async saveSheet(){
     if(!state.currentUser){ showToast('로그인 후 이용해주세요'); return; }
-    const adminBox = document.getElementById('sf-cat-admin');
-    const category = (adminBox && adminBox.checked) ? '관리자 제작' : '회원 제작';
-    if(category==='관리자 제작' && !this.canWriteOfficialSheet()){ showToast('관리자 제작 카테고리는 관리자 계정만 등록할 수 있습니다'); return; }
+    // 글쓴이 계정이 관리자인지 여부로 카테고리(배지)가 자동으로 정해집니다.
+    const category = state.currentUser.isAdmin ? '관리자 제작' : '회원 제작';
 
     const title = document.getElementById('sf-title').value.trim();
     const songName = document.getElementById('sf-song').value.trim();

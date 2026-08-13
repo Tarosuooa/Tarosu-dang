@@ -685,7 +685,26 @@ footer{
       <button class="btn ghost" onclick="app.closeLoginModal()">취소</button>
       <button class="btn" onclick="app.submitLogin()">로그인</button>
     </div>
+    <div class="switch-link">
+      <a onclick="app.openForgotPasswordModal()">비밀번호를 잊으셨나요?</a>
+    </div>
     <div class="switch-link">계정이 없으신가요? <a onclick="app.closeLoginModal(); app.openSignupModal()">회원가입</a></div>
+  </div>
+</div>
+
+<!-- 비밀번호 찾기 모달 -->
+<div class="modal-overlay" id="forgotPasswordModal">
+  <div class="modal-box wide">
+    <h3>비밀번호 찾기</h3>
+    <p class="sub">가입하신 이메일 주소를 입력하시면<br>비밀번호 재설정 링크를 보내드려요.<br><strong style="color:var(--danger)">메일이 안 보이면 스팸함도 꼭 확인해주세요!</strong></p>
+    <label>이메일</label>
+    <input type="text" id="fpEmail" placeholder="you@example.com">
+    <div class="modal-err" id="fpErr" style="height:auto; margin-top:10px;"></div>
+    <div class="modal-actions" style="margin-top:8px;">
+      <button class="btn ghost" onclick="app.closeForgotPasswordModal()">취소</button>
+      <button class="btn" id="fpSendBtn" onclick="app.submitForgotPassword()">재설정 링크 보내기</button>
+    </div>
+    <div class="switch-link">비밀번호가 기억나셨나요? <a onclick="app.closeForgotPasswordModal(); app.openLoginModal()">로그인</a></div>
   </div>
 </div>
 
@@ -1603,6 +1622,37 @@ const app = {
     }
   },
 
+  openForgotPasswordModal(){
+    const emailFromLogin = document.getElementById('liEmail').value.trim();
+    this.closeLoginModal();
+    document.getElementById('forgotPasswordModal').classList.add('show');
+    document.getElementById('fpEmail').value = emailFromLogin;
+    document.getElementById('fpErr').textContent = '';
+  },
+  closeForgotPasswordModal(){ document.getElementById('forgotPasswordModal').classList.remove('show'); },
+  async submitForgotPassword(){
+    if(!auth){ showToast('Firebase가 설정되지 않았습니다'); return; }
+    const email = document.getElementById('fpEmail').value.trim();
+    const errEl = document.getElementById('fpErr');
+    errEl.textContent = '';
+    if(!validEmail(email)){ errEl.textContent = '올바른 이메일 주소를 입력해주세요'; return; }
+
+    const btn = document.getElementById('fpSendBtn');
+    btn.disabled = true; btn.textContent = '전송 중...';
+    try{
+      await auth.sendPasswordResetEmail(email);
+      this.closeForgotPasswordModal();
+      showToast('비밀번호 재설정 이메일을 보냈어요. 받은편지함(스팸함도 확인해주세요!)을 확인해주세요');
+    }catch(e){
+      console.error(e);
+      if(e.code === 'auth/user-not-found') errEl.textContent = '가입되지 않은 이메일이에요';
+      else if(e.code === 'auth/invalid-email') errEl.textContent = '올바른 이메일 주소를 입력해주세요';
+      else if(e.code === 'auth/too-many-requests') errEl.textContent = '요청이 너무 많아요. 잠시 후 다시 시도해주세요';
+      else errEl.textContent = '이메일 전송에 실패했어요: ' + (e.message || '알 수 없는 오류');
+    }
+    btn.disabled = false; btn.textContent = '재설정 링크 보내기';
+  },
+
   openSignupModal(){
     document.getElementById('signupModal').classList.add('show');
     ['suNickname','suEmail','suCode','suPassword','suPassword2'].forEach(id=>document.getElementById(id).value='');
@@ -2406,6 +2456,7 @@ const app = {
 document.getElementById('adminModal').addEventListener('click', (e)=>{ if(e.target.id==='adminModal') app.closeAdminModal(); });
 document.getElementById('signupModal').addEventListener('click', (e)=>{ if(e.target.id==='signupModal') app.closeSignupModal(); });
 document.getElementById('loginModal').addEventListener('click', (e)=>{ if(e.target.id==='loginModal') app.closeLoginModal(); });
+document.getElementById('forgotPasswordModal').addEventListener('click', (e)=>{ if(e.target.id==='forgotPasswordModal') app.closeForgotPasswordModal(); });
 document.getElementById('adminPwInput')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') app.tryAdminLogin(); });
 document.getElementById('liPassword')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') app.submitLogin(); });
 

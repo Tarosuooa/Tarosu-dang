@@ -890,7 +890,7 @@
           <button id="infoBtn" title="사이트 정보">ⓘ info</button>
           <div id="infoPanel" class="command-list-panel" hidden>
             <div class="cmd-item">Site Admin: 타로수 Tarosu</div>
-            <div class="cmd-item">Contact: tarosu.ooa@gmail.com</div>
+            <div class="cmd-item">Contact: manyuanchunse@naver.com</div>
             <div class="cmd-item">Version: 0.0.1</div>
           </div>
         </span>
@@ -3021,7 +3021,9 @@
     } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){
       e.preventDefault(); saveScoreFile();
     } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p'){
-      e.preventDefault(); window.print();
+      e.preventDefault();
+      if(!isLoggedIn){ alert('로그인 상태에서만 가능합니다'); }
+      else window.print();
     } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r'){
       e.preventDefault(); openRecordModal();
     } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l'){
@@ -3067,7 +3069,22 @@
   });
 
   // ---------- Export / Save / Load ----------
-  document.getElementById('printBtn').addEventListener('click', () => window.print());
+  // 부모 사이트(타로당)로부터 로그인 상태를 전달받습니다.
+  // URL 파라미터(?loggedin=1)로 초기 상태를 받고, postMessage로 이후 변경사항도 반영합니다.
+  let isLoggedIn = new URLSearchParams(window.location.search).get('loggedin') === '1';
+  window.addEventListener('message', (e) => {
+    if(e.data && e.data.type === 'auth'){
+      isLoggedIn = !!e.data.loggedIn;
+    }
+  });
+
+  document.getElementById('printBtn').addEventListener('click', () => {
+    if(!isLoggedIn){
+      alert('로그인 상태에서만 가능합니다');
+      return;
+    }
+    window.print();
+  });
 
   async function saveScoreFile(){
     syncActiveVoiceStorage();

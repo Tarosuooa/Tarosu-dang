@@ -1,0 +1,3265 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>숫자 악보 만들기</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --tb-h: 0px;
+    --paper: #EEF2ED;
+    --paper-line: #C9D6CC;
+    --card: #F7F9F5;
+    --ink: #1F3A34;
+    --ink-soft: #587065;
+    --ink-faint: #92A69C;
+    --accent: #B23A2E;
+    --accent-soft: #E3B4AC;
+    --gold: #C89B3C;
+    --header-bg: #1F3A34;
+    --header-text: #EEF2ED;
+    --header-text-faint: rgba(238,242,237,0.4);
+    --radius: 3px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: #DCE3DA;
+    color: var(--ink);
+    font-family: 'Noto Sans KR', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app{
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 28px 20px 60px;
+  }
+
+  /* ---------- Header ---------- */
+  .titleblock{
+    position: relative;
+    background: var(--header-bg);
+    color: var(--header-text);
+    border-radius: 10px 10px 0 0;
+    padding: 26px 30px 22px;
+  }
+  .contact-tag{
+    position: absolute;
+    top: 14px;
+    right: 20px;
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--header-text-faint);
+  }
+  h1#titleInput{
+    font-family: 'Nanum Myeongjo', serif;
+    font-weight: 800;
+    font-size: 34px;
+    margin: 0 0 10px;
+    outline: none;
+    line-height: 1.25;
+    border-bottom: 1px dashed transparent;
+  }
+  h1#titleInput:hover, h1#titleInput:focus{
+    border-bottom-color: rgba(238,242,237,0.35);
+  }
+  .credit-row{
+    display:flex;
+    margin-bottom: 14px;
+  }
+  .credit-input{
+    background: transparent;
+    border: none;
+    color: var(--header-text);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 12px;
+    padding: 2px 2px;
+    width: 220px;
+  }
+  .credit-input::placeholder{ color: var(--header-text-faint); }
+  .credit-input:focus{ outline:none; }
+  .subtitle-row{
+    display:flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    align-items:center;
+    font-size: 13px;
+    color: var(--header-text);
+    min-height: 32px;
+  }
+  .subtitle-row label{ margin-right:6px; }
+  .subtitle-row input{
+    background: rgba(238,242,237,0.1);
+    border: 1px solid rgba(238,242,237,0.35);
+    color: var(--header-text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    width: 64px;
+    text-align:center;
+  }
+  .subtitle-row input:focus{ outline: 2px solid var(--gold); }
+
+  /* ---------- Toolbar ---------- */
+  .toolbar{
+    background: var(--card);
+    border-left: 1px solid var(--paper-line);
+    border-right: 1px solid var(--paper-line);
+    padding: 16px 24px;
+    display:flex;
+    flex-wrap:wrap;
+    gap: 18px 26px;
+    align-items:flex-end;
+  }
+  .playback-bar{
+    border-top: 1px solid var(--paper-line);
+  }
+  .tool-group{
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .tool-group .group-label{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+  .tool-group .btn-row{ display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  button{
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 13px;
+    border: 1px solid var(--paper-line);
+    background: #fff;
+    color: var(--ink);
+    padding: 7px 11px;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all .12s ease;
+    line-height:1;
+  }
+  button:hover{ border-color: var(--ink-soft); }
+  button:active{ transform: translateY(1px); }
+  button:focus-visible{ outline: 2px solid var(--accent); outline-offset: 1px; }
+  button:disabled{ opacity: 0.4; cursor: not-allowed; }
+  button:disabled:hover{ border-color: var(--paper-line); }
+  .plus-emphasis{
+    display: inline-block;
+    transform: scale(1.5);
+  }
+  button.note-btn{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:600;
+    font-size:15px;
+    width: 34px;
+    text-align:center;
+    padding: 7px 0;
+  }
+  button.active{
+    background: var(--ink);
+    border-color: var(--ink);
+    color: #fff;
+  }
+  #dotToggle.active, #delBtn:active{ background: var(--accent); border-color: var(--accent); color:#fff; }
+  .octave-control{ display:flex; align-items:center; gap:8px; }
+  .command-input{
+    width: 170px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 7px 10px;
+    border: 1px solid var(--paper-line);
+    border-radius: var(--radius);
+    background: #fff;
+    color: var(--ink);
+  }
+  .command-input:focus{ outline: 2px solid var(--accent); outline-offset: 1px; }
+  .command-input-wrap{ position: relative; display: inline-block; }
+  .command-list-panel{
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 50;
+    background: #fff;
+    border: 1px solid var(--paper-line);
+    border-radius: 6px;
+    box-shadow: 0 8px 20px -8px rgba(31,58,52,0.35);
+    padding: 8px 0;
+    min-width: 320px;
+    max-width: 90vw;
+    max-height: 316px;
+    overflow-y: auto;
+  }
+  .lyrics-modal{
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 200;
+    max-height: none;
+  }
+  .record-modal{
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    background: rgba(20,25,22,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .record-modal[hidden]{ display: none; }
+  .record-panel{
+    background: #FBFCF9;
+    border-radius: 10px;
+    width: min(560px, 100%);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 50px -20px rgba(0,0,0,0.5);
+  }
+  .record-header{
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--paper-line);
+  }
+  .record-title{ font-weight: 700; color: var(--ink); flex: 1 1 auto; }
+  .record-volume{ display:flex; align-items:center; gap:4px; font-size:13px; }
+  .record-volume input[type="range"]{ width: 70px; }
+  .record-transpose{ font-size: 12px; color: var(--ink-soft); font-family: 'IBM Plex Mono', monospace; }
+  .record-close-btn{
+    background: transparent;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    color: var(--ink-soft);
+    padding: 2px 6px;
+  }
+  .record-close-btn:hover{ color: var(--accent); }
+  .guzheng-strings{
+    flex: 1 1 auto;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 14px 18px;
+  }
+  .guzheng-string-row{
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .guzheng-string-num{
+    width: 22px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+  }
+  .guzheng-degree-dots{
+    display: flex;
+    gap: 2px;
+  }
+  .guzheng-degree-dots span{
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .guzheng-degree-dots.below span{ background: #2E5FA3; }
+  .guzheng-degree-label{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+  }
+  .recorded-preview-list{
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    vertical-align: middle;
+  }
+  .recorded-symbol{
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--ink-soft);
+    align-self: center;
+  }
+  .recorded-item{
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+  }
+  .recorded-item:hover{ background: rgba(178,58,46,0.08); }
+  .recorded-item.selected{
+    background: rgba(200,155,60,0.25);
+    outline: 1px solid var(--gold);
+  }
+  .guzheng-degree-digit{
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--ink);
+    line-height: 1;
+  }
+  .guzheng-string-bar{
+    flex: 1 1 auto;
+    height: 10px;
+    border-radius: 5px;
+    background: linear-gradient(180deg, #E4C98A, #C89B3C);
+    cursor: pointer;
+    border: 1px solid rgba(31,58,52,0.15);
+  }
+  .guzheng-string-bar.degree-5{
+    background: linear-gradient(180deg, #6FBF8B, #2E7D4F);
+  }
+  .guzheng-string-bar:hover{ filter: brightness(1.08); }
+  .guzheng-string-bar:active, .guzheng-string-bar.playing{
+    background: linear-gradient(180deg, #B23A2E, #8C2C22);
+  }
+  .record-footer{
+    border-top: 1px solid var(--paper-line);
+    padding: 12px 18px;
+  }
+  .recorded-preview{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    color: var(--ink);
+    min-height: 18px;
+    margin-bottom: 10px;
+    word-break: break-all;
+  }
+  .record-footer-btns{ display: flex; gap: 8px; flex-wrap: wrap; }
+  .record-footer-btns button{
+    padding: 7px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--paper-line);
+    background: #fff;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  #recordConfirmBtn{ background: var(--ink); color: #fff; border-color: var(--ink); margin-left: auto; }
+  #recordConfirmBtn:hover{ background: var(--accent); border-color: var(--accent); }
+  .command-list-panel .cmd-item{
+    display: block;
+    padding: 6px 14px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink);
+    white-space: nowrap;
+    user-select: text;
+    cursor: text;
+  }
+  .command-list-panel .cmd-item:hover{ background: rgba(200,155,60,0.12); }
+  .command-list-panel .cmd-name{ font-weight: 700; color: var(--accent); }
+  .command-list-panel .cmd-desc{
+    font-family: 'Noto Sans KR', sans-serif;
+    color: var(--ink-soft);
+  }
+  .lyrics-panel-body{
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    white-space: normal;
+    cursor: default;
+    padding: 2px 14px 4px;
+  }
+  .lyrics-panel-desc{
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 11px;
+    color: var(--ink-soft);
+    line-height: 1.4;
+  }
+  .lyrics-panel-input{ width: 100%; box-sizing: border-box; }
+  .lyrics-panel-body:hover{ background: transparent; }
+  .volume-control{
+    display:flex;
+    align-items:center;
+    gap:4px;
+    font-size: 13px;
+  }
+  .volume-control input[type="range"]{
+    width: 80px;
+    accent-color: var(--gold);
+    cursor: pointer;
+  }
+  .speed-btn.active{
+    background: var(--ink);
+    border-color: var(--ink);
+    color: #fff;
+  }
+  .toolbar-toggle-btn{
+    flex: 1 1 100%;
+    text-align: left;
+    background: var(--paper);
+    border-color: var(--paper-line);
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .toolbar.collapsed .tool-group{ display: none; }
+  .color-btn{
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border-radius: 50%;
+    background: var(--sw);
+    border: 2px solid transparent;
+  }
+  .color-btn:hover{ border-color: var(--ink-soft); }
+  .color-btn.active{
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px #fff inset;
+  }
+  #octIndicator{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:700;
+    min-width: 26px;
+    text-align:center;
+    color: var(--accent);
+    font-size:14px;
+  }
+  /* ---------- Paper / pages (A4) ---------- */
+  .paper-wrap{
+    background: var(--paper);
+    border-left: 1px solid var(--paper-line);
+    border-right: 1px solid var(--paper-line);
+    padding: 30px;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+  .page{
+    width: 210mm;
+    aspect-ratio: 210 / 297;
+    max-width: 100%;
+    background: #FBFCF9;
+    border: 1px solid var(--paper-line);
+    border-radius: 6px;
+    padding: 26mm 14mm 12mm;
+    box-shadow: 0 1px 0 rgba(31,58,52,0.05), 0 12px 24px -18px rgba(31,58,52,0.4);
+    display:flex;
+    flex-direction:column;
+    box-sizing:border-box;
+  }
+  .page:first-child{ padding-top: 16mm; height: calc(297mm - var(--tb-h, 0px)); }
+  .page + .page{ margin-top: 26px; }
+  body.two-row-mode .page:first-child{ height: auto; }
+  .page-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    gap:14px;
+    padding-bottom: 8px;
+    margin-bottom: 16px;
+    white-space:nowrap;
+    overflow:hidden;
+  }
+  .page-header .ph-title{
+    font-family:'Nanum Myeongjo', serif;
+    font-weight:700;
+    font-size: 14px;
+    color: var(--ink);
+    overflow:hidden;
+    text-overflow:ellipsis;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .page-header .ph-meta{
+    font-family:'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--ink-faint);
+    flex-shrink:0;
+  }
+  .page-footer{
+    flex-shrink: 0;
+    text-align: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--ink-faint);
+    padding-top: 4px;
+  }
+  .page-canvas{
+    flex: 1 1 auto;
+    display:flex;
+    flex-wrap:wrap;
+    align-content:flex-start;
+    align-items:flex-start;
+    row-gap: 14px;
+    overflow:hidden;
+  }
+  .systems-wrap{
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  .grand-staff-group{
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .brace-svg{
+    flex: 0 0 16px;
+    width: 16px;
+    height: auto;
+    align-self: stretch;
+  }
+  .staff-wrap{
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 0;
+  }
+  .staff-wrap .page-canvas{ min-height: 62px; }
+  .lower-voice-canvas{
+    padding-top: 12px;
+  }
+  .mobile-key-input{
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: 0;
+    border: none;
+    opacity: 0;
+    pointer-events: none;
+    font-size: 16px; /* prevents iOS auto-zoom on focus */
+  }
+
+  .empty-hint{
+    color: var(--ink-faint);
+    font-size: 13px;
+    text-align:center;
+    margin: 20px auto;
+    width: 100%;
+  }
+
+  .cell{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    min-width: 30px;
+    padding: 0 4px;
+    cursor:pointer;
+    border-radius: 4px;
+    position:relative;
+  }
+  .cell:hover{ background: rgba(178,58,46,0.06); }
+  .cell.half-cell{
+    min-width: 15px;
+    padding: 0 2px;
+  }
+  .cell.half-cell .lyric-input{ width: 20px; }
+  .cell.half-cell .underlines{ width: 10px; }
+  .cell.selected{
+    background: rgba(200,155,60,0.15);
+    outline: 2px solid var(--gold);
+    outline-offset: -2px;
+    border-radius: 4px;
+  }
+  .cell.playing{
+    background: rgba(46,125,79,0.18);
+    outline: 2px solid #2E7D4F;
+    outline-offset: -2px;
+    border-radius: 4px;
+  }
+
+  .oct-row{ display:flex; gap:2px; height:8px; align-items:center; }
+  .oct-row-below{ position: relative; top: -4px; }
+  .oct-dot{ width:4px; height:4px; border-radius:50%; background: var(--accent); }
+  .oct-dot-below{ background: #2E5FA3; }
+
+  .digit-row{ display:flex; align-items:flex-start; position:relative; height: 30px; align-items:center; }
+  .accidental-mark{
+    position: absolute;
+    top: -3px;
+    right: -5px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--ink);
+    pointer-events: none;
+  }
+  .finger-mark{
+    position: absolute;
+    top: -3px;
+    left: -10px;
+    font-size: 9px;
+    font-weight: 900;
+    line-height: 1;
+    color: var(--ink);
+    -webkit-text-stroke: 0.4px currentColor;
+    text-stroke: 0.4px currentColor;
+    pointer-events: none;
+  }
+  .yaozhi-mark{
+    position: absolute;
+    bottom: 0;
+    left: -10px;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -2px;
+    color: var(--ink);
+    pointer-events: none;
+    transform: scaleY(0.6);
+    transform-origin: bottom left;
+  }
+  .accidental-mark.flat-mark{
+    -webkit-text-stroke: 0.6px currentColor;
+    text-stroke: 0.6px currentColor;
+  }
+  .digit{
+    font-family:'IBM Plex Mono', monospace;
+    font-weight:700;
+    font-size: 22px;
+    color: var(--ink);
+    min-width: 16px;
+    text-align:center;
+  }
+  .augment-dot{
+    width:4px; height:4px; border-radius:50%;
+    background: var(--ink);
+    align-self: flex-end;
+    margin: 0 0 6px 2px;
+  }
+
+  .underlines{ display:flex; flex-direction:column; gap:2px; width: 20px; margin-top:2px; position: relative; top: -3px; }
+  .underline{ height:2px; background: var(--ink); border-radius:1px; }
+
+  .chord-notes{
+    height: 0;
+    overflow: visible;
+    display: flex;
+    gap: 2px;
+    justify-content: center;
+    align-items: flex-start;
+    line-height: 1;
+    margin-top: -3px;
+    pointer-events: none;
+  }
+  .chord-notes span{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--ink-soft);
+  }
+
+  .lyric-input{
+    margin-top: 6px;
+    width: 44px;
+    border: none;
+    border-bottom: 1px solid transparent;
+    background: transparent;
+    text-align:center;
+    font-size: 11px;
+    font-family:'Noto Sans KR',sans-serif;
+    font-weight: 700;
+    color: var(--ink);
+    padding: 1px 3px;
+    border-radius: 3px;
+  }
+  .lyric-input:hover{ border-bottom-color: var(--ink-faint); }
+  .lyric-input:focus{
+    outline: 2px solid var(--gold);
+    outline-offset: 0;
+    border-bottom-color: transparent;
+    background: rgba(200,155,60,0.15);
+  }
+  .lyric-input.lyric-bold{ font-weight: 400; color: var(--ink-soft); }
+
+  .cell.bar-cell{ cursor:pointer; padding-top: 6px; }
+  .bar-line{ width:1.5px; height: 26px; background: var(--ink); margin-top: 0; }
+  .cell.bar-cell.selected .bar-line{ background: var(--gold); }
+
+  .cell.dash-cell .digit{ font-weight:400; }
+  .cell.bold-note .digit{ -webkit-text-stroke: 0.7px currentColor; text-stroke: 0.7px currentColor; }
+
+  .line-break{ flex-basis: 100%; height: 0; }
+
+  .fileLabel{
+    display:inline-flex;
+    align-items:center;
+    padding: 7px 11px;
+    border-radius: var(--radius);
+    font-size:13px;
+    cursor:pointer;
+  }
+  @media (max-width: 1024px){
+    .app{ padding: 16px 12px 40px; }
+    .titleblock{ padding: 18px 18px 16px; }
+    .contact-tag{ font-size: 9px; top: 10px; right: 14px; }
+    h1#titleInput{ font-size: 26px; margin-bottom: 8px; }
+    .credit-row{ margin-bottom: 10px; }
+    .credit-input{ width: 100%; max-width: 320px; }
+    .subtitle-row{ gap: 10px 14px; }
+    .toolbar{ padding: 12px; gap: 12px 16px; }
+    .tool-group .btn-row{ gap: 7px; }
+    button{ padding: 9px 12px; font-size: 13px; }
+    button.note-btn{ width: 38px; padding: 9px 0; font-size: 16px; }
+    .color-btn{ width: 30px; height: 30px; }
+    .paper-wrap{ padding: 16px; }
+    .page + .page{ margin-top: 18px; }
+    .brace-svg{ flex-basis: 13px; width: 13px; }
+    .systems-wrap{ gap: 18px; }
+    .staff-wrap{ gap: 8px; }
+    .lower-voice-canvas{ padding-top: 8px; }
+  }
+
+  @media (max-width: 640px){
+    .app{ padding: 10px 6px 32px; }
+    h1#titleInput{ font-size:22px; }
+    .toolbar{ padding:10px; gap:10px 14px; }
+    .paper-wrap{ padding:6px; }
+    .page{ width: 100%; aspect-ratio: auto; height: auto; }
+    .page:first-child{ height: auto; }
+    .credit-input{ max-width: none; }
+    .command-input{ width: 140px; }
+    .command-list-panel{ min-width: 0; width: 88vw; max-width: 340px; }
+    .cell{ min-width: 22px; padding: 0 2px; }
+    .cell.half-cell{ min-width: 11px; padding: 0 1px; }
+    .digit{ font-size: 17px; min-width: 13px; }
+    .digit-row{ height: 24px; }
+    .accidental-mark{ font-size: 9px; top: -2px; right: -3px; }
+    .finger-mark{ font-size: 7px; top: -2px; left: -7px; }
+    .yaozhi-mark{ font-size: 8px; bottom: 0; left: -7px; letter-spacing: -1.5px; transform: scaleY(0.6); transform-origin: bottom left; }
+    .oct-row{ height: 6px; }
+    .oct-dot{ width:3px; height:3px; }
+    .underlines{ width: 15px; top: -2px; }
+    .underline{ height: 1.5px; }
+    .augment-dot{ width:3px; height:3px; }
+    .bar-line{ height: 20px; }
+    .lyric-input{ width: 32px; font-size: 9px; }
+    .page-header .ph-title{ font-size: 12px; }
+    .page-header .ph-meta{ font-size: 9px; }
+    .page:first-child{ padding-top: 10mm; }
+    .page{ padding-left: 5mm; padding-right: 5mm; padding-bottom: 6mm; }
+    .page-canvas{ row-gap: 8px; }
+    .brace-svg{ flex-basis: 11px; width: 11px; }
+    .systems-wrap{ gap: 14px; }
+    .staff-wrap{ gap: 6px; }
+    .lower-voice-canvas{ padding-top: 6px; }
+    .staff-wrap .page-canvas{ min-height: 50px; }
+  }
+
+  @media (max-width: 400px){
+    .cell{ min-width: 19px; padding: 0 1.5px; }
+    .digit{ font-size: 15px; }
+    .lyric-input{ width: 26px; font-size: 8px; }
+    .page{ padding-left: 4mm; padding-right: 4mm; }
+  }
+
+  @media print{
+    *{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    body{ background:#fff; }
+    .app{ max-width:100%; padding:0; }
+    .toolbar, .page-header{ display:none; }
+    .titleblock{ border-radius:0; text-align:right; }
+    .titleblock .credit-row{ justify-content:flex-end; }
+    .titleblock .credit-input{ text-align:right; }
+    .contact-tag{ top: calc(var(--tb-sub-bottom, 100px) + 8px); }
+    .titleblock .subtitle-row{ justify-content:flex-end; }
+    .paper-wrap{ padding:0; border:none; background:#fff; display:block; }
+    #pagesContainer{ display:block; }
+    .page{
+      box-shadow:none;
+      border:none;
+      border-radius:0;
+      margin:0 auto;
+      page-break-after: always;
+      break-after: page;
+      width: 210mm;
+      height: 297mm;
+      aspect-ratio: auto;
+      max-width: none;
+    }
+    .page:first-child{ height: calc(297mm - var(--tb-h, 0px)); }
+    .page + .page{ margin-top:0; }
+    .page:last-child{ page-break-after: auto; }
+    @page{ size: A4; margin: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="titleblock">
+    <h1 id="titleInput" contenteditable="true" spellcheck="false">제목을 입력하세요</h1>
+    <div class="credit-row">
+      <input id="creditInput" placeholder="가수 / 작곡가" class="credit-input">
+    </div>
+    <div class="credit-row">
+      <input id="producerInput" placeholder="악보 작성자" class="credit-input">
+    </div>
+    <div class="subtitle-row" id="subtitleRow">
+      <span id="keyFieldWrap"><label for="keyInput">장조</label><input id="keyInput" value="D"></span>
+      <span id="timeFieldWrap"><label for="timeInput">박자</label><input id="timeInput" value="4/4"></span>
+      <span id="tempoFieldWrap"><label for="tempoInput">템포 ♩ =</label><input id="tempoInput" value="120"></span>
+    </div>
+    <span class="contact-tag" hidden>contact: manyuanchunse@naver.com</span>
+  </header>
+
+  <section class="toolbar collapsed" id="toolbar" role="toolbar" aria-label="악보 편집 도구">
+    <button id="toolbarToggleBtn" class="toolbar-toggle-btn" title="편집 도구 접기/펼치기">▼ 편집 도구 펼치기</button>
+
+    <div class="tool-group">
+      <span class="group-label">음 입력</span>
+      <div class="btn-row" id="noteButtons">
+        <button class="note-btn" data-note="1">1</button>
+        <button class="note-btn" data-note="2">2</button>
+        <button class="note-btn" data-note="3">3</button>
+        <button class="note-btn" data-note="4">4</button>
+        <button class="note-btn" data-note="5">5</button>
+        <button class="note-btn" data-note="6">6</button>
+        <button class="note-btn" data-note="7">7</button>
+        <button class="note-btn" data-note="rest" title="쉼표">0</button>
+      </div>
+    </div>
+
+    <div class="tool-group">
+      <span class="group-label">음표 길이</span>
+      <div class="btn-row" id="durButtons">
+        <button data-dur="1" title="온음표">온음</button>
+        <button data-dur="2" title="2분음표">2분</button>
+        <button data-dur="4" class="active" title="4분음표">4분</button>
+        <button data-dur="8" title="8분음표">8분</button>
+        <button data-dur="16" title="16분음표">16분</button>
+        <button id="dotToggle" title="점음표 (길이를 1.5배로)">．점음표</button>
+      </div>
+    </div>
+
+    <div class="tool-group">
+      <span class="group-label">옥타브</span>
+      <div class="btn-row octave-control">
+        <button id="octDown" title="옥타브 내림">▼</button>
+        <span id="octIndicator">0</span>
+        <button id="octUp" title="옥타브 올림">▲</button>
+        <button id="octReset" title="옥타브 기본값으로">초기화</button>
+      </div>
+    </div>
+
+    <div class="tool-group">
+      <span class="group-label">임시표</span>
+      <div class="btn-row">
+        <button id="sharpBtn" title="선택한 음에 샵(#) 적용 · 다시 누르면 해제 · F6">♯</button>
+        <button id="flatBtn" title="선택한 음에 플랫(b) 적용 · 다시 누르면 해제 · F7">♭</button>
+      </div>
+    </div>
+
+    <div class="tool-group">
+      <span class="group-label">색상</span>
+      <div class="btn-row" id="colorButtons">
+        <button class="color-btn" data-color="black" style="--sw:#1F3A34" title="검정" aria-label="검정"></button>
+        <button class="color-btn" data-color="red" style="--sw:#C0392B" title="빨강" aria-label="빨강"></button>
+        <button class="color-btn" data-color="blue" style="--sw:#2E5FA3" title="파랑" aria-label="파랑"></button>
+        <button class="color-btn" data-color="green" style="--sw:#2E7D4F" title="초록" aria-label="초록"></button>
+      </div>
+    </div>
+
+    <div class="tool-group">
+      <span class="group-label">행 개수 변경</span>
+      <div class="btn-row">
+        <button id="oneRowBtn" class="active" title="한 줄 악보로 돌아가요">1행</button>
+        <button id="twoRowBtn" title="오른손(위)·왼손(아래) 두 줄로 나눠서 작성해요">2행</button>
+      </div>
+    </div>
+
+    <div class="tool-group">
+      <span class="group-label">저장 / 인쇄</span>
+      <div class="btn-row">
+        <button id="printBtn">인쇄 / PDF 저장</button>
+        <button id="saveJsonBtn">파일로 저장 (.json)</button>
+        <button id="loadJsonBtn" class="fileLabel">불러오기</button>
+        <input type="file" id="loadJson" accept="application/json" hidden>
+        <span class="command-input-wrap">
+          <button id="infoBtn" title="사이트 정보">ⓘ info</button>
+          <div id="infoPanel" class="command-list-panel" hidden>
+            <div class="cmd-item">Site Admin: 타로수 Tarosu</div>
+            <div class="cmd-item">Contact: manyuanchunse@naver.com</div>
+            <div class="cmd-item">Version: 0.0.1</div>
+          </div>
+        </span>
+      </div>
+    </div>
+
+    <div class="tool-group">
+      <span class="group-label">기호 / 편집</span>
+      <div class="btn-row">
+        <button id="insertBtn" title="선택한 칸 뒤에 빈 칸을 넣고, 이후 음들을 한 칸씩 뒤로 밀어요">＋ 뒤에 삽입</button>
+        <button id="splitBtn" title="선택한 한 칸을 0.5칸씩 좌우로 나눠요">⟷ 나누기</button>
+        <button id="mergeBtn" title="인접한 0.5칸 두 개를 한 칸으로 합쳐요">⟶⟵ 병합</button>
+        <button id="chordBtn" title="선택한 음에 화음(작은 숫자, 최대 3개) 추가 · 재생 시 제외 · Shift+H">♫ 화음</button>
+        <button id="fingerBtn" title="선택한 음에 손가락 번호(1~5) 표시 · Shift+F">☝ 손가락</button>
+        <span class="command-input-wrap">
+          <button id="techniqueBtn" title="선택한 음에 연주 주법을 적용해요">주법</button>
+          <div id="techniquePanel" class="command-list-panel" hidden></div>
+        </span>
+        <button id="dashBtn" title="이음줄 · 앞 음을 늘림">－ 이음</button>
+        <button id="barBtn" title="마디선 삽입">｜ 마디선</button>
+        <button id="lyricsBtn" title="선택한 음에 가사를 음절/단어 단위로 순서대로 채워요 · Ctrl+L">가사</button>
+      </div>
+      <div class="btn-row">
+        <button id="undoBtn" title="뒤로 가기 · Ctrl+Z">↶ 뒤로 가기</button>
+        <button id="redoBtn" title="다시 실행 · Ctrl+Y">↷ 다시 실행</button>
+        <button id="copyBtn" title="선택한 음(가사 포함) 복사 · Ctrl+C">⧉ 복사</button>
+        <button id="pasteBtn" title="복사한 음을 선택한 칸 뒤에 붙여넣기 · Ctrl+V">📋 붙여넣기</button>
+        <button id="breakBtn" title="줄바꿈">↵ 줄바꿈</button>
+        <button id="delBtn" title="선택한 칸(또는 마지막 칸) 삭제">⌫ 지우기</button>
+        <button id="clearBtn" title="모두 지우기">전체 지우기</button>
+      </div>
+    </div>
+
+  </section>
+
+  <section class="toolbar playback-bar" role="toolbar" aria-label="재생 도구">
+    <div class="tool-group">
+      <span class="group-label">재생</span>
+      <div class="btn-row">
+        <button id="playBtn" title="재생 · 음을 선택하면 그 음부터 재생">▶ 재생</button>
+        <button id="playWithChordsBtn" title="화음도 함께 들리게 재생 · Ctrl+Space">▶<span class="plus-emphasis">+</span></button>
+        <button id="pauseBtn" title="일시정지">⏸ 일시정지</button>
+        <button id="stopBtn" title="정지">⏹ 정지</button>
+        <span class="volume-control" title="볼륨">
+          🔊 <input type="range" id="volumeSlider" min="0" max="100" value="50">
+        </span>
+        <button class="speed-btn active" data-rate="1" title="기본 속도">1배</button>
+        <button class="speed-btn" data-rate="1.5" title="1.5배 빠르게">1.5배</button>
+        <button class="speed-btn" data-rate="2" title="2배 빠르게">2배</button>
+        <button id="recordBtn" title="고쟁 인터페이스에서 연주한 음을 악보에 기록해요 · Ctrl+R">🎙 녹음</button>
+        <span class="command-input-wrap">
+          <input type="text" id="commandInput" class="command-input" placeholder="/명령어 입력 후 Enter" autocomplete="off">
+          <div id="commandListPanel" class="command-list-panel" hidden></div>
+        </span>
+      </div>
+    </div>
+  </section>
+
+
+  <main class="paper-wrap">
+    <div id="pagesContainer"></div>
+    <input type="tel" inputmode="numeric" pattern="[0-9]*" autocomplete="off"
+           id="mobileKeyInput" class="mobile-key-input" aria-hidden="true" tabindex="-1">
+  </main>
+
+  <div id="lyricsPanel" class="command-list-panel lyrics-modal" hidden>
+    <div class="cmd-item lyrics-panel-body">
+      <div class="lyrics-panel-desc">한글·한자·가나는 음절씩, 알파벳은 띄어쓰기 단어씩 순서대로 채워집니다.</div>
+      <input type="text" id="lyricsPanelInput" class="command-input lyrics-panel-input" placeholder="가사 입력 후 Enter" autocomplete="off">
+      <button id="lyricsApplyBtn">적용</button>
+    </div>
+  </div>
+
+  <div id="fingerPanel" class="command-list-panel lyrics-modal" hidden>
+    <div class="cmd-item lyrics-panel-body">
+      <div class="lyrics-panel-desc">손가락 번호(1~5)를 입력하세요. 비워두면 지워집니다.</div>
+      <input type="text" id="fingerPanelInput" class="command-input lyrics-panel-input" placeholder="예: 3" autocomplete="off">
+      <button id="fingerApplyBtn">적용</button>
+    </div>
+  </div>
+
+  <div id="chordPanel" class="command-list-panel lyrics-modal" hidden>
+    <div class="cmd-item lyrics-panel-body">
+      <div class="lyrics-panel-desc">화음으로 넣을 작은 숫자를 입력하세요 (최대 3개, 1~7만 가능. 예: 35)</div>
+      <input type="text" id="chordPanelInput" class="command-input lyrics-panel-input" placeholder="예: 35" autocomplete="off">
+      <button id="chordApplyBtn">적용</button>
+    </div>
+  </div>
+
+  <div id="recordModal" class="record-modal" hidden>
+    <div class="record-panel">
+      <div class="record-header">
+        <span class="record-title">🎙 고쟁 연주 녹음</span>
+        <span class="record-volume" title="볼륨">🔊 <input type="range" id="recordVolumeSlider" min="0" max="100" value="50"></span>
+        <span class="record-transpose">이조: <b id="recordTransposeLabel">0</b>반음 (← / →)</span>
+        <button id="recordCloseBtn" class="record-close-btn" title="닫기">✕</button>
+      </div>
+      <div id="guzhengStrings" class="guzheng-strings"></div>
+      <div class="record-footer">
+        <div id="recordedPreview" class="recorded-preview">연주한 음: (없음)</div>
+        <div class="record-footer-btns">
+          <button id="recordDashBtn" title="이음줄 · 방금 연주한 음을 늘려요 · 단축키: -">－ 이음</button>
+          <button id="recordBarBtn" title="마디선 삽입">｜ 마디선</button>
+          <button id="recordUndoBtn" title="Ctrl+Z">되돌리기</button>
+          <button id="recordDeleteSelectedBtn" title="미리보기에서 선택한 음을 지워요">선택 삭제</button>
+          <button id="recordRedoBtn" title="Ctrl+Y">다시실행</button>
+          <button id="recordClearBtn">전체 지우기</button>
+          <button id="recordConfirmBtn">확인</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const pagesContainer = document.getElementById('pagesContainer');
+  const octIndicator = document.getElementById('octIndicator');
+  const mobileKeyInput = document.getElementById('mobileKeyInput');
+  function focusMobileKeyInput(){
+    if(!mobileKeyInput) return;
+    const scrollX = window.scrollX;
+    const scrollY = window.scrollY;
+    mobileKeyInput.focus({ preventScroll: true });
+    window.scrollTo(scrollX, scrollY);
+    setTimeout(() => window.scrollTo(scrollX, scrollY), 50);
+  }
+
+  let cellsUpper = [];
+  let cellsLower = [];
+  let activeVoice = 'upper';
+  let twoRowMode = false;
+  let cells = cellsUpper;
+  function syncActiveVoiceStorage(){
+    if(activeVoice === 'upper') cellsUpper = cells; else cellsLower = cells;
+  }
+  function focusVoice(voice){
+    if(activeVoice === voice) return;
+    syncActiveVoiceStorage();
+    activeVoice = voice;
+    cells = (voice === 'upper') ? cellsUpper : cellsLower;
+    selectedIndex = null;
+    rangeEndIndex = null;
+    extraSelected.clear();
+  }
+  let selectedIndex = null;
+  let rangeEndIndex = null;
+  let extraSelected = new Set();
+  function getSelectionRange(){
+    if(selectedIndex === null) return null;
+    if(rangeEndIndex === null) return [selectedIndex, selectedIndex];
+    return [Math.min(selectedIndex, rangeEndIndex), Math.max(selectedIndex, rangeEndIndex)];
+  }
+  function getSelectedIndices(){
+    const set = new Set();
+    const r = getSelectionRange();
+    if(r){ for(let i = r[0]; i <= r[1]; i++) set.add(i); }
+    extraSelected.forEach(i => set.add(i));
+    return Array.from(set).sort((a, b) => a - b);
+  }
+  function isInSelection(voice, i){
+    if(voice !== activeVoice) return false;
+    const r = getSelectionRange();
+    if(r !== null && i >= r[0] && i <= r[1]) return true;
+    return extraSelected.has(i);
+  }
+  let currentInput = { duration: 4, octave: 0, dot: false, color: 'black', bold: false };
+  let isDirty = false;
+  function markDirty(){ isDirty = true; }
+  let clipboardCells = null;
+
+  let undoStack = [];
+  let redoStack = [];
+  const HISTORY_LIMIT = 100;
+  function snapshotCells(){ return JSON.parse(JSON.stringify(cells)); }
+  function setActiveVoiceCells(newCells){
+    cells = newCells;
+    if(activeVoice === 'upper') cellsUpper = cells; else cellsLower = cells;
+  }
+  function pushHistory(){
+    undoStack.push(snapshotCells());
+    if(undoStack.length > HISTORY_LIMIT) undoStack.shift();
+    redoStack = [];
+  }
+  function undo(){
+    if(!undoStack.length) return;
+    redoStack.push(snapshotCells());
+    cells = undoStack.pop();
+    if(activeVoice === 'upper') cellsUpper = cells; else cellsLower = cells;
+    selectedIndex = null;
+    rangeEndIndex = null;
+    extraSelected.clear();
+    markDirty();
+    render();
+  }
+  function redo(){
+    if(!redoStack.length) return;
+    undoStack.push(snapshotCells());
+    cells = redoStack.pop();
+    if(activeVoice === 'upper') cellsUpper = cells; else cellsLower = cells;
+    selectedIndex = null;
+    rangeEndIndex = null;
+    extraSelected.clear();
+    markDirty();
+    render();
+  }
+  const COLOR_MAP = { black: '#1F3A34', red: '#C0392B', blue: '#2E5FA3', green: '#2E7D4F' };
+  let pageContentBox = null;
+
+  // ---------- Playback ----------
+  const NOTE_LETTER_SEMITONE = { C:0, D:2, E:4, F:5, G:7, A:9, B:11 };
+  const MAJOR_SCALE_OFFSETS = [0, 2, 4, 5, 7, 9, 11]; // scale degree 1..7 (도레미파솔라시)
+  const DURATION_TO_BEATS = { 1: 4, 2: 2, 4: 1, 8: 0.5, 16: 0.25 };
+
+  function parseKeyToSemitone(keyStr){
+    if(!keyStr) return 0;
+    const s = String(keyStr).trim();
+    if(!s.length) return 0;
+    const letter = s[0].toUpperCase();
+    const base = NOTE_LETTER_SEMITONE[letter];
+    if(base === undefined) return 0;
+    const rest = s.slice(1);
+    let acc = 0;
+    if(/#|♯/.test(rest)) acc = 1;
+    else if(/b|♭/i.test(rest)) acc = -1;
+    return ((base + acc) % 12 + 12) % 12;
+  }
+  function noteFrequency(scaleDegree, octave, keySemitone, accidental){
+    const degree = ((scaleDegree - 1) % 7 + 7) % 7;
+    const accShift = accidental === 'sharp' ? 1 : (accidental === 'flat' ? -1 : 0);
+    const midi = 60 + keySemitone + MAJOR_SCALE_OFFSETS[degree] + (octave || 0) * 12 + accShift;
+    return 440 * Math.pow(2, (midi - 69) / 12);
+  }
+  function durationToBeats(duration, dot){
+    let beats = DURATION_TO_BEATS[duration] || 1;
+    if(dot) beats *= 1.5;
+    return beats;
+  }
+
+  let audioCtx = null;
+  let playState = 'stopped'; // 'stopped' | 'playing' | 'paused'
+  let playSequence = [];
+  let playTotalTime = 0;
+  let playStartOffset = 0;
+  let playEndOffset = null;
+  let playStartCtxTime = 0;
+  let scheduledTimers = [];
+  let masterVolume = 0.5;
+  let playbackRate = 1;
+  let lastSpaceTime = 0;
+  let slashPressCount = 0;
+  let slashPressTimer = null;
+
+  let playChords = false;
+  function expandRepeats(arr, originIdx){
+    originIdx = originIdx || 0;
+    const order = [];
+    const repeatedOnce = new Set();
+    for(let i = 0; i < arr.length; i++){
+      order.push(i);
+      const cell = arr[i];
+      if(i >= originIdx && cell && cell.type === 'note' && cell.repeat && !repeatedOnce.has(i)){
+        repeatedOnce.add(i);
+        for(let j = originIdx; j <= i; j++){
+          order.push(j);
+        }
+      }
+    }
+    return order;
+  }
+  function buildVoiceSequence(arr, beatSec, keySemi, originIdx){
+    let t = 0;
+    const seq = [];
+    let lastEvent = null;
+    const order = expandRepeats(arr, originIdx);
+    order.forEach(idx => {
+      const cell = arr[idx];
+      if(cell.type === 'note' || cell.type === 'rest'){
+        let beats = durationToBeats(cell.duration, cell.dot);
+        if(cell.half) beats /= 2;
+        const durSec = beats * beatSec;
+        const freq = (cell.type === 'note' && !cell.repeat) ? noteFrequency(parseInt(cell.value, 10), cell.octave || 0, keySemi, cell.accidental) : null;
+        let chordFreqs = null;
+        if(playChords && cell.type === 'note' && !cell.repeat && cell.chord && cell.chord.length){
+          chordFreqs = cell.chord.map(d => noteFrequency(parseInt(d, 10), (cell.octave || 0) - 1, keySemi, null));
+        }
+        const ev = { cellIndex: idx, time: t, duration: durSec, freq, isRest: cell.type === 'rest', chordFreqs };
+        seq.push(ev);
+        lastEvent = ev;
+        t += durSec;
+      } else if(cell.type === 'dash'){
+        const durSec = 1 * beatSec;
+        if(lastEvent) lastEvent.duration += durSec;
+        t += durSec;
+      }
+      // 'bar' and 'break' cells take no playback time
+    });
+    return { seq, totalTime: t };
+  }
+
+  function buildPlaySequence(){
+    const bpm = parseFloat(document.getElementById('tempoInput').value) || 100;
+    const beatSec = (60 / bpm) / playbackRate;
+    const keySemi = parseKeyToSemitone(document.getElementById('keyInput').value);
+    syncActiveVoiceStorage();
+
+    const idxs = getSelectedIndices();
+    const originIdx = idxs.length ? Math.min(...idxs) : 0;
+    const upperOrigin = activeVoice === 'upper' ? originIdx : 0;
+    const lowerOrigin = activeVoice === 'lower' ? originIdx : 0;
+
+    const upperBuilt = buildVoiceSequence(cellsUpper, beatSec, keySemi, upperOrigin);
+    let seq = upperBuilt.seq.map(ev => Object.assign({ voice: 'upper' }, ev));
+    let totalTime = upperBuilt.totalTime;
+
+    if(twoRowMode){
+      const lowerBuilt = buildVoiceSequence(cellsLower, beatSec, keySemi, lowerOrigin);
+      seq = seq.concat(lowerBuilt.seq.map(ev => Object.assign({ voice: 'lower' }, ev)));
+      totalTime = Math.max(totalTime, lowerBuilt.totalTime);
+    }
+
+    return { seq, totalTime };
+  }
+
+  function playTone(freq, durationSec){
+    const now = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, now);
+
+    const gain = audioCtx.createGain();
+    const decayTime = Math.min(Math.max(durationSec * 0.9, 0.15), 2.2);
+    const peak = Math.max(0.0001, masterVolume * 0.4);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(peak, now + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.008 + decayTime);
+
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 0.008 + decayTime + 0.05);
+  }
+
+  function highlightPlayingCell(idx, voice){
+    clearPlayingHighlight(voice);
+    const el = pagesContainer.querySelector('.cell[data-cell-index="' + idx + '"][data-voice="' + voice + '"]');
+    if(el) el.classList.add('playing');
+  }
+  function clearPlayingHighlight(voice){
+    const selector = voice ? '.cell.playing[data-voice="' + voice + '"]' : '.cell.playing';
+    pagesContainer.querySelectorAll(selector).forEach(el => el.classList.remove('playing'));
+  }
+
+  function clearScheduledTimers(){
+    scheduledTimers.forEach(id => clearTimeout(id));
+    scheduledTimers = [];
+  }
+
+  function schedulePlayback(){
+    clearScheduledTimers();
+    const effectiveEnd = (playEndOffset !== null && playEndOffset !== undefined) ? playEndOffset : playTotalTime;
+    playSequence.forEach(ev => {
+      if(ev.time + ev.duration <= playStartOffset) return;
+      if(ev.time >= effectiveEnd) return;
+      const delay = Math.max(0, ev.time - playStartOffset);
+      const id = setTimeout(() => {
+        if(playState !== 'playing') return;
+        highlightPlayingCell(ev.cellIndex, ev.voice);
+        if(!ev.isRest && ev.freq) playTone(ev.freq, ev.duration);
+        if(ev.chordFreqs) ev.chordFreqs.forEach(f => playTone(f, ev.duration));
+      }, delay * 1000);
+      scheduledTimers.push(id);
+    });
+    const endDelay = Math.max(0, effectiveEnd - playStartOffset);
+    const endId = setTimeout(() => {
+      if(playState === 'playing') stopPlayback();
+    }, endDelay * 1000 + 60);
+    scheduledTimers.push(endId);
+  }
+
+  function updatePlayButtons(){
+    const playBtn = document.getElementById('playBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    if(!playBtn) return;
+    playBtn.disabled = playState === 'playing';
+    pauseBtn.disabled = playState !== 'playing';
+    stopBtn.disabled = playState === 'stopped';
+  }
+
+  function startPlayback(){
+    syncActiveVoiceStorage();
+    if(!cellsUpper.length && !(twoRowMode && cellsLower.length)) return;
+    if(playState === 'playing') return;
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+
+    if(playState === 'stopped'){
+      const built = buildPlaySequence();
+      playSequence = built.seq;
+      playTotalTime = built.totalTime;
+      playStartOffset = 0;
+      playEndOffset = null;
+      const idxs = getSelectedIndices();
+      if(idxs.length){
+        const matching = playSequence.filter(e => e.voice === activeVoice && idxs.includes(e.cellIndex));
+        if(matching.length){
+          playStartOffset = Math.min(...matching.map(e => e.time));
+          if(idxs.length >= 2){
+            playEndOffset = Math.max(...matching.map(e => e.time + e.duration));
+          }
+        }
+      }
+    }
+
+    playStartCtxTime = audioCtx.currentTime;
+    playState = 'playing';
+    schedulePlayback();
+    updatePlayButtons();
+  }
+  function pausePlayback(){
+    if(playState !== 'playing') return;
+    playStartOffset += (audioCtx.currentTime - playStartCtxTime);
+    clearScheduledTimers();
+    playState = 'paused';
+    updatePlayButtons();
+  }
+  function stopPlayback(){
+    clearScheduledTimers();
+    playState = 'stopped';
+    playStartOffset = 0;
+    playEndOffset = null;
+    clearPlayingHighlight();
+    updatePlayButtons();
+  }
+
+  function setPlaybackRate(rate){
+    if(playbackRate === rate) return;
+    if(playState === 'playing'){
+      const oldBeatSec = (60 / (parseFloat(document.getElementById('tempoInput').value) || 100)) / playbackRate;
+      const elapsedOld = playStartOffset + (audioCtx.currentTime - playStartCtxTime);
+      const beatsSoFar = elapsedOld / oldBeatSec;
+      const beatsEnd = (playEndOffset !== null && playEndOffset !== undefined) ? playEndOffset / oldBeatSec : null;
+      playbackRate = rate;
+      const built = buildPlaySequence();
+      playSequence = built.seq;
+      playTotalTime = built.totalTime;
+      const newBeatSec = (60 / (parseFloat(document.getElementById('tempoInput').value) || 100)) / playbackRate;
+      playStartOffset = beatsSoFar * newBeatSec;
+      playEndOffset = (beatsEnd !== null) ? beatsEnd * newBeatSec : null;
+      playStartCtxTime = audioCtx.currentTime;
+      schedulePlayback();
+    } else if(playState === 'paused'){
+      const oldBeatSec = (60 / (parseFloat(document.getElementById('tempoInput').value) || 100)) / playbackRate;
+      const beatsSoFar = playStartOffset / oldBeatSec;
+      const beatsEnd = (playEndOffset !== null && playEndOffset !== undefined) ? playEndOffset / oldBeatSec : null;
+      playbackRate = rate;
+      const newBeatSec = (60 / (parseFloat(document.getElementById('tempoInput').value) || 100)) / playbackRate;
+      playStartOffset = beatsSoFar * newBeatSec;
+      playEndOffset = (beatsEnd !== null) ? beatsEnd * newBeatSec : null;
+      const built = buildPlaySequence();
+      playSequence = built.seq;
+      playTotalTime = built.totalTime;
+    } else {
+      playbackRate = rate;
+    }
+    document.querySelectorAll('.speed-btn').forEach(b => {
+      b.classList.toggle('active', Number(b.dataset.rate) === rate);
+    });
+  }
+
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+  function isNoteLike(c){ return c && (c.type === 'note' || c.type === 'rest'); }
+
+  function activeState(){
+    if(selectedIndex !== null && isNoteLike(cells[selectedIndex])) return cells[selectedIndex];
+    return currentInput;
+  }
+
+  // ---------- Insert / edit logic ----------
+  function insertOrEditNote(value){
+    pushHistory();
+    markDirty();
+    const isRest = value === 'rest';
+    if(selectedIndex !== null && cells[selectedIndex] && (cells[selectedIndex].type === 'bar' || cells[selectedIndex].type === 'dash')){
+      // convert a selected symbol (bar/dash) into a note
+      cells[selectedIndex] = {
+        type: isRest ? 'rest' : 'note',
+        value: isRest ? '0' : String(value),
+        octave: isRest ? 0 : currentInput.octave,
+        duration: currentInput.duration,
+        dot: currentInput.dot,
+        color: currentInput.color,
+        bold: currentInput.bold,
+        lyric: ''
+      };
+      render();
+      return;
+    }
+    if(selectedIndex !== null && isNoteLike(cells[selectedIndex])){
+      const c = cells[selectedIndex];
+      if(isRest){ c.type = 'rest'; c.value = '0'; c.octave = 0; }
+      else { c.type = 'note'; c.value = String(value); }
+      render();
+      return;
+    }
+    const cell = {
+      type: isRest ? 'rest' : 'note',
+      value: isRest ? '0' : String(value),
+      octave: isRest ? 0 : currentInput.octave,
+      duration: currentInput.duration,
+      dot: currentInput.dot,
+      color: currentInput.color,
+      bold: currentInput.bold,
+      lyric: ''
+    };
+    cells.push(cell);
+    if(cell.duration === 2) cells.push({ type:'dash', lyric:'' });
+    else if(cell.duration === 1) cells.push({ type:'dash', lyric:'' }, { type:'dash', lyric:'' }, { type:'dash', lyric:'' });
+    selectedIndex = null;
+    rangeEndIndex = null;
+    extraSelected.clear();
+    render();
+  }
+
+  function insertDash(){
+    pushHistory();
+    markDirty();
+    if(selectedIndex !== null && cells[selectedIndex]){
+      // convert the selected cell (note/rest/bar) into a sustain dash
+      cells[selectedIndex] = { type:'dash', lyric: cells[selectedIndex].lyric || '' };
+      render();
+      return;
+    }
+    cells.push({ type:'dash', lyric:'' });
+    selectedIndex = null;
+    rangeEndIndex = null;
+    extraSelected.clear();
+    render();
+  }
+  function copySelected(){
+    const idxs = getSelectedIndices();
+    if(!idxs.length){
+      alert('복사할 음을 먼저 클릭해서 선택해주세요. (Shift+클릭: 범위, Ctrl+클릭: 개별 추가)');
+      return;
+    }
+    clipboardCells = idxs.map(i => JSON.parse(JSON.stringify(cells[i])));
+  }
+  function pasteCell(){
+    if(!clipboardCells || !clipboardCells.length){
+      alert('먼저 복사한 음이 없어요. 음을 선택하고 "복사"를 눌러주세요.');
+      return;
+    }
+    pushHistory();
+    markDirty();
+    const toInsert = clipboardCells.map(c => JSON.parse(JSON.stringify(c)));
+    const idxs = getSelectedIndices();
+    const insertAt = idxs.length ? Math.max(...idxs) + 1 : cells.length;
+    cells.splice(insertAt, 0, ...toInsert);
+    extraSelected.clear();
+    selectedIndex = insertAt;
+    rangeEndIndex = insertAt + toInsert.length - 1;
+    render();
+  }
+  function openChordPanel(){
+    const idxs = getSelectedIndices();
+    const noteIdxs = idxs.filter(i => cells[i] && cells[i].type === 'note');
+    if(!noteIdxs.length){
+      alert('화음을 추가할 음을 먼저 선택해주세요. (쉼표·기호에는 추가할 수 없어요)');
+      return;
+    }
+    const panel = document.getElementById('chordPanel');
+    const panelInput = document.getElementById('chordPanelInput');
+    panel.hidden = false;
+    // Pre-fill only when a single note is selected; for multiple, start blank so all get the same new value.
+    panelInput.value = noteIdxs.length === 1 ? (cells[noteIdxs[0]].chord || []).join('') : '';
+    panelInput.focus();
+    panelInput.select();
+  }
+  function applyChordFromInput(){
+    const idxs = getSelectedIndices();
+    const noteIdxs = idxs.filter(i => cells[i] && cells[i].type === 'note');
+    const panel = document.getElementById('chordPanel');
+    const panelInput = document.getElementById('chordPanelInput');
+    if(!noteIdxs.length){
+      panel.hidden = true;
+      panelInput.blur();
+      return;
+    }
+    const digits = panelInput.value.replace(/[^1-7]/g, '').slice(0, 3).split('');
+    pushHistory();
+    markDirty();
+    noteIdxs.forEach(i => { cells[i].chord = digits.slice(); });
+    render();
+    panel.hidden = true;
+    panelInput.blur();
+  }
+
+  function isCJKChar(ch){
+    const code = ch.codePointAt(0);
+    return (
+      (code >= 0xAC00 && code <= 0xD7A3) || // 한글 완성형 음절
+      (code >= 0x3130 && code <= 0x318F) || // 한글 자모
+      (code >= 0x4E00 && code <= 0x9FFF) || // 한자
+      (code >= 0x3400 && code <= 0x4DBF) || // 한자 확장
+      (code >= 0x3040 && code <= 0x309F) || // 히라가나
+      (code >= 0x30A0 && code <= 0x30FF)    // 가타카나
+    );
+  }
+  function tokenizeLyrics(text){
+    const tokens = [];
+    let buffer = '';
+    let mode = 'none'; // 'none' | 'cjk' | 'latin'
+    const flush = () => { if(buffer.length){ tokens.push(buffer); buffer = ''; } };
+    for(const ch of text){
+      if(/\s/.test(ch)){
+        if(mode === 'latin'){
+          flush();
+          mode = 'none';
+        } else {
+          // space right after a CJK character (or at the very start) skips one cell
+          tokens.push('');
+          mode = 'none';
+        }
+      } else if(isCJKChar(ch)){
+        flush();
+        tokens.push(ch);
+        mode = 'cjk';
+      } else {
+        buffer += ch;
+        mode = 'latin';
+      }
+    }
+    flush();
+    return tokens;
+  }
+  function applyLyricsFromInput(){
+    const idxs = getSelectedIndices();
+    const panelInput = document.getElementById('lyricsPanelInput');
+    const text = panelInput.value;
+    if(idxs.length < 1 || !text) { document.getElementById('lyricsPanel').hidden = true; panelInput.blur(); return; }
+    const tokens = tokenizeLyrics(text);
+    if(tokens.length){
+      pushHistory();
+      markDirty();
+      idxs.forEach((idx, i) => {
+        if(i < tokens.length && cells[idx]){
+          cells[idx].lyric = tokens[i];
+        }
+      });
+      selectedIndex = null;
+      rangeEndIndex = null;
+      extraSelected.clear();
+      render();
+    }
+    panelInput.value = '';
+    document.getElementById('lyricsPanel').hidden = true;
+    panelInput.blur();
+  }
+  function openLyricsPanel(){
+    const idxs = getSelectedIndices();
+    if(idxs.length < 1){
+      alert('가사를 넣을 음을 먼저 선택해주세요.');
+      return;
+    }
+    const panel = document.getElementById('lyricsPanel');
+    panel.hidden = false;
+    const panelInput = document.getElementById('lyricsPanelInput');
+    panelInput.value = '';
+    panelInput.focus();
+  }
+
+  function insertAfterSelected(){
+    if(selectedIndex === null){
+      alert('삽입할 위치의 음을 먼저 클릭해서 선택해주세요.');
+      return;
+    }
+    pushHistory();
+    markDirty();
+    const newCell = {
+      type: 'rest',
+      value: '0',
+      octave: 0,
+      duration: currentInput.duration,
+      dot: currentInput.dot,
+      color: currentInput.color,
+      bold: currentInput.bold,
+      lyric: ''
+    };
+    cells.splice(selectedIndex + 1, 0, newCell);
+    selectedIndex = selectedIndex + 1;
+    render();
+  }
+  function insertBar(){
+    pushHistory();
+    markDirty();
+    if(selectedIndex !== null && cells[selectedIndex]){
+      // convert the selected cell (note/rest/dash) into a bar line
+      cells[selectedIndex] = { type:'bar' };
+      render();
+      return;
+    }
+    cells.push({ type:'bar' });
+    selectedIndex = null;
+    rangeEndIndex = null;
+    extraSelected.clear();
+    render();
+  }
+  function insertBreak(){
+    pushHistory();
+    markDirty();
+    cells.push({ type:'break' });
+    selectedIndex = null;
+    rangeEndIndex = null;
+    extraSelected.clear();
+    render();
+  }
+
+  function setDuration(d){
+    pushHistory();
+    markDirty();
+    currentInput.duration = d;
+    getSelectedIndices().forEach(i => {
+      if(isNoteLike(cells[i])) cells[i].duration = d;
+    });
+    render();
+  }
+  function toggleDot(){
+    pushHistory();
+    markDirty();
+    const idxs = getSelectedIndices();
+    if(idxs.length && isNoteLike(cells[idxs[0]])){
+      const newVal = !cells[idxs[0]].dot;
+      idxs.forEach(i => { if(isNoteLike(cells[i])) cells[i].dot = newVal; });
+    } else {
+      currentInput.dot = !currentInput.dot;
+    }
+    render();
+  }
+  function setColor(color){
+    pushHistory();
+    markDirty();
+    const idxs = getSelectedIndices();
+    if(idxs.length){
+      let any = false;
+      idxs.forEach(i => { if(isNoteLike(cells[i])){ cells[i].color = color; any = true; } });
+      if(!any) currentInput.color = color;
+    } else {
+      currentInput.color = color;
+    }
+    render();
+  }
+  function setAccidental(type){
+    const idxs = getSelectedIndices();
+    if(!idxs.length){
+      alert('먼저 음을 선택해주세요.');
+      return;
+    }
+    pushHistory();
+    markDirty();
+    idxs.forEach(i => {
+      if(cells[i] && cells[i].type === 'note'){
+        cells[i].accidental = (cells[i].accidental === type) ? null : type;
+      }
+    });
+    render();
+  }
+  function openFingerPanel(){
+    const idxs = getSelectedIndices();
+    const noteIdxs = idxs.filter(i => cells[i] && cells[i].type === 'note');
+    if(!noteIdxs.length){
+      alert('손가락 번호를 넣을 음을 먼저 선택해주세요.');
+      return;
+    }
+    const panel = document.getElementById('fingerPanel');
+    const panelInput = document.getElementById('fingerPanelInput');
+    panel.hidden = false;
+    panelInput.value = noteIdxs.length === 1 && cells[noteIdxs[0]].finger ? String(cells[noteIdxs[0]].finger) : '';
+    panelInput.focus();
+    panelInput.select();
+  }
+  function applyFingerFromInput(){
+    const idxs = getSelectedIndices();
+    const noteIdxs = idxs.filter(i => cells[i] && cells[i].type === 'note');
+    const panel = document.getElementById('fingerPanel');
+    const panelInput = document.getElementById('fingerPanelInput');
+    if(!noteIdxs.length){
+      panel.hidden = true;
+      panelInput.blur();
+      return;
+    }
+    pushHistory();
+    markDirty();
+    const num = parseInt(panelInput.value, 10);
+    const finger = (num >= 1 && num <= 5) ? num : null;
+    noteIdxs.forEach(i => { cells[i].finger = finger; });
+    render();
+    panel.hidden = true;
+    panelInput.blur();
+  }
+  function toggleYaozhi(){
+    const idxs = getSelectedIndices();
+    const noteIdxs = idxs.filter(i => cells[i] && cells[i].type === 'note');
+    if(!noteIdxs.length){
+      alert('摇指를 표시할 음을 먼저 선택해주세요.');
+      return;
+    }
+    const allMarked = noteIdxs.every(i => cells[i].yaozhi);
+    pushHistory();
+    markDirty();
+    noteIdxs.forEach(i => { cells[i].yaozhi = !allMarked; });
+    render();
+  }
+  function toggleRepeat(){
+    const idxs = getSelectedIndices();
+    const noteIdxs = idxs.filter(i => cells[i] && cells[i].type === 'note');
+    if(!noteIdxs.length){
+      // No existing note selected: insert a brand-new repeat-marked note, just like typing a digit.
+      pushHistory();
+      markDirty();
+      if(selectedIndex !== null && cells[selectedIndex] && (cells[selectedIndex].type === 'bar' || cells[selectedIndex].type === 'dash')){
+        cells[selectedIndex] = {
+          type: 'note',
+          value: '1',
+          octave: currentInput.octave,
+          duration: currentInput.duration,
+          dot: currentInput.dot,
+          color: currentInput.color,
+          bold: currentInput.bold,
+          lyric: '',
+          repeat: true
+        };
+        render();
+        return;
+      }
+      const newCell = {
+        type: 'note',
+        value: '1',
+        octave: currentInput.octave,
+        duration: currentInput.duration,
+        dot: currentInput.dot,
+        color: currentInput.color,
+        bold: currentInput.bold,
+        lyric: '',
+        repeat: true
+      };
+      if(selectedIndex !== null){
+        cells.splice(selectedIndex + 1, 0, newCell);
+        selectedIndex = selectedIndex + 1;
+      } else {
+        cells.push(newCell);
+        selectedIndex = cells.length - 1;
+      }
+      rangeEndIndex = null;
+      extraSelected.clear();
+      render();
+      return;
+    }
+    const allMarked = noteIdxs.every(i => cells[i].repeat);
+    pushHistory();
+    markDirty();
+    noteIdxs.forEach(i => { cells[i].repeat = !allMarked; });
+    render();
+  }
+  // ---------- 녹음 (guzheng recording interface) ----------
+  const PENTATONIC_DEGREES = [1, 2, 3, 5, 6];
+  const GUZHENG_STRING_COUNT = 21;
+  function buildGuzhengStrings(count){
+    const strings = [];
+    for(let i = 0; i < count; i++){
+      strings.push({
+        num: i + 1,
+        degree: PENTATONIC_DEGREES[i % 5],
+        octave: Math.floor(i / 5) - 2
+      });
+    }
+    return strings;
+  }
+  const guzhengStrings = buildGuzhengStrings(GUZHENG_STRING_COUNT);
+  let recordTranspose = 0;
+  let recordedNotes = [];
+  let recordUndoStack = [];
+  let recordRedoStack = [];
+  function pushRecordHistory(){
+    recordUndoStack.push(JSON.parse(JSON.stringify(recordedNotes)));
+    recordRedoStack = [];
+  }
+  function recordUndo(){
+    if(!recordUndoStack.length) return;
+    recordRedoStack.push(JSON.parse(JSON.stringify(recordedNotes)));
+    recordedNotes = recordUndoStack.pop();
+    recordSelectedIndices.clear();
+    recordSelectAnchor = null;
+    updateRecordedPreview();
+  }
+  function recordRedo(){
+    if(!recordRedoStack.length) return;
+    recordUndoStack.push(JSON.parse(JSON.stringify(recordedNotes)));
+    recordedNotes = recordRedoStack.pop();
+    recordSelectedIndices.clear();
+    recordSelectAnchor = null;
+    updateRecordedPreview();
+  }
+
+  function playGuzhengString(str){
+    const keySemi = parseKeyToSemitone(document.getElementById('keyInput').value);
+    const freq = noteFrequency(str.degree, str.octave, keySemi + recordTranspose, null);
+    if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if(audioCtx.state === 'suspended') audioCtx.resume();
+    playTone(freq, 0.9);
+  }
+  function buildDegreeLabelEl(degree, octave, isRed){
+    const wrap = document.createElement('div');
+    wrap.className = 'guzheng-degree-label';
+    const dotsAbove = document.createElement('div');
+    dotsAbove.className = 'guzheng-degree-dots above';
+    for(let i = 0; i < Math.max(0, octave); i++){
+      const dot = document.createElement('span');
+      dotsAbove.appendChild(dot);
+    }
+    const digitEl = document.createElement('div');
+    digitEl.className = 'guzheng-degree-digit';
+    digitEl.textContent = degree;
+    if(isRed) digitEl.style.color = COLOR_MAP.red;
+    const dotsBelow = document.createElement('div');
+    dotsBelow.className = 'guzheng-degree-dots below';
+    for(let i = 0; i < Math.max(0, -octave); i++){
+      const dot = document.createElement('span');
+      dotsBelow.appendChild(dot);
+    }
+    wrap.appendChild(dotsAbove);
+    wrap.appendChild(digitEl);
+    wrap.appendChild(dotsBelow);
+    return wrap;
+  }
+  let recordSelectedIndices = new Set();
+  let recordSelectAnchor = null;
+  function toggleRecordSelection(idx, isShift){
+    if(isShift && recordSelectAnchor !== null){
+      const lo = Math.min(recordSelectAnchor, idx);
+      const hi = Math.max(recordSelectAnchor, idx);
+      for(let i = lo; i <= hi; i++) recordSelectedIndices.add(i);
+    } else {
+      if(recordSelectedIndices.has(idx)) recordSelectedIndices.delete(idx);
+      else recordSelectedIndices.add(idx);
+      recordSelectAnchor = idx;
+    }
+    updateRecordedPreview();
+  }
+  function deleteSelectedRecordedNotes(){
+    if(!recordSelectedIndices.size) return;
+    pushRecordHistory();
+    recordedNotes = recordedNotes.filter((n, i) => !recordSelectedIndices.has(i));
+    recordSelectedIndices.clear();
+    recordSelectAnchor = null;
+    updateRecordedPreview();
+  }
+  function updateRecordedPreview(){
+    const preview = document.getElementById('recordedPreview');
+    preview.innerHTML = '';
+    if(!recordedNotes.length){
+      preview.textContent = '연주한 음: (없음)';
+      return;
+    }
+    const label = document.createElement('span');
+    label.textContent = '연주한 음: ';
+    preview.appendChild(label);
+    const list = document.createElement('span');
+    list.className = 'recorded-preview-list';
+    recordedNotes.forEach((n, idx) => {
+      let el;
+      if(n.type === 'dash'){
+        el = document.createElement('span');
+        el.className = 'recorded-symbol';
+        el.textContent = '－';
+      } else if(n.type === 'bar'){
+        el = document.createElement('span');
+        el.className = 'recorded-symbol';
+        el.textContent = '｜';
+      } else {
+        el = buildDegreeLabelEl(n.value, n.octave, n.transposed);
+      }
+      el.classList.add('recorded-item');
+      if(recordSelectedIndices.has(idx)) el.classList.add('selected');
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleRecordSelection(idx, e.shiftKey);
+      });
+      list.appendChild(el);
+    });
+    preview.appendChild(list);
+  }
+  function renderGuzhengStrings(){
+    const wrap = document.getElementById('guzhengStrings');
+    wrap.innerHTML = '';
+    guzhengStrings.forEach(str => {
+      const row = document.createElement('div');
+      row.className = 'guzheng-string-row';
+      const numEl = document.createElement('span');
+      numEl.className = 'guzheng-string-num';
+      numEl.appendChild(buildDegreeLabelEl(str.degree, str.octave));
+      const bar = document.createElement('div');
+      bar.className = 'guzheng-string-bar' + (str.degree === 5 ? ' degree-5' : '');
+      bar.addEventListener('click', () => {
+        playGuzhengString(str);
+        pushRecordHistory();
+        recordedNotes.push({ type: 'note', value: String(str.degree), octave: str.octave, transposed: recordTranspose !== 0 });
+        updateRecordedPreview();
+        bar.classList.add('playing');
+        setTimeout(() => bar.classList.remove('playing'), 150);
+      });
+      row.appendChild(numEl);
+      row.appendChild(bar);
+      wrap.appendChild(row);
+    });
+  }
+  function openRecordModal(){
+    recordTranspose = 0;
+    recordedNotes = [];
+    recordUndoStack = [];
+    recordRedoStack = [];
+    recordSelectedIndices.clear();
+    recordSelectAnchor = null;
+    document.getElementById('recordTransposeLabel').textContent = '0';
+    document.getElementById('recordVolumeSlider').value = Math.round(masterVolume * 100);
+    updateRecordedPreview();
+    renderGuzhengStrings();
+    document.getElementById('recordModal').hidden = false;
+  }
+  function closeRecordModal(){
+    document.getElementById('recordModal').hidden = true;
+  }
+  function confirmRecording(){
+    if(!recordedNotes.length){
+      closeRecordModal();
+      return;
+    }
+    pushHistory();
+    markDirty();
+    const toInsert = recordedNotes.map(n => {
+      if(n.type === 'dash') return { type: 'dash', lyric: '' };
+      if(n.type === 'bar') return { type: 'bar' };
+      return {
+        type: 'note',
+        value: n.value,
+        octave: n.octave,
+        duration: currentInput.duration,
+        dot: false,
+        color: n.transposed ? 'red' : currentInput.color,
+        bold: false,
+        lyric: ''
+      };
+    });
+    const idxs = getSelectedIndices();
+    const insertAt = idxs.length ? Math.max(...idxs) + 1 : cells.length;
+    cells.splice(insertAt, 0, ...toInsert);
+    extraSelected.clear();
+    selectedIndex = insertAt;
+    rangeEndIndex = insertAt + toInsert.length - 1;
+    render();
+    closeRecordModal();
+  }
+
+  function splitCell(){
+    const idxs = getSelectedIndices();
+    if(idxs.length !== 1){
+      alert('나눌 칸 하나를 선택해주세요.');
+      return;
+    }
+    const i = idxs[0];
+    const cell = cells[i];
+    if(!cell || (cell.type !== 'note' && cell.type !== 'rest')){
+      alert('숫자(음) 또는 쉼표 칸만 나눌 수 있어요.');
+      return;
+    }
+    pushHistory();
+    markDirty();
+    const leftHalf = JSON.parse(JSON.stringify(cell));
+    const rightHalf = JSON.parse(JSON.stringify(cell));
+    leftHalf.half = true;
+    rightHalf.half = true;
+    cells.splice(i, 1, leftHalf, rightHalf);
+    selectedIndex = i;
+    rangeEndIndex = i + 1;
+    extraSelected.clear();
+    render();
+  }
+  function mergeCells(){
+    const idxs = getSelectedIndices();
+    if(idxs.length !== 2 || idxs[1] !== idxs[0] + 1){
+      alert('인접한 0.5칸 두 개를 선택해주세요.');
+      return;
+    }
+    const [a, b] = idxs;
+    if(!cells[a] || !cells[b] || !cells[a].half || !cells[b].half){
+      alert('나누기로 만든 0.5칸끼리만 병합할 수 있어요.');
+      return;
+    }
+    pushHistory();
+    markDirty();
+    const merged = JSON.parse(JSON.stringify(cells[a]));
+    delete merged.half;
+    cells.splice(a, 2, merged);
+    selectedIndex = a;
+    rangeEndIndex = null;
+    extraSelected.clear();
+    render();
+  }
+  function toggleBold(){
+    pushHistory();
+    markDirty();
+    const active = document.activeElement;
+    if(active && active.classList && active.classList.contains('lyric-input')){
+      const idx = Number(active.dataset.index);
+      const caret = active.selectionStart;
+      if(!isNaN(idx) && cells[idx]){
+        cells[idx].lyricBold = !cells[idx].lyricBold;
+        render();
+        const restored = document.querySelector('.lyric-input[data-index="' + idx + '"]');
+        if(restored){
+          restored.focus();
+          if(caret !== null && caret !== undefined) restored.setSelectionRange(caret, caret);
+        }
+      }
+      return;
+    }
+    const idxs = getSelectedIndices();
+    if(idxs.length && isNoteLike(cells[idxs[0]])){
+      const newVal = !cells[idxs[0]].bold;
+      idxs.forEach(i => { if(isNoteLike(cells[i])) cells[i].bold = newVal; });
+    } else {
+      currentInput.bold = !currentInput.bold;
+    }
+    render();
+  }
+  function changeOctave(delta){
+    pushHistory();
+    markDirty();
+    const idxs = getSelectedIndices();
+    let any = false;
+    idxs.forEach(i => {
+      if(cells[i] && cells[i].type === 'note'){
+        cells[i].octave = clamp(cells[i].octave + delta, -2, 2);
+        any = true;
+      }
+    });
+    if(!any) currentInput.octave = clamp(currentInput.octave + delta, -2, 2);
+    render();
+  }
+  function resetOctave(){
+    pushHistory();
+    markDirty();
+    const idxs = getSelectedIndices();
+    let any = false;
+    idxs.forEach(i => {
+      if(cells[i] && cells[i].type === 'note'){
+        cells[i].octave = 0;
+        any = true;
+      }
+    });
+    if(!any) currentInput.octave = 0;
+    render();
+  }
+  function deleteSelected(){
+    const idxs = getSelectedIndices();
+    if(!idxs.length && cells.length === 0) return;
+    pushHistory();
+    markDirty();
+    if(idxs.length){
+      [...idxs].sort((a, b) => b - a).forEach(i => cells.splice(i, 1));
+      selectedIndex = null;
+      rangeEndIndex = null;
+      extraSelected.clear();
+    } else if(cells.length){
+      cells.pop();
+    }
+    render();
+  }
+  function clearAll(){
+    if(cells.length === 0) return;
+    if(confirm('입력한 악보를 모두 지울까요?')){
+      pushHistory();
+      markDirty();
+      cells = [];
+      if(activeVoice === 'upper') cellsUpper = cells; else cellsLower = cells;
+      selectedIndex = null;
+      rangeEndIndex = null;
+      extraSelected.clear();
+      render();
+    }
+  }
+
+  // ---------- Cell building (shared by measurement + final render) ----------
+  function buildCellElement(cell, i, voice){
+    voice = voice || 'upper';
+    let el;
+    if(cell.type === 'break'){
+      el = document.createElement('div');
+      el.className = 'line-break';
+      return el;
+    }
+    if(cell.type === 'bar'){
+      el = document.createElement('div');
+      el.className = 'cell bar-cell' + (isInSelection(voice, i) ? ' selected' : '');
+      el.dataset.cellIndex = i;
+      el.dataset.voice = voice;
+      el.innerHTML = '<div class="bar-line"></div>';
+      el.addEventListener('click', (e) => { e.stopPropagation(); selectCell(voice, i, e.shiftKey, e.ctrlKey || e.metaKey); });
+      return el;
+    }
+
+    el = document.createElement('div');
+    el.className = 'cell' + (cell.type === 'dash' ? ' dash-cell' : '') + (isInSelection(voice, i) ? ' selected' : '') + (cell.bold ? ' bold-note' : '') + (cell.half ? ' half-cell' : '');
+    el.dataset.cellIndex = i;
+    el.dataset.voice = voice;
+
+    const octAbove = document.createElement('div');
+    octAbove.className = 'oct-row';
+    const octBelowWrap = document.createElement('div');
+    octBelowWrap.className = 'oct-row oct-row-below';
+
+    if(cell.type === 'note' && cell.octave > 0){
+      for(let k=0;k<cell.octave;k++){ const d=document.createElement('div'); d.className='oct-dot'; octAbove.appendChild(d); }
+    }
+    el.appendChild(octAbove);
+
+    const digitRow = document.createElement('div');
+    digitRow.className = 'digit-row';
+    const digit = document.createElement('span');
+    digit.className = 'digit';
+    digit.textContent = cell.type === 'dash' ? '－' : (cell.repeat ? '↻' : cell.value);
+    if(cell.repeat && (!cell.color || cell.color === 'black')){
+      digit.style.color = COLOR_MAP.red;
+    } else if(cell.color && cell.color !== 'black'){
+      digit.style.color = COLOR_MAP[cell.color] || '';
+    }
+    digitRow.appendChild(digit);
+    if(cell.dot){
+      const dot = document.createElement('span');
+      dot.className = 'augment-dot';
+      if(cell.color && cell.color !== 'black'){
+        dot.style.background = COLOR_MAP[cell.color] || '';
+      }
+      digitRow.appendChild(dot);
+    }
+    if(cell.type === 'note' && cell.accidental){
+      const mark = document.createElement('span');
+      mark.className = 'accidental-mark' + (cell.accidental === 'flat' ? ' flat-mark' : '');
+      mark.textContent = cell.accidental === 'sharp' ? '♯' : '♭';
+      if(cell.color && cell.color !== 'black'){
+        mark.style.color = COLOR_MAP[cell.color] || '';
+      }
+      digitRow.appendChild(mark);
+    }
+    if(cell.type === 'note' && cell.finger){
+      const fingerEl = document.createElement('span');
+      fingerEl.className = 'finger-mark';
+      fingerEl.textContent = '[' + cell.finger + ']';
+      digitRow.appendChild(fingerEl);
+    }
+    if(cell.type === 'note' && cell.yaozhi){
+      const yaozhiEl = document.createElement('span');
+      yaozhiEl.className = 'yaozhi-mark';
+      yaozhiEl.textContent = '///';
+      digitRow.appendChild(yaozhiEl);
+    }
+    el.appendChild(digitRow);
+
+    const underlines = document.createElement('div');
+    underlines.className = 'underlines';
+    if(cell.type !== 'dash' && cell.duration){
+      const count = cell.duration === 8 ? 1 : (cell.duration === 16 ? 2 : 0);
+      for(let k=0;k<count;k++){ const u=document.createElement('div'); u.className='underline'; underlines.appendChild(u); }
+    }
+    el.appendChild(underlines);
+
+    if(cell.type === 'note' && cell.octave < 0){
+      for(let k=0;k<Math.abs(cell.octave);k++){ const d=document.createElement('div'); d.className='oct-dot oct-dot-below'; octBelowWrap.appendChild(d); }
+    }
+    el.appendChild(octBelowWrap);
+
+    if(cell.type === 'note' && cell.chord && cell.chord.length){
+      const chordEl = document.createElement('div');
+      chordEl.className = 'chord-notes';
+      cell.chord.slice(0, 3).forEach(digit => {
+        const span = document.createElement('span');
+        span.textContent = digit;
+        chordEl.appendChild(span);
+      });
+      el.appendChild(chordEl);
+    }
+
+    const lyric = document.createElement('input');
+    lyric.className = 'lyric-input' + (cell.lyricBold ? ' lyric-bold' : '');
+    lyric.type = 'text';
+    lyric.value = cell.lyric || '';
+    lyric.dataset.index = i;
+    lyric.dataset.voice = voice;
+    lyric.addEventListener('click', (e) => { e.stopPropagation(); focusVoice(voice); });
+    lyric.addEventListener('focus', () => { focusVoice(voice); pushHistory(); });
+    lyric.addEventListener('input', (e) => { cell.lyric = e.target.value; markDirty(); });
+    el.appendChild(lyric);
+
+    el.addEventListener('click', (e) => { e.stopPropagation(); selectCell(voice, i, e.shiftKey, e.ctrlKey || e.metaKey); });
+    return el;
+  }
+
+  function buildPageHeader(){
+    const header = document.createElement('div');
+    header.className = 'page-header';
+    const title = document.createElement('div');
+    title.className = 'ph-title';
+    title.textContent = document.getElementById('titleInput').textContent.trim() || '제목을 입력하세요';
+    const meta = document.createElement('div');
+    meta.className = 'ph-meta';
+    const credit = document.getElementById('creditInput').value.trim();
+    const key = hiddenFields.key ? '' : document.getElementById('keyInput').value.trim();
+    const time = hiddenFields.time ? '' : document.getElementById('timeInput').value.trim();
+    const tempo = hiddenFields.tempo ? '' : document.getElementById('tempoInput').value.trim();
+    const parts = [];
+    if(credit) parts.push(credit);
+    if(key) parts.push('1=' + key);
+    if(time) parts.push(time);
+    if(tempo) parts.push('♩=' + tempo);
+    meta.textContent = parts.join(' · ');
+
+    header.appendChild(title);
+    header.appendChild(meta);
+    return header;
+  }
+
+  let pageNumberHidden = false;
+  function buildPageFooter(pageNum, totalPages){
+    const footer = document.createElement('div');
+    footer.className = 'page-footer';
+    footer.textContent = pageNum + ' / ' + totalPages;
+    if(pageNumberHidden) footer.style.visibility = 'hidden';
+    return footer;
+  }
+
+  // ---------- Pagination (A4) ----------
+  function measureBraceOverhead(){
+    try{
+      const ref = document.createElement('div');
+      ref.className = 'grand-staff-group';
+      ref.style.position = 'fixed';
+      ref.style.left = '-9999px';
+      ref.style.top = '0';
+      ref.style.visibility = 'hidden';
+      const brace = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      brace.setAttribute('class', 'brace-svg');
+      ref.appendChild(brace);
+      const staffWrap = document.createElement('div');
+      staffWrap.className = 'staff-wrap';
+      staffWrap.style.height = '20px';
+      ref.appendChild(staffWrap);
+      document.body.appendChild(ref);
+      const braceRect = brace.getBoundingClientRect();
+      const groupStyle = getComputedStyle(ref);
+      const gap = parseFloat(groupStyle.columnGap || groupStyle.gap || '0') || 0;
+      const overhead = braceRect.width + gap;
+      document.body.removeChild(ref);
+      return overhead;
+    } catch(err){
+      return 24; // sensible fallback matching the default (non-mobile) sizing
+    }
+  }
+
+  function computePageContentBox(){
+    const refPage = document.createElement('div');
+    refPage.className = 'page';
+    refPage.style.position = 'fixed';
+    refPage.style.left = '-9999px';
+    refPage.style.top = '0';
+    refPage.style.visibility = 'hidden';
+    const refCanvas = document.createElement('div');
+    refCanvas.className = 'page-canvas';
+    refPage.appendChild(refCanvas);
+    const refFooter = document.createElement('div');
+    refFooter.className = 'page-footer';
+    refFooter.textContent = '1 / 1';
+    refPage.appendChild(refFooter);
+    document.body.appendChild(refPage);
+    const rect = refCanvas.getBoundingClientRect();
+    const box = { width: rect.width, height: rect.height };
+    document.body.removeChild(refPage);
+    return box;
+  }
+
+  function measureRows(arr, widthPx){
+    if(!arr.length) return [];
+    const wrap = document.createElement('div');
+    wrap.className = 'page-canvas';
+    wrap.style.position = 'fixed';
+    wrap.style.left = '-9999px';
+    wrap.style.top = '0';
+    wrap.style.visibility = 'hidden';
+    wrap.style.width = widthPx + 'px';
+    wrap.style.overflow = 'visible';
+    document.body.appendChild(wrap);
+
+    const elements = arr.map((c, i) => buildCellElement(c, i, 'upper'));
+    elements.forEach(el => wrap.appendChild(el));
+
+    const wrapRect = wrap.getBoundingClientRect();
+    const rows = [];
+    let lastTop = null;
+    let currentRow = null;
+    elements.forEach((el, i) => {
+      const r = el.getBoundingClientRect();
+      const top = Math.round(r.top - wrapRect.top);
+      if(lastTop === null || Math.abs(top - lastTop) > 2){
+        currentRow = { height: 0, indices: [] };
+        rows.push(currentRow);
+        lastTop = top;
+      }
+      currentRow.indices.push(i);
+      currentRow.height = Math.max(currentRow.height, r.height);
+    });
+
+    document.body.removeChild(wrap);
+    return rows;
+  }
+
+  function paginateRows(rows, firstPageMaxRows, rowsPerPage){
+    const ROWS_PER_PAGE = rowsPerPage || 10;
+    const pages = [];
+    if(!rows.length){ pages.push([]); return pages; }
+
+    const firstCount = Math.max(0, Math.min(ROWS_PER_PAGE, firstPageMaxRows, rows.length));
+    pages.push(rows.slice(0, firstCount));
+
+    for(let i = firstCount; i < rows.length; i += ROWS_PER_PAGE){
+      pages.push(rows.slice(i, i + ROWS_PER_PAGE));
+    }
+    return pages;
+  }
+
+  function countRowsForHeight(rows, budgetHeight, rowsPerPage){
+    const cap = rowsPerPage || 10;
+    const ROW_GAP = 14;
+    let used = 0;
+    let count = 0;
+    for(const row of rows){
+      const extra = count > 0 ? ROW_GAP : 0;
+      if(used + extra + row.height > budgetHeight) break;
+      used += extra + row.height;
+      count++;
+      if(count >= cap) break;
+    }
+    return count;
+  }
+
+  function updateTitleblockVar(){
+    try{
+      const tb = document.querySelector('.titleblock');
+      if(!tb) return 0;
+      const tbRect = tb.getBoundingClientRect();
+      const sub = document.querySelector('.subtitle-row');
+      if(sub){
+        const subRect = sub.getBoundingClientRect();
+        const subBottom = subRect.bottom - tbRect.top;
+        document.documentElement.style.setProperty('--tb-sub-bottom', subBottom + 'px');
+      }
+      const h = tbRect.height;
+      if(typeof h === 'number' && isFinite(h) && h >= 0){
+        document.documentElement.style.setProperty('--tb-h', h + 'px');
+        return h;
+      }
+    } catch(err){ /* ignore measurement errors, non-critical */ }
+    return 0;
+  }
+
+  // ---------- Rendering ----------
+  function render(){
+    document.body.classList.toggle('two-row-mode', twoRowMode);
+    const titleblockHeight = updateTitleblockVar();
+    if(!pageContentBox) pageContentBox = computePageContentBox();
+
+    const rowsPerPage = twoRowMode ? 5 : 10;
+    const availWidth = twoRowMode ? Math.max(0, pageContentBox.width - measureBraceOverhead()) : pageContentBox.width;
+    const upperRows = measureRows(cellsUpper, availWidth);
+    const lowerRows = twoRowMode ? measureRows(cellsLower, availWidth) : [];
+
+    // Combine both voices into one system list BEFORE paginating, so pagination is driven by
+    // the combined system count -- not by whichever voice happens to wrap into more rows first.
+    const systemCountTotal = twoRowMode ? Math.max(upperRows.length, lowerRows.length) : upperRows.length;
+    const systemRows = [];
+    for(let i = 0; i < systemCountTotal; i++){
+      const u = upperRows[i] || null;
+      const l = twoRowMode ? (lowerRows[i] || null) : null;
+      systemRows.push({
+        height: Math.max(u ? u.height : 0, l ? l.height : 0),
+        upper: u,
+        lower: l
+      });
+    }
+
+    let firstPageMaxRows = rowsPerPage;
+    if(pageContentBox.height > 0){
+      const firstPageBudget = Math.max(0, pageContentBox.height - titleblockHeight);
+      firstPageMaxRows = countRowsForHeight(systemRows, firstPageBudget, rowsPerPage);
+    }
+    const systemPages = paginateRows(systemRows, firstPageMaxRows, rowsPerPage);
+    const totalPages = systemPages.length;
+
+    const makeDeselect = (voice) => (e) => {
+      if(e.target === e.currentTarget || e.target.classList.contains('empty-hint')){
+        focusMobileKeyInput();
+        focusVoice(voice);
+        selectedIndex = null;
+        rangeEndIndex = null;
+        extraSelected.clear();
+        render();
+      }
+    };
+
+    function buildBrace(){
+      const brace = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      brace.setAttribute('class', 'brace-svg');
+      brace.setAttribute('viewBox', '0 0 20 100');
+      brace.setAttribute('preserveAspectRatio', 'none');
+      brace.innerHTML = '<path d="M16,1 C6,1 6,16 6,22 C6,30 9,34 9,40 C9,47 2,48 1,50 C2,52 9,53 9,60 C9,66 6,70 6,78 C6,84 6,99 16,99" fill="none" stroke="var(--ink)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>';
+      return brace;
+    }
+    function buildVoiceRow(sourceArr, row, voice){
+      const canvas = document.createElement('div');
+      canvas.className = 'page-canvas' + (voice === 'lower' ? ' lower-voice-canvas' : '');
+      (row ? row.indices : []).forEach(idx => {
+        canvas.appendChild(buildCellElement(sourceArr[idx], idx, voice));
+      });
+      canvas.addEventListener('click', makeDeselect(voice));
+      return canvas;
+    }
+
+    pagesContainer.innerHTML = '';
+    for(let pIdx = 0; pIdx < totalPages; pIdx++){
+      const pageEl = document.createElement('div');
+      pageEl.className = 'page';
+      pageEl.appendChild(buildPageHeader());
+
+      const systemsThisPage = systemPages[pIdx] || [];
+
+      if(cellsUpper.length === 0 && pIdx === 0 && !(twoRowMode && cellsLower.length)){
+        const upperCanvas = document.createElement('div');
+        upperCanvas.className = 'page-canvas';
+        const hint = document.createElement('p');
+        hint.className = 'empty-hint';
+        hint.textContent = '숫자(1~7) 버튼을 눌러 음을 입력해 보세요. 각 음 아래 칸에는 가사를 적을 수 있어요.';
+        upperCanvas.appendChild(hint);
+        upperCanvas.addEventListener('click', makeDeselect('upper'));
+        pageEl.appendChild(upperCanvas);
+      } else if(!twoRowMode){
+        const upperCanvas = document.createElement('div');
+        upperCanvas.className = 'page-canvas';
+        systemsThisPage.forEach(sys => {
+          (sys.upper ? sys.upper.indices : []).forEach(idx => {
+            upperCanvas.appendChild(buildCellElement(cellsUpper[idx], idx, 'upper'));
+          });
+        });
+        upperCanvas.addEventListener('click', makeDeselect('upper'));
+        pageEl.appendChild(upperCanvas);
+      } else {
+        // Two-row (piano) mode: each voice wraps independently based on its own content;
+        // system k pairs upper's row k with lower's row k (by row NUMBER, not cell count),
+        // and both voices share the SAME page boundaries via the combined system list above.
+        const systemsWrap = document.createElement('div');
+        systemsWrap.className = 'systems-wrap';
+
+        systemsThisPage.forEach(sys => {
+          const groupEl = document.createElement('div');
+          groupEl.className = 'grand-staff-group';
+
+          const staffWrap = document.createElement('div');
+          staffWrap.className = 'staff-wrap';
+          staffWrap.appendChild(buildVoiceRow(cellsUpper, sys.upper, 'upper'));
+          staffWrap.appendChild(buildVoiceRow(cellsLower, sys.lower, 'lower'));
+
+          groupEl.appendChild(buildBrace());
+          groupEl.appendChild(staffWrap);
+          systemsWrap.appendChild(groupEl);
+        });
+
+        if(cellsUpper.length === 0 && cellsLower.length === 0 && pIdx === 0){
+          const hint = document.createElement('p');
+          hint.className = 'empty-hint';
+          hint.textContent = '숫자(1~7) 버튼을 눌러 음을 입력해 보세요. 위/아래 줄을 각각 클릭해서 오른손·왼손을 따로 입력할 수 있어요.';
+          systemsWrap.appendChild(hint);
+        }
+
+        pageEl.appendChild(systemsWrap);
+      }
+
+      pageEl.appendChild(buildPageFooter(pIdx + 1, totalPages));
+      pagesContainer.appendChild(pageEl);
+    }
+
+    updateToolbarUI();
+  }
+
+  function selectAllCells(){
+    if(!cells.length) return;
+    selectedIndex = 0;
+    rangeEndIndex = cells.length - 1;
+    extraSelected.clear();
+    render();
+  }
+
+  function selectCell(voice, i, isShift, isCtrl){
+    focusMobileKeyInput();
+    if(activeVoice !== voice){
+      focusVoice(voice);
+      selectedIndex = i;
+      render();
+      return;
+    }
+    if(isCtrl){
+      if(extraSelected.has(i)) extraSelected.delete(i);
+      else extraSelected.add(i);
+      if(selectedIndex === null){
+        selectedIndex = i;
+        rangeEndIndex = null;
+      }
+      render();
+      return;
+    }
+    if(isShift && selectedIndex !== null){
+      rangeEndIndex = i;
+      render();
+      return;
+    }
+    extraSelected.clear();
+    if(selectedIndex === i && rangeEndIndex === null){
+      selectedIndex = null;
+    } else {
+      selectedIndex = i;
+    }
+    rangeEndIndex = null;
+    render();
+  }
+
+  function updateToolbarUI(){
+    const state = activeState();
+    document.querySelectorAll('#durButtons button[data-dur]').forEach(b => {
+      b.classList.toggle('active', Number(b.dataset.dur) === state.duration);
+    });
+    document.getElementById('dotToggle').classList.toggle('active', !!state.dot);
+    octIndicator.textContent = (state.octave > 0 ? '+' : '') + state.octave;
+    octIndicator.style.color = state.octave < 0 ? '#2E5FA3' : 'var(--accent)';
+    document.querySelectorAll('#colorButtons button[data-color]').forEach(b => {
+      b.classList.toggle('active', b.dataset.color === (state.color || 'black'));
+    });
+    document.getElementById('sharpBtn').classList.toggle('active', state.accidental === 'sharp');
+    document.getElementById('flatBtn').classList.toggle('active', state.accidental === 'flat');
+  }
+
+  // ---------- Event bindings ----------
+  document.getElementById('noteButtons').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-note]');
+    if(!btn) return;
+    const v = btn.dataset.note;
+    insertOrEditNote(v === 'rest' ? 'rest' : v);
+  });
+  document.getElementById('durButtons').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-dur]');
+    if(btn) setDuration(Number(btn.dataset.dur));
+  });
+  document.getElementById('colorButtons').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-color]');
+    if(btn) setColor(btn.dataset.color);
+  });
+  document.getElementById('sharpBtn').addEventListener('click', () => setAccidental('sharp'));
+  document.getElementById('flatBtn').addEventListener('click', () => setAccidental('flat'));
+  document.getElementById('playBtn').addEventListener('click', () => { playChords = false; startPlayback(); });
+  document.getElementById('playWithChordsBtn').addEventListener('click', () => { playChords = true; startPlayback(); });
+  document.getElementById('pauseBtn').addEventListener('click', pausePlayback);
+  document.getElementById('stopBtn').addEventListener('click', stopPlayback);
+  document.getElementById('volumeSlider').addEventListener('input', (e) => {
+    masterVolume = Number(e.target.value) / 100;
+    document.getElementById('recordVolumeSlider').value = e.target.value;
+  });
+  document.getElementById('recordVolumeSlider').addEventListener('input', (e) => {
+    masterVolume = Number(e.target.value) / 100;
+    document.getElementById('volumeSlider').value = e.target.value;
+  });
+  document.querySelectorAll('.speed-btn').forEach(btn => {
+    btn.addEventListener('click', () => setPlaybackRate(Number(btn.dataset.rate)));
+  });
+  document.getElementById('toolbarToggleBtn').addEventListener('click', () => {
+    const toolbar = document.getElementById('toolbar');
+    const collapsed = toolbar.classList.toggle('collapsed');
+    document.getElementById('toolbarToggleBtn').textContent = collapsed ? '▼ 편집 도구 펼치기' : '▲ 편집 도구 접기';
+  });
+  updatePlayButtons();
+  document.getElementById('dotToggle').addEventListener('click', toggleDot);
+  document.getElementById('octUp').addEventListener('click', () => changeOctave(1));
+  document.getElementById('octDown').addEventListener('click', () => changeOctave(-1));
+  document.getElementById('octReset').addEventListener('click', resetOctave);
+  document.getElementById('insertBtn').addEventListener('click', insertAfterSelected);
+  document.getElementById('splitBtn').addEventListener('click', splitCell);
+  document.getElementById('mergeBtn').addEventListener('click', mergeCells);
+  document.getElementById('chordBtn').addEventListener('click', (e) => { e.stopPropagation(); openChordPanel(); });
+  document.getElementById('fingerBtn').addEventListener('click', (e) => { e.stopPropagation(); openFingerPanel(); });
+  const TECHNIQUES = [
+    { label: '/// 摇指', apply: toggleYaozhi },
+    { label: '↻ 반복', apply: toggleRepeat }
+  ];
+  function showTechniquePanel(){
+    const panel = document.getElementById('techniquePanel');
+    panel.innerHTML = '';
+    TECHNIQUES.forEach(tech => {
+      const item = document.createElement('div');
+      item.className = 'cmd-item';
+      item.textContent = tech.label;
+      item.addEventListener('click', () => {
+        tech.apply();
+        panel.hidden = true;
+      });
+      panel.appendChild(item);
+    });
+    panel.hidden = false;
+  }
+  document.getElementById('techniqueBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    showTechniquePanel();
+  });
+  document.getElementById('recordBtn').addEventListener('click', openRecordModal);
+  document.getElementById('recordCloseBtn').addEventListener('click', closeRecordModal);
+  document.getElementById('recordConfirmBtn').addEventListener('click', confirmRecording);
+  function addRecordDash(){
+    pushRecordHistory();
+    recordedNotes.push({ type: 'dash' });
+    updateRecordedPreview();
+  }
+  document.getElementById('recordDashBtn').addEventListener('click', addRecordDash);
+  document.getElementById('recordBarBtn').addEventListener('click', () => {
+    pushRecordHistory();
+    recordedNotes.push({ type: 'bar' });
+    updateRecordedPreview();
+  });
+  document.getElementById('recordUndoBtn').addEventListener('click', recordUndo);
+  document.getElementById('recordRedoBtn').addEventListener('click', recordRedo);
+  document.getElementById('recordDeleteSelectedBtn').addEventListener('click', deleteSelectedRecordedNotes);
+  document.getElementById('recordClearBtn').addEventListener('click', () => {
+    if(!recordedNotes.length) return;
+    pushRecordHistory();
+    recordedNotes = [];
+    recordSelectedIndices.clear();
+    recordSelectAnchor = null;
+    updateRecordedPreview();
+  });
+  document.getElementById('recordModal').addEventListener('click', (e) => {
+    if(e.target.id === 'recordModal') closeRecordModal();
+  });
+  document.getElementById('chordApplyBtn').addEventListener('click', applyChordFromInput);
+  document.getElementById('fingerApplyBtn').addEventListener('click', applyFingerFromInput);
+  document.getElementById('chordPanelInput').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){ e.preventDefault(); e.stopPropagation(); applyChordFromInput(); }
+  });
+  document.getElementById('fingerPanelInput').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){ e.preventDefault(); e.stopPropagation(); applyFingerFromInput(); }
+  });
+  document.getElementById('undoBtn').addEventListener('click', undo);
+  document.getElementById('redoBtn').addEventListener('click', redo);
+  document.getElementById('copyBtn').addEventListener('click', copySelected);
+  document.getElementById('pasteBtn').addEventListener('click', pasteCell);
+  document.getElementById('dashBtn').addEventListener('click', insertDash);
+  document.getElementById('barBtn').addEventListener('click', insertBar);
+  document.getElementById('lyricsBtn').addEventListener('click', (e) => { e.stopPropagation(); openLyricsPanel(); });
+  document.getElementById('lyricsApplyBtn').addEventListener('click', applyLyricsFromInput);
+  document.getElementById('lyricsPanelInput').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      e.stopPropagation();
+      applyLyricsFromInput();
+    }
+  });
+  document.getElementById('breakBtn').addEventListener('click', insertBreak);
+  document.getElementById('delBtn').addEventListener('click', deleteSelected);
+  document.getElementById('clearBtn').addEventListener('click', clearAll);
+
+  function setTitleColor(bg, text){
+    document.documentElement.style.setProperty('--header-bg', bg);
+    document.documentElement.style.setProperty('--header-text', text);
+    const faint = text.toLowerCase() === '#000000' ? 'rgba(0,0,0,0.4)' : 'rgba(238,242,237,0.4)';
+    document.documentElement.style.setProperty('--header-text-faint', faint);
+  }
+  const SHORTCUTS = [
+    { key: 'F1 / F2 / F3 / F4', desc: '선택한 음(또는 이후 입력)을 검정/빨강/파랑/초록으로' },
+    { key: 'F5', desc: '선택한 음, 또는 포커스된 가사를 굵게/얇게 토글' },
+    { key: 'F6', desc: '선택한 음에 샵(#) 적용/해제' },
+    { key: 'F7', desc: '선택한 음에 플랫(b) 적용/해제' },
+    { key: 'Ctrl+C', desc: '선택한 음 복사' },
+    { key: 'Ctrl+V', desc: '복사한 음 붙여넣기' },
+    { key: 'Ctrl+Z', desc: '실행 취소' },
+    { key: 'Ctrl+Y / Ctrl+Shift+Z', desc: '다시 실행' },
+    { key: 'Ctrl+A', desc: '전체 선택' },
+    { key: 'Ctrl+S', desc: '파일로 저장' },
+    { key: 'Ctrl+P', desc: '인쇄 / PDF 저장' },
+    { key: 'Ctrl+R', desc: '녹음(고쟁 연주) 창 열기' },
+    { key: 'Ctrl+L', desc: '가사 입력창 열기' },
+    { key: 'Shift+F', desc: '손가락 번호 입력창 열기' },
+    { key: 'Shift+H', desc: '화음 번호 입력창 열기' },
+    { key: 'Shift+S', desc: '파일 불러오기 (.json)' },
+    { key: '/ (빠르게 3번)', desc: '선택한 음에 /// 摇指 적용/해제' },
+    { key: 'Space', desc: '재생 / 일시정지' },
+    { key: 'Ctrl+Space', desc: '화음 포함 재생 / 일시정지' },
+    { key: 'Space 두 번(빠르게)', desc: '정지' },
+    { key: '← / →', desc: '이전 / 다음 칸 선택' },
+    { key: '↑ / ↓', desc: '옥타브 올림 / 내림' },
+    { key: 'Backspace / Delete', desc: '선택한 칸(또는 마지막 칸) 삭제' },
+    { key: '-', desc: '이음줄 삽입' },
+    { key: '|', desc: '마디선 삽입' },
+    { key: 'Enter', desc: '줄바꿈' },
+    { key: '0~7', desc: '숫자(음) · 쉼표(0) 입력' }
+  ];
+  function showShortcutListPanel(){
+    commandListPanel.innerHTML = '';
+    SHORTCUTS.forEach(s => {
+      const item = document.createElement('div');
+      item.className = 'cmd-item';
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'cmd-name';
+      nameSpan.textContent = s.key;
+      const descSpan = document.createElement('span');
+      descSpan.className = 'cmd-desc';
+      descSpan.textContent = ' (' + s.desc + ')';
+      item.appendChild(nameSpan);
+      item.appendChild(descSpan);
+      commandListPanel.appendChild(item);
+    });
+    commandListPanel.hidden = false;
+  }
+  const COMMANDS = {
+    titlegreen: { run: () => setTitleColor('#1F3A34', '#EEF2ED'), desc: '타이틀 색상을 초록색(기본값)으로 변경합니다' },
+    titlered:   { run: () => setTitleColor('#7A2E2E', '#F5EDEA'), desc: '타이틀 색상을 빨간색으로 변경합니다' },
+    titleblue:  { run: () => setTitleColor('#1F3A5C', '#EAF1F7'), desc: '타이틀 색상을 파란색으로 변경합니다' },
+    titlegrey:  { run: () => setTitleColor('#4A4F55', '#F0F0F0'), desc: '타이틀 색상을 회색으로 변경합니다' },
+    titlewhite: { run: () => setTitleColor('#FFFFFF', '#000000'), desc: '타이틀 색상을 흰색으로 변경합니다' },
+    titleblack: { run: () => setTitleColor('#000000', '#F5F5F5'), desc: '타이틀 색상을 검정색으로 변경합니다' },
+    shortcut:   { run: () => showShortcutListPanel(), desc: '키보드 단축키 목록을 보여줍니다' },
+    pagenumber: { run: () => { pageNumberHidden = !pageNumberHidden; render(); }, desc: '페이지 번호를 숨기거나 다시 표시합니다 (기본값: 표시)' }
+  };
+  let hiddenFields = { key: false, time: false, tempo: false };
+  function applyFieldVisibility(hideKey, hideTime, hideTempo){
+    hiddenFields = { key: hideKey, time: hideTime, tempo: hideTempo };
+    const keyWrap = document.getElementById('keyFieldWrap');
+    const timeWrap = document.getElementById('timeFieldWrap');
+    const tempoWrap = document.getElementById('tempoFieldWrap');
+    if(keyWrap) keyWrap.style.display = hideKey ? 'none' : '';
+    if(timeWrap) timeWrap.style.display = hideTime ? 'none' : '';
+    if(tempoWrap) tempoWrap.style.display = hideTempo ? 'none' : '';
+    pageContentBox = null;
+    render();
+  }
+  function parseD4100(name){
+    let rest = name;
+    let hideKey = false, hideTime = false, hideTempo = false;
+    if(rest.startsWith('d')){ hideKey = true; rest = rest.slice(1); }
+    if(rest.startsWith('4')){ hideTime = true; rest = rest.slice(1); }
+    if(rest === '100'){ hideTempo = true; rest = ''; }
+    if(rest !== '') return null;
+    if(!hideKey && !hideTime && !hideTempo) return null;
+    return { hideKey, hideTime, hideTempo };
+  }
+  function runCommand(raw){
+    const trimmed = (raw || '').trim();
+    if(!trimmed.startsWith('/')) return;
+    const name = trimmed.slice(1).toLowerCase();
+    if(name === 'd4100+'){
+      applyFieldVisibility(false, false, false);
+      return;
+    }
+    const parsed = parseD4100(name);
+    if(parsed){
+      applyFieldVisibility(parsed.hideKey, parsed.hideTime, parsed.hideTempo);
+      return;
+    }
+    if(COMMANDS[name]){
+      COMMANDS[name].run();
+    } else if(name){
+      alert('알 수 없는 명령어예요: /' + name);
+    }
+  }
+  document.getElementById('commandInput').addEventListener('keydown', (e) => {
+    if(e.key === 'Enter'){
+      e.preventDefault();
+      e.stopPropagation();
+      runCommand(e.target.value);
+      e.target.value = '';
+    }
+  });
+
+  const commandListPanel = document.getElementById('commandListPanel');
+  const D4100_COMMANDS = [
+    { name: 'd', desc: '장조 칸을 숨깁니다' },
+    { name: '4', desc: '박자 칸을 숨깁니다' },
+    { name: '100', desc: '템포 칸을 숨깁니다' },
+    { name: 'd4', desc: '장조·박자 칸을 숨깁니다' },
+    { name: 'd100', desc: '장조·템포 칸을 숨깁니다' },
+    { name: '4100', desc: '박자·템포 칸을 숨깁니다' },
+    { name: 'd4100', desc: '장조·박자·템포 칸을 모두 숨깁니다' },
+    { name: 'd4100+', desc: '숨긴 장조·박자·템포 칸을 다시 표시합니다' }
+  ];
+  function fillCommandInputAndClose(name){
+    const input = document.getElementById('commandInput');
+    input.value = '/' + name;
+    hideCommandListPanel();
+    input.focus();
+    const len = input.value.length;
+    input.setSelectionRange(len, len);
+  }
+  function showCommandListPanel(){
+    commandListPanel.innerHTML = '';
+    Object.keys(COMMANDS).forEach(name => {
+      const item = document.createElement('div');
+      item.className = 'cmd-item';
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'cmd-name';
+      nameSpan.textContent = '/' + name;
+      const descSpan = document.createElement('span');
+      descSpan.className = 'cmd-desc';
+      descSpan.textContent = ' (' + COMMANDS[name].desc + ')';
+      item.appendChild(nameSpan);
+      item.appendChild(descSpan);
+      item.title = '더블클릭하면 입력창에 채워져요';
+      item.addEventListener('dblclick', () => fillCommandInputAndClose(name));
+      commandListPanel.appendChild(item);
+    });
+    D4100_COMMANDS.forEach(cmd => {
+      const item = document.createElement('div');
+      item.className = 'cmd-item';
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'cmd-name';
+      nameSpan.textContent = '/' + cmd.name;
+      const descSpan = document.createElement('span');
+      descSpan.className = 'cmd-desc';
+      descSpan.textContent = ' (' + cmd.desc + ')';
+      item.appendChild(nameSpan);
+      item.appendChild(descSpan);
+      item.title = '더블클릭하면 입력창에 채워져요';
+      item.addEventListener('dblclick', () => fillCommandInputAndClose(cmd.name));
+      commandListPanel.appendChild(item);
+    });
+    commandListPanel.hidden = false;
+  }
+  function hideCommandListPanel(){ commandListPanel.hidden = true; }
+
+  let commandInputClickCount = 0;
+  let commandInputClickTimer = null;
+  document.getElementById('commandInput').addEventListener('click', () => {
+    commandInputClickCount++;
+    clearTimeout(commandInputClickTimer);
+    commandInputClickTimer = setTimeout(() => { commandInputClickCount = 0; }, 2000);
+    if(commandInputClickCount >= 5){
+      commandInputClickCount = 0;
+      showCommandListPanel();
+    }
+  });
+
+  const infoPanel = document.getElementById('infoPanel');
+  document.getElementById('infoBtn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    infoPanel.hidden = !infoPanel.hidden;
+  });
+
+  function closePanelAndBlur(panel){
+    if(panel.hidden) return;
+    panel.hidden = true;
+    if(document.activeElement && panel.contains(document.activeElement)){
+      document.activeElement.blur();
+    }
+  }
+  document.addEventListener('click', (e) => {
+    if(!commandListPanel.hidden && !e.target.closest('.command-input-wrap')){
+      closePanelAndBlur(commandListPanel);
+    }
+    if(!infoPanel.hidden && !e.target.closest('.command-input-wrap')){
+      closePanelAndBlur(infoPanel);
+    }
+    const lyricsPanel = document.getElementById('lyricsPanel');
+    if(!lyricsPanel.hidden && !e.target.closest('.command-input-wrap') && !e.target.closest('#lyricsPanel')){
+      closePanelAndBlur(lyricsPanel);
+    }
+    const fingerPanel = document.getElementById('fingerPanel');
+    if(!fingerPanel.hidden && !e.target.closest('.command-input-wrap') && !e.target.closest('#fingerPanel')){
+      closePanelAndBlur(fingerPanel);
+    }
+    const chordPanel = document.getElementById('chordPanel');
+    if(!chordPanel.hidden && !e.target.closest('.command-input-wrap') && !e.target.closest('#chordPanel')){
+      closePanelAndBlur(chordPanel);
+    }
+    const techniquePanel = document.getElementById('techniquePanel');
+    if(!techniquePanel.hidden && !e.target.closest('.command-input-wrap') && !e.target.closest('#techniquePanel')){
+      closePanelAndBlur(techniquePanel);
+    }
+  });
+
+  window.addEventListener('resize', () => {
+    clearTimeout(window.__resizeT);
+    window.__resizeT = setTimeout(() => { pageContentBox = null; render(); }, 200);
+  });
+
+  ['titleInput','creditInput','producerInput','keyInput','timeInput','tempoInput'].forEach(id => {
+    const el = document.getElementById(id);
+    const evt = id === 'titleInput' ? 'input' : 'input';
+    el.addEventListener(evt, () => { markDirty(); pageContentBox = null; render(); });
+  });
+
+  if(mobileKeyInput){
+    mobileKeyInput.addEventListener('input', (e) => {
+      if(e.inputType === 'deleteContentBackward'){
+        mobileKeyInput.value = '';
+        deleteSelected();
+        return;
+      }
+      const match = e.target.value.match(/[0-9]/);
+      mobileKeyInput.value = '';
+      if(!match) return;
+      const digit = match[0];
+      if(digit === '0'){ insertOrEditNote('rest'); }
+      else if(digit >= '1' && digit <= '7'){ insertOrEditNote(digit); }
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    const recordModalEl = document.getElementById('recordModal');
+    if(recordModalEl && !recordModalEl.hidden){
+      const onVolumeSlider = document.activeElement && document.activeElement.id === 'recordVolumeSlider';
+      if(!onVolumeSlider && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')){
+        e.preventDefault();
+        recordTranspose += (e.key === 'ArrowRight') ? 1 : -1;
+        recordTranspose = Math.max(-24, Math.min(24, recordTranspose));
+        document.getElementById('recordTransposeLabel').textContent = recordTranspose;
+        return;
+      }
+      if(e.key === 'Escape'){
+        e.preventDefault();
+        closeRecordModal();
+        return;
+      }
+      if((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z'){
+        e.preventDefault();
+        recordUndo();
+        return;
+      }
+      if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y'){
+        e.preventDefault();
+        recordRedo();
+        return;
+      }
+      if(!onVolumeSlider && e.key === '-'){
+        e.preventDefault();
+        addRecordDash();
+        return;
+      }
+      return;
+    }
+    const active = document.activeElement;
+    const isLyricInput = active && active.tagName === 'INPUT' && active.classList.contains('lyric-input');
+    const isMobileKeyInput = active && active.id === 'mobileKeyInput';
+
+    if(e.key === 'F5' && isLyricInput){
+      e.preventDefault();
+      toggleBold();
+      return;
+    }
+
+    const tag = active.tagName;
+    const editable = active.isContentEditable;
+    const inputType = (active.type || '').toLowerCase();
+    const NON_TEXT_INPUT_TYPES = ['range', 'checkbox', 'radio', 'button', 'file', 'submit', 'reset', 'color', 'image'];
+    const isTextInput = tag === 'INPUT' && !NON_TEXT_INPUT_TYPES.includes(inputType);
+    const isBlockingField = tag === 'TEXTAREA' || editable || isTextInput;
+    if(isBlockingField && !isMobileKeyInput) return;
+
+    if(/^[0-7]$/.test(e.key)){
+      if(isMobileKeyInput) return; // handled by mobileKeyInput's own 'input' listener instead
+      insertOrEditNote(e.key === '0' ? 'rest' : e.key);
+    } else if(e.key === 'Backspace' || e.key === 'Delete'){
+      e.preventDefault();
+      deleteSelected();
+    } else if(e.key === 'ArrowUp'){
+      e.preventDefault(); changeOctave(1);
+    } else if(e.key === 'ArrowDown'){
+      e.preventDefault(); changeOctave(-1);
+    } else if(e.key === 'ArrowLeft'){
+      if(cells.length){ selectedIndex = selectedIndex === null ? cells.length-1 : clamp(selectedIndex-1,0,cells.length-1); render(); }
+    } else if(e.key === 'ArrowRight'){
+      if(cells.length){ selectedIndex = selectedIndex === null ? 0 : clamp(selectedIndex+1,0,cells.length-1); render(); }
+    } else if(e.key === '-'){
+      insertDash();
+    } else if(e.key === '|'){
+      e.preventDefault();
+      insertBar();
+    } else if(e.key === 'Enter'){
+      insertBreak();
+    } else if(e.key === 'F1'){
+      e.preventDefault(); setColor('black');
+    } else if(e.key === 'F2'){
+      e.preventDefault(); setColor('red');
+    } else if(e.key === 'F3'){
+      e.preventDefault(); setColor('blue');
+    } else if(e.key === 'F4'){
+      e.preventDefault(); setColor('green');
+    } else if(e.key === 'F5'){
+      e.preventDefault(); toggleBold();
+    } else if(e.key === 'F6'){
+      e.preventDefault(); setAccidental('sharp');
+    } else if(e.key === 'F7'){
+      e.preventDefault(); setAccidental('flat');
+    } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c'){
+      const sel = window.getSelection ? window.getSelection() : null;
+      if(sel && sel.toString().length > 0){
+        return; // let the browser copy the selected text natively
+      }
+      e.preventDefault(); copySelected();
+    } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v'){
+      e.preventDefault(); pasteCell();
+    } else if((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z'){
+      e.preventDefault(); undo();
+    } else if((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z'){
+      e.preventDefault(); redo();
+    } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y'){
+      e.preventDefault(); redo();
+    } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a'){
+      e.preventDefault(); selectAllCells();
+    } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's'){
+      e.preventDefault(); saveScoreFile();
+    } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p'){
+      e.preventDefault(); window.print();
+    } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'r'){
+      e.preventDefault(); openRecordModal();
+    } else if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'l'){
+      e.preventDefault(); openLyricsPanel();
+    } else if(e.shiftKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'f'){
+      e.preventDefault(); openFingerPanel();
+    } else if(e.shiftKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'h'){
+      e.preventDefault(); openChordPanel();
+    } else if(e.shiftKey && !e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 's'){
+      e.preventDefault(); loadScoreFile();
+    } else if(e.key === '/'){
+      e.preventDefault();
+      slashPressCount++;
+      clearTimeout(slashPressTimer);
+      slashPressTimer = setTimeout(() => { slashPressCount = 0; }, 600);
+      if(slashPressCount >= 3){
+        slashPressCount = 0;
+        toggleYaozhi();
+      }
+    } else if((e.ctrlKey || e.metaKey) && (e.key === ' ' || e.code === 'Space')){
+      e.preventDefault();
+      const now = Date.now();
+      if(now - lastSpaceTime < 350){
+        stopPlayback();
+        lastSpaceTime = 0;
+      } else {
+        if(playState === 'playing') pausePlayback();
+        else { playChords = true; startPlayback(); }
+        lastSpaceTime = now;
+      }
+    } else if(e.key === ' ' || e.code === 'Space'){
+      e.preventDefault();
+      const now = Date.now();
+      if(now - lastSpaceTime < 350){
+        stopPlayback();
+        lastSpaceTime = 0;
+      } else {
+        if(playState === 'playing') pausePlayback();
+        else { playChords = false; startPlayback(); }
+        lastSpaceTime = now;
+      }
+    }
+  });
+
+  // ---------- Export / Save / Load ----------
+  document.getElementById('printBtn').addEventListener('click', () => window.print());
+
+  async function saveScoreFile(){
+    syncActiveVoiceStorage();
+    const data = {
+      title: document.getElementById('titleInput').textContent.trim(),
+      credit: document.getElementById('creditInput').value,
+      producer: document.getElementById('producerInput').value,
+      key: document.getElementById('keyInput').value,
+      time: document.getElementById('timeInput').value,
+      tempo: document.getElementById('tempoInput').value,
+      cells: cellsUpper,
+      cellsLower: cellsLower
+    };
+    const jsonStr = JSON.stringify(data, null, 2);
+    const baseName = (data.title || '숫자악보');
+
+    if(window.showSaveFilePicker){
+      let handle;
+      try{
+        handle = await window.showSaveFilePicker({
+          id: 'sungja-akbo-json',
+          suggestedName: baseName + '.json',
+          types: [{ description: 'JSON 파일', accept: { 'application/json': ['.json'] } }]
+        });
+      } catch(err){
+        return false; // user cancelled the picker
+      }
+
+      let isExisting = false;
+      try{
+        const existingFile = await handle.getFile();
+        if(existingFile && existingFile.size > 0) isExisting = true;
+      } catch(err){ /* treat as new file */ }
+
+      if(isExisting){
+        const ok = confirm('선택하신 파일이 이미 존재합니다. 덮어쓰시겠습니까?');
+        if(!ok) return false;
+      }
+
+      try{
+        const writable = await handle.createWritable();
+        await writable.write(jsonStr);
+        await writable.close();
+        isDirty = false;
+        return true;
+      } catch(err){
+        alert('저장 중 문제가 발생했어요. 다시 시도해 주세요.');
+        return false;
+      }
+    } else {
+      // Fallback for browsers without File System Access API (e.g. Firefox, Safari)
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const link = document.createElement('a');
+      link.download = baseName + '.json';
+      link.href = URL.createObjectURL(blob);
+      link.click();
+      isDirty = false;
+      return true;
+    }
+  }
+  document.getElementById('saveJsonBtn').addEventListener('click', saveScoreFile);
+
+  async function switchToOneRow(){
+    if(!twoRowMode) return;
+    if(isDirty){
+      if(confirm('저장하지 않은 변경사항이 있어요. 1행으로 전환하기 전에 저장하시겠어요?')){
+        await saveScoreFile();
+      }
+    }
+    syncActiveVoiceStorage();
+    cellsLower = [];
+    twoRowMode = false;
+    activeVoice = 'upper';
+    cells = cellsUpper;
+    selectedIndex = null;
+    rangeEndIndex = null;
+    extraSelected.clear();
+    pageContentBox = null;
+    document.getElementById('twoRowBtn').classList.remove('active');
+    document.getElementById('oneRowBtn').classList.add('active');
+    render();
+  }
+  async function switchToTwoRow(){
+    if(twoRowMode) return;
+    if(isDirty){
+      if(confirm('저장하지 않은 변경사항이 있어요. 2행으로 전환하기 전에 저장하시겠어요?')){
+        await saveScoreFile();
+      }
+    }
+    twoRowMode = true;
+    pageContentBox = null;
+    document.getElementById('oneRowBtn').classList.remove('active');
+    document.getElementById('twoRowBtn').classList.add('active');
+    render();
+  }
+  document.getElementById('twoRowBtn').addEventListener('click', switchToTwoRow);
+  document.getElementById('oneRowBtn').addEventListener('click', switchToOneRow);
+
+  function applyLoadedJson(jsonText){
+    try{
+      const data = JSON.parse(jsonText);
+      applyFieldVisibility(false, false, false);
+      pageNumberHidden = false;
+      document.getElementById('titleInput').textContent = data.title || '제목을 입력하세요';
+      document.getElementById('creditInput').value = data.credit || '';
+      document.getElementById('producerInput').value = data.producer || '';
+      document.getElementById('keyInput').value = data.key || 'D';
+      document.getElementById('timeInput').value = data.time || '4/4';
+      document.getElementById('tempoInput').value = data.tempo || '120';
+      cellsUpper = Array.isArray(data.cells) ? data.cells : [];
+      cellsLower = Array.isArray(data.cellsLower) ? data.cellsLower : [];
+      activeVoice = 'upper';
+      twoRowMode = cellsLower.length > 0;
+      cells = cellsUpper;
+      const twoRowBtnEl = document.getElementById('twoRowBtn');
+      const oneRowBtnEl = document.getElementById('oneRowBtn');
+      if(twoRowBtnEl) twoRowBtnEl.classList.toggle('active', twoRowMode);
+      if(oneRowBtnEl) oneRowBtnEl.classList.toggle('active', !twoRowMode);
+        selectedIndex = null;
+      rangeEndIndex = null;
+      extraSelected.clear();
+      pageContentBox = null;
+      isDirty = false;
+      render();
+    } catch(err){
+      alert('파일을 읽는 데 문제가 생겼어요. 올바른 .json 파일인지 확인해 주세요.');
+    }
+  }
+
+  async function confirmSaveBeforeDiscard(actionLabel){
+    if(!isDirty) return true;
+    if(confirm('저장하지 않은 변경사항이 있어요. ' + actionLabel + ' 전에 저장하시겠어요?')){
+      await saveScoreFile();
+    }
+    return true;
+  }
+
+  async function loadScoreFile(){
+    await confirmSaveBeforeDiscard('불러오기');
+    if(window.showOpenFilePicker){
+      let handles;
+      try{
+        handles = await window.showOpenFilePicker({
+          id: 'sungja-akbo-json',
+          types: [{ description: 'JSON 파일', accept: { 'application/json': ['.json'] } }],
+          multiple: false
+        });
+      } catch(err){
+        return; // user cancelled the picker
+      }
+      try{
+        const file = await handles[0].getFile();
+        const text = await file.text();
+        applyLoadedJson(text);
+      } catch(err){
+        alert('파일을 읽는 데 문제가 생겼어요. 올바른 .json 파일인지 확인해 주세요.');
+      }
+    } else {
+      document.getElementById('loadJson').click();
+    }
+  }
+  document.getElementById('loadJsonBtn').addEventListener('click', loadScoreFile);
+
+  document.getElementById('loadJson').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => applyLoadedJson(evt.target.result);
+    reader.readAsText(file);
+    e.target.value = '';
+  });
+
+  window.addEventListener('beforeunload', (e) => {
+    if(!isDirty) return;
+    e.preventDefault();
+    e.returnValue = '';
+    return '';
+  });
+
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => { pageContentBox = null; render(); }, 300);
+  });
+
+  render();
+
+  if(document.fonts && document.fonts.ready){
+    document.fonts.ready.then(() => {
+      pageContentBox = null;
+      render();
+    });
+  }
+})();
+</script>
+</body>
+</html>

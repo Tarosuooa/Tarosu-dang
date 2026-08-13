@@ -409,6 +409,7 @@ footer{
       <span class="eyebrow">GUZHENG · 古筝 · 스물한 줄의 이야기</span>
       <h1>타로수가 선명하게<br><em>고쟁</em>을 핥고 있었다.</h1>
       <p class="tagline">취미 고쟁러 '타로수'의 공간입니다. <br>저의 연주 영상 및 자작 악보를 담았습니다.</p>
+      <p style="margin-top:6px; font-size:12px; color:var(--ink-soft);">instagram @tarosu_gzh</p>
     </div>
     <div class="strings-wrap"><svg viewBox="0 0 500 400" preserveAspectRatio="none"></svg></div>
   </section>
@@ -845,37 +846,6 @@ const RTE_SIZES = [
   {label:'크게', px:'18px'},
   {label:'아주 크게', px:'24px'}
 ];
-const rteSavedRange = {}; // editorId -> Range (마지막으로 편집창에서 선택했던 영역)
-
-function saveRteSelection(editorId){
-  const sel = window.getSelection();
-  if(!sel.rangeCount) return;
-  const el = document.getElementById(editorId);
-  if(!el) return;
-  const range = sel.getRangeAt(0);
-  if(el.contains(range.commonAncestorContainer)){
-    rteSavedRange[editorId] = range.cloneRange();
-  }
-}
-function restoreRteSelection(editorId){
-  const el = document.getElementById(editorId);
-  if(!el) return;
-  el.focus();
-  const saved = rteSavedRange[editorId];
-  if(saved){
-    const sel = window.getSelection();
-    sel.removeAllRanges();
-    try{ sel.addRange(saved); }catch(e){}
-  }
-}
-
-// 편집창 안에서 선택이 바뀔 때마다 저장 (색상 팔레트를 눌러도 선택이 유지되도록)
-document.addEventListener('mouseup', (e)=>{
-  if(e.target.closest && e.target.closest('.rte-editor')) saveRteSelection(e.target.closest('.rte-editor').id);
-});
-document.addEventListener('keyup', (e)=>{
-  if(e.target.closest && e.target.closest('.rte-editor')) saveRteSelection(e.target.closest('.rte-editor').id);
-});
 
 // Enter 키를 직접 처리해 빈 줄이 사라지지 않고 항상 한 줄씩 정확히 내려가게 한다
 document.addEventListener('keydown', (e)=>{
@@ -891,12 +861,12 @@ function buildRteHtml(editorId, placeholder){
   const monoHex = isDark ? '#FFFFFF' : '#000000';
   const monoLabel = isDark ? '흰색' : '검정';
   const swatches = RTE_RAINBOW.concat([{label:monoLabel, hex:monoHex}]).map(c =>
-    `<button type="button" class="rte-swatch" data-color="${c.hex}" title="${c.label}"
+    `<button type="button" class="rte-swatch" title="${c.label}"
        style="background:${c.hex}${c.hex==='#FFFFFF' ? ';border:1px solid var(--paper-deep)' : ''}"
-       onmousedown="event.preventDefault()" onclick="app.rteSelectColor('${editorId}', this)"></button>`
+       onmousedown="event.preventDefault()" onclick="app.rteApplyColor('${editorId}', '${c.hex}')"></button>`
   ).join('');
   const sizeBtns = RTE_SIZES.map(s =>
-    `<button type="button" class="rte-size-btn" data-size="${s.px}" onmousedown="event.preventDefault()" onclick="app.rteSelectSize('${editorId}', this)">${s.label}</button>`
+    `<button type="button" class="rte-size-btn" style="min-width:${1.4 + s.label.length*0.95}em;" onmousedown="event.preventDefault()" onclick="app.rteApplyFontSize('${editorId}', '${s.px}')">${s.label}</button>`
   ).join('');
   return `
     <div class="rte-toolbar">
@@ -907,7 +877,6 @@ function buildRteHtml(editorId, placeholder){
       <div class="rte-size-row">${sizeBtns}</div>
       <span class="rte-sep"></span>
       <div class="rte-swatch-row">${swatches}</div>
-      <button type="button" class="btn small" onmousedown="event.preventDefault()" onclick="app.rteApplyStyle('${editorId}')">적용</button>
     </div>
     <div class="rte-editor" id="${editorId}" contenteditable="true" data-placeholder="${escapeHtml(placeholder||'')}"></div>`;
 }
@@ -1259,56 +1228,30 @@ const app = {
   rteExec(editorId, cmd){
     const el = document.getElementById(editorId);
     if(!el) return;
-    restoreRteSelection(editorId);
+    el.focus();
     document.execCommand(cmd, false, null);
-    saveRteSelection(editorId);
   },
-  rteSelectColor(editorId, btnEl){
-    const toolbar = btnEl.closest('.rte-toolbar');
-    toolbar.querySelectorAll('.rte-swatch').forEach(b => b.classList.toggle('active', b === btnEl));
-  },
-  rteSelectSize(editorId, btnEl){
-    const toolbar = btnEl.closest('.rte-toolbar');
-    toolbar.querySelectorAll('.rte-size-btn').forEach(b => b.classList.toggle('active', b === btnEl));
-  },
-  rteApplyStyle(editorId){
+  rteApplyColor(editorId, hex){
     const el = document.getElementById(editorId);
     if(!el) return;
-    const toolbar = el.previousElementSibling;
-    const activeSwatch = toolbar ? toolbar.querySelector('.rte-swatch.active') : null;
-    const activeSize = toolbar ? toolbar.querySelector('.rte-size-btn.active') : null;
-    const color = activeSwatch ? activeSwatch.dataset.color : null;
-    const sizePx = activeSize ? activeSize.dataset.size : null;
-    if(!color && !sizePx){ showToast('적용할 색상이나 글씨 크기를 먼저 선택해주세요'); return; }
-
-    // 선택이 살아있지 않으면(포커스가 옮겨갔다면) 마지막으로 저장해둔 선택 영역을 복원
-    const sel = window.getSelection();
-    const liveOk = sel.rangeCount && !sel.getRangeAt(0).collapsed && el.contains(sel.getRangeAt(0).commonAncestorContainer);
-    if(!liveOk) restoreRteSelection(editorId);
-    if(!sel.rangeCount || sel.getRangeAt(0).collapsed){
-      showToast('먼저 글씨를 드래그해서 선택해주세요');
-      return;
-    }
-
     el.focus();
-    // 굵게/기울임/밑줄과 동일하게 브라우저 내장 명령을 사용해 안정적으로 적용한다
-    if(color){
-      document.execCommand('styleWithCSS', false, true);
-      document.execCommand('foreColor', false, color);
-      document.execCommand('styleWithCSS', false, false);
-    }
-    if(sizePx){
-      document.execCommand('fontSize', false, '7'); // 임시로 <font size="7">를 만든 뒤 아래에서 치환
-      el.querySelectorAll('font[size]').forEach(f => {
-        const span = document.createElement('span');
-        span.style.fontSize = sizePx;
-        if(f.style && f.style.color) span.style.color = f.style.color;
-        else if(color) span.style.color = color;
-        while(f.firstChild) span.appendChild(f.firstChild);
-        f.replaceWith(span);
-      });
-    }
-    saveRteSelection(editorId);
+    // 굵게/기울임/밑줄과 동일한 방식(execCommand)을 그대로 사용한다
+    document.execCommand('styleWithCSS', false, true);
+    document.execCommand('foreColor', false, hex);
+    document.execCommand('styleWithCSS', false, false);
+  },
+  rteApplyFontSize(editorId, px){
+    const el = document.getElementById(editorId);
+    if(!el) return;
+    el.focus();
+    document.execCommand('fontSize', false, '7'); // 임시로 <font size="7">를 만든 뒤 아래에서 span으로 치환
+    el.querySelectorAll('font[size]').forEach(f => {
+      const span = document.createElement('span');
+      span.style.fontSize = px;
+      if(f.color) span.style.color = f.color;
+      while(f.firstChild) span.appendChild(f.firstChild);
+      f.replaceWith(span);
+    });
   },
 
   updateAuthArea(){
@@ -1840,6 +1783,7 @@ const app = {
             <div class="sheet-fields" style="margin-bottom:16px; font-size:14px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif;">
               <div>곡명: ${escapeHtml(post.songName || '-')}</div>
               <div>가수/작곡가: ${escapeHtml(post.artistName || '-')}</div>
+              <div>악보 제작자: ${escapeHtml(post.makerName || '-')}</div>
             </div>
             <div class="detail-body">${sanitizeRichHtml(post.content)}</div>
             ${post.link ? `<a class="dl-link" href="${escapeHtml(post.link)}" target="_blank" rel="noopener">악보 링크 열기 ↗</a>` : ''}
@@ -1866,6 +1810,8 @@ const app = {
         <div><label>곡명</label><input type="text" id="sf-song" maxlength="80"></div>
         <div><label>가수 및 작곡가</label><input type="text" id="sf-artist" maxlength="80"></div>
       </div>
+      <label>악보 제작자</label>
+      <input type="text" id="sf-maker" maxlength="40" placeholder="악보를 만든 사람의 이름/닉네임">
       <label>내용</label>
       <div id="sf-content-wrap"></div>
       <label>악보 링크 (URL)</label>
@@ -1888,6 +1834,7 @@ const app = {
     const title = document.getElementById('sf-title').value.trim();
     const songName = document.getElementById('sf-song').value.trim();
     const artistName = document.getElementById('sf-artist').value.trim();
+    const makerName = document.getElementById('sf-maker').value.trim();
     const contentEl = document.getElementById('sf-content');
     const content = sanitizeRichHtml(contentEl ? contentEl.innerHTML : '');
     const link = document.getElementById('sf-link').value.trim();
@@ -1898,7 +1845,7 @@ const app = {
     saveBtn.disabled = true; saveBtn.textContent = '등록 중...';
     try{
       const docData = {
-        title, content, songName, artistName, category, link,
+        title, content, songName, artistName, makerName, category, link,
         authorUid: state.currentUser.uid,
         authorNickname: state.currentUser.nickname,
         date: nowStr()

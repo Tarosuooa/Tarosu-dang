@@ -1509,7 +1509,7 @@ const app = {
       statusEl.style.color = 'var(--danger)';
       statusEl.textContent = '⚠ 오류가 발생했습니다: ' + (e && e.message ? e.message : String(e));
       iframeEl.style.display = '';
-      if(!iframeEl.src) iframeEl.src = 'score-maker.html';
+      if(!iframeEl.getAttribute('src')) iframeEl.src = 'score-maker.html';
     }
   },
 
@@ -1521,7 +1521,7 @@ const app = {
       statusEl.style.display = 'none';
       blockedEl.style.display = 'none';
       iframeEl.style.display = '';
-      if(!iframeEl.src) iframeEl.src = 'score-maker.html';
+      if(!iframeEl.getAttribute('src')) iframeEl.src = 'score-maker.html';
       return;
     }
 
@@ -1533,7 +1533,7 @@ const app = {
     if(!db){
       statusEl.textContent = '⚠ 이용 시간 확인 기능을 사용할 수 없습니다 (Firebase 설정 필요). 제한 없이 이용됩니다.';
       iframeEl.style.display = '';
-      if(!iframeEl.src) iframeEl.src = 'score-maker.html';
+      if(!iframeEl.getAttribute('src')) iframeEl.src = 'score-maker.html';
       return;
     }
 
@@ -1543,7 +1543,7 @@ const app = {
     if(!ip){
       statusEl.textContent = '⚠ 접속 정보를 확인할 수 없어 이용 시간 제한을 적용할 수 없습니다. 로그인하면 언제든 제한 없이 이용할 수 있어요.';
       iframeEl.style.display = '';
-      if(!iframeEl.src) iframeEl.src = 'score-maker.html';
+      if(!iframeEl.getAttribute('src')) iframeEl.src = 'score-maker.html';
       return;
     }
 
@@ -1581,7 +1581,7 @@ const app = {
     scoreMakerState.active = true;
 
     iframeEl.style.display = '';
-    if(!iframeEl.src) iframeEl.src = 'score-maker.html';
+    if(!iframeEl.getAttribute('src')) iframeEl.src = 'score-maker.html';
     statusEl.style.display = '';
     this.updateScoreMakerCountdown();
 

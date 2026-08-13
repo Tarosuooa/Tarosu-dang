@@ -191,6 +191,11 @@ main.no-hero{padding-top:44px;}
   border:1px solid var(--jade); color:var(--jade); border-radius:16px;
   font-family:'Noto Sans KR',sans-serif; text-decoration:none;
 }
+.post-media-wrap{ display:flex; flex-direction:column; gap:16px; margin-top:20px; }
+.post-media-img{ max-width:100%; border-radius:4px; display:block; border:1px solid var(--paper-deep); }
+.post-media-video{ position:relative; width:100%; padding-top:56.25%; border-radius:4px; overflow:hidden; border:1px solid var(--paper-deep); }
+.post-media-video iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
+.post-media-video-tag{ max-width:100%; border-radius:4px; border:1px solid var(--paper-deep); }
 
 /* ---------- forms ---------- */
 .toolbar{display:flex; justify-content:flex-end; margin-bottom:16px; gap:10px;}
@@ -703,9 +708,9 @@ const NAV_ITEMS = [
 ];
 
 const BOARD_CONFIG = {
-  notice:   {label:'공지', hasLink:false},
-  download: {label:'자료', hasLink:true},
-  inquiry:  {label:'문의', hasLink:false},
+  notice:   {label:'공지', hasLink:false, hasMedia:true},
+  download: {label:'자료', hasLink:true, hasMedia:true},
+  inquiry:  {label:'문의', hasLink:false, hasMedia:false},
 };
 
 const SEED = {
@@ -828,6 +833,39 @@ function richTextHasContent(html){
   const wrapper = document.createElement('div');
   wrapper.innerHTML = html || '';
   return wrapper.textContent.trim().length > 0;
+}
+
+/* ---------- 게시물 하단 미디어(이미지/영상/GIF) 첨부 ---------- */
+function parseMediaUrls(text){
+  return (text || '').split('\n').map(s => s.trim()).filter(s => /^https?:\/\//i.test(s));
+}
+function isImageUrl(url){ return /\.(jpe?g|png|gif|webp|avif)(\?.*)?$/i.test(url); }
+function isVideoFileUrl(url){ return /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url); }
+function getYouTubeEmbed(url){
+  const m = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([A-Za-z0-9_-]{6,})/);
+  return m ? 'https://www.youtube.com/embed/' + m[1] : null;
+}
+function getVimeoEmbed(url){
+  const m = url.match(/vimeo\.com\/(\d+)/);
+  return m ? 'https://player.vimeo.com/video/' + m[1] : null;
+}
+function buildMediaEmbedsHtml(mediaArr){
+  if(!mediaArr || !mediaArr.length) return '';
+  const items = mediaArr.map(url => {
+    const safeUrl = escapeHtml(url);
+    if(isImageUrl(url)){
+      return `<img src="${safeUrl}" alt="첨부 이미지" class="post-media-img" loading="lazy">`;
+    }
+    const yt = getYouTubeEmbed(url);
+    if(yt) return `<div class="post-media-video"><iframe src="${escapeHtml(yt)}" allowfullscreen loading="lazy"></iframe></div>`;
+    const vm = getVimeoEmbed(url);
+    if(vm) return `<div class="post-media-video"><iframe src="${escapeHtml(vm)}" allowfullscreen loading="lazy"></iframe></div>`;
+    if(isVideoFileUrl(url)){
+      return `<video src="${safeUrl}" controls class="post-media-video-tag"></video>`;
+    }
+    return `<a class="dl-link" href="${safeUrl}" target="_blank" rel="noopener">첨부 링크 열기 ↗</a>`;
+  }).join('');
+  return `<div class="post-media-wrap">${items}</div>`;
 }
 
 /* ---------- rich text editor: 팔레트 + 적용 버튼 + 선택영역 보존 ---------- */
@@ -1471,6 +1509,7 @@ const app = {
             <div class="post-meta">${escapeHtml(post.author)} · ${escapeHtml(post.date)}</div>
             <div class="detail-body">${sanitizeRichHtml(post.content)}</div>
             ${cfg.hasLink && post.link ? `<a class="dl-link" href="${escapeHtml(post.link)}" target="_blank" rel="noopener">자료 링크 열기 ↗</a>` : ''}
+            ${cfg.hasMedia ? buildMediaEmbedsHtml(post.media) : ''}
           </div>`;
       }
     }else{
@@ -1508,6 +1547,10 @@ const app = {
       <label>내용</label>
       <div id="${editorId}-wrap"></div>
       ${cfg.hasLink ? `<label>다운로드 링크 (URL)</label><input type="text" id="${name}-f-link" value="${existing && existing.link ? escapeHtml(existing.link) : ''}" placeholder="https://...">` : ''}
+      ${cfg.hasMedia ? `
+        <label>이미지 / 영상 / GIF 링크</label>
+        <textarea id="${name}-f-media" placeholder="이미지·GIF·영상 링크를 한 줄에 하나씩 붙여넣으세요 (유튜브 링크도 가능)">${existing && existing.media ? escapeHtml(existing.media.join('\n')) : ''}</textarea>
+        <div class="field-hint">게시물 내용 하단에 그대로 표시돼요 (선택 입력)</div>` : ''}
       <div class="form-actions">
         <button class="btn" onclick="app.savePost('${name}', ${existing ? `'${existing.id}'` : 'null'})">${existing ? '수정 완료' : '등록'}</button>
         <button class="btn ghost" onclick="document.getElementById('${name}-form').remove()">취소</button>
@@ -1524,14 +1567,17 @@ const app = {
     const content = sanitizeRichHtml(contentEl ? contentEl.innerHTML : '');
     const linkEl = document.getElementById(name+'-f-link');
     const link = linkEl ? linkEl.value.trim() : undefined;
+    const mediaEl = document.getElementById(name+'-f-media');
+    const media = mediaEl ? parseMediaUrls(mediaEl.value) : undefined;
     if(!title || !richTextHasContent(content)){ showToast('제목과 내용을 입력해주세요'); return; }
 
     if(editId){
       const post = state.data[name].find(p=>p.id===editId);
       post.title = title; post.content = content;
       if(link!==undefined) post.link = link;
+      if(media!==undefined) post.media = media;
     }else{
-      state.data[name].unshift({ id: uid(), title, content, author:'관리자', date: nowStr(), ...(link!==undefined ? {link} : {}) });
+      state.data[name].unshift({ id: uid(), title, content, author:'관리자', date: nowStr(), ...(link!==undefined ? {link} : {}), ...(media!==undefined ? {media} : {}) });
     }
     await saveBoard(name);
     const f = document.getElementById(name+'-form'); if(f) f.remove();
@@ -1789,6 +1835,7 @@ const app = {
             </div>
             <div class="detail-body">${sanitizeRichHtml(post.content)}</div>
             ${post.link ? `<a class="dl-link" href="${escapeHtml(post.link)}" target="_blank" rel="noopener">악보 링크 열기 ↗</a>` : ''}
+            ${buildMediaEmbedsHtml(post.media)}
             ${(state.currentUser && state.currentUser.uid === post.authorUid) ? `
               <div class="form-actions" style="margin-top:18px;">
                 <button class="btn ghost small" onclick="app.openSheetForm('${post.id}')">수정</button>
@@ -1829,6 +1876,9 @@ const app = {
       <label>악보 링크 (URL)</label>
       <input type="text" id="sf-link" placeholder="https://drive.google.com/... 등 PDF가 있는 주소" value="${existing ? escapeHtml(existing.link || '') : ''}">
       <div class="field-hint">구글 드라이브, 원드라이브 등에 PDF를 올린 뒤 공유 링크를 붙여넣어주세요 (선택 입력)</div>
+      <label>이미지 / 영상 / GIF 링크</label>
+      <textarea id="sf-media" placeholder="연주 영상, 악보 사진 등의 링크를 한 줄에 하나씩 붙여넣으세요 (유튜브 링크도 가능)">${existing && existing.media ? escapeHtml(existing.media.join('\n')) : ''}</textarea>
+      <div class="field-hint">게시물 내용 하단에 그대로 표시돼요 (선택 입력)</div>
       <div class="form-actions">
         <button class="btn" onclick="app.saveSheet(${existing ? `'${existing.id}'` : 'null'})">${existing ? '수정 완료' : '등록'}</button>
         <button class="btn ghost" onclick="document.getElementById('sheets-form').remove()">취소</button>
@@ -1856,6 +1906,7 @@ const app = {
     const contentEl = document.getElementById('sf-content');
     const content = sanitizeRichHtml(contentEl ? contentEl.innerHTML : '');
     const link = document.getElementById('sf-link').value.trim();
+    const media = parseMediaUrls(document.getElementById('sf-media').value);
 
     if(!title || !richTextHasContent(content)){ showToast('제목과 내용을 입력해주세요'); return; }
 
@@ -1863,10 +1914,10 @@ const app = {
     saveBtn.disabled = true; saveBtn.textContent = editId ? '수정 중...' : '등록 중...';
     try{
       if(editId){
-        await db.collection('sheets').doc(editId).update({ title, content, songName, artistName, makerName, link });
+        await db.collection('sheets').doc(editId).update({ title, content, songName, artistName, makerName, link, media });
       }else{
         const docData = {
-          title, content, songName, artistName, makerName, category, link,
+          title, content, songName, artistName, makerName, category, link, media,
           authorUid: state.currentUser.uid,
           authorNickname: state.currentUser.nickname,
           date: nowStr()

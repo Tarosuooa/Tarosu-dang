@@ -527,8 +527,8 @@ footer{
     <div class="field-hint" id="suCodeStatus"></div>
 
     <label>비밀번호</label>
-    <input type="password" id="suPassword" placeholder="영문+숫자 조합 4~13자">
-    <div class="field-hint">영문과 숫자를 모두 포함해 4~13자로 입력해주세요</div>
+    <input type="password" id="suPassword" placeholder="영문+숫자+기호 조합 4~13자">
+    <div class="field-hint">영문, 숫자, 기호를 모두 포함해 4~13자로 입력해주세요 (대소문자 구분)</div>
 
     <label>비밀번호 확인</label>
     <input type="password" id="suPassword2" placeholder="비밀번호를 다시 입력">
@@ -585,7 +585,7 @@ const ADMIN_PW = "YUtou0808"; // 관리자 로그인(위 게시판 전용) 비�
 
 // '악보 > 악보 다운로드'에서 '타로수 제작' 카테고리로 글을 올릴 수 있는 계정의 이메일입니다.
 // 본인이 회원가입할 이메일 주소로 바꿔주세요. Firestore 규칙에도 동일하게 넣어야 합니다.
-const ADMIN_EMAIL = "tarosu.ooa@gmail.com";
+const ADMIN_EMAIL = "YOUR_ADMIN_EMAIL@example.com";
 
 /* =====================================================================
    ▼▼▼ Google Apps Script 설정 (회원가입 인증번호 이메일 발송용, 무료) ▼▼▼
@@ -654,7 +654,12 @@ const state = {
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function todayStr(){ const d=new Date(); return d.toISOString().slice(0,10); }
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function validPassword(pw){ return /^(?=.*[A-Za-z])(?=.*[0-9])[A-Za-z0-9]{4,13}$/.test(pw); }
+function validPassword(pw){
+  // 영문, 숫자, 기호를 모두 포함, 4~13자, 대소문자 구분
+  const SYMBOLS = "!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?~`";
+  const re = new RegExp('^(?=.*[A-Za-z])(?=.*[0-9])(?=.*[' + SYMBOLS + '])[A-Za-z0-9' + SYMBOLS + ']{4,13}$');
+  return re.test(pw);
+}
 function validEmail(em){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em); }
 
 function showToast(msg){
@@ -952,7 +957,7 @@ const app = {
     if(!state.pendingSignup || state.pendingSignup.email !== email || !state.pendingSignup.verified){
       errEl.textContent='이메일 인증을 먼저 완료해주세요'; return;
     }
-    if(!validPassword(pw)){ errEl.textContent='비밀번호는 영문+숫자를 포함해 4~13자로 입력해주세요'; return; }
+    if(!validPassword(pw)){ errEl.textContent='비밀번호는 영문, 숫자, 기호를 모두 포함해 4~13자로 입력해주세요'; return; }
     if(pw !== pw2){ errEl.textContent='비밀번호가 일치하지 않습니다'; return; }
 
     try{

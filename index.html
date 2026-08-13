@@ -906,7 +906,8 @@ const scoreMakerState = {
 function ensureScoreMakerFrameLoaded(iframeEl, loggedIn){
   if(scoreMakerState.frameSrcSet) return;
   scoreMakerState.frameSrcSet = true;
-  iframeEl.src = 'score-maker.html' + (loggedIn ? '?loggedin=1' : '');
+  const base = 'https://tarosuooa.github.io/Guzheng-sheet-Tarosu/';
+  iframeEl.src = base + (loggedIn ? '?loggedin=1' : '');
 }
 /* ---------- 홈 화면 고쟁 줄 소리 ---------- */
 const GUZHENG_NOTE_FREQ = {

@@ -119,7 +119,8 @@ main.no-hero{padding-top:44px;}
   position:relative; padding:64px 0 40px; overflow:hidden;
   border-bottom:1px solid var(--paper-deep); margin-bottom:48px;
 }
-.hero-inner{position:relative; z-index:2; max-width:640px;}
+.hero-inner{position:relative; z-index:2; max-width:640px; pointer-events:none;}
+.hero-inner a{ pointer-events:auto; }
 .hero .eyebrow{
   font-family:'Noto Sans KR',sans-serif; font-size:12.5px; letter-spacing:4px;
   color:var(--wood); text-transform:uppercase; margin-bottom:14px; display:block;
@@ -133,6 +134,28 @@ main.no-hero{padding-top:44px;}
   opacity:0.9;
 }
 .strings-wrap svg{width:100%; height:100%;}
+.guzheng-guide-btn{
+  position:absolute; left:6px; bottom:6px; z-index:5;
+  opacity:0.85; font-size:11.5px; padding:5px 11px;
+}
+.guzheng-guide-btn:hover{ opacity:1; }
+/* 모달과 달리 화면 전체를 덮는 배경이 없어서, 열려 있는 동안에도 뒤쪽 고쟁 줄을 계속 클릭할 수 있다 */
+.guzheng-guide-panel{
+  position:fixed; z-index:70;
+  width:400px; max-width:calc(100vw - 40px);
+  background:#fbf7ec; border:1px solid var(--gold); border-radius:4px;
+  box-shadow:var(--shadow); padding:14px 16px;
+}
+.guzheng-guide-close{
+  background:none; border:none; cursor:pointer; font-size:14px;
+  color:var(--ink-soft); line-height:1; padding:2px;
+}
+.guzheng-guide-close:hover{ color:var(--wood); }
+#guzhengGuideBody{ font-size:13px; color:var(--ink); white-space:pre-wrap; word-break:break-word; }
+#guzhengGuideBody textarea{
+  width:100%; min-height:110px; padding:8px 10px; border:1px solid var(--paper-deep);
+  background:#fff; font-family:'Gowun Batang',serif; font-size:13px; border-radius:2px; resize:vertical;
+}
 .string-line{
   stroke:var(--gold); stroke-width:1.1; opacity:0.55;
   transform-origin:center;
@@ -477,8 +500,20 @@ footer{
       <p style="margin-top:14px; font-size:12px; color:var(--ink-soft);"><a href="https://www.instagram.com/tarosu_gzh/" target="_blank" rel="noopener" style="color:inherit; text-decoration:none;">instagram @tarosu_gzh</a></p>
       <p style="margin-top:2px; font-size:12px; color:var(--ink-soft);">E-Mail: tarosu.ooa@gmail.com</p>
     </div>
-    <div class="strings-wrap"><svg viewBox="0 0 500 400" preserveAspectRatio="none"></svg></div>
+    <div class="strings-wrap">
+      <svg viewBox="0 0 500 400" preserveAspectRatio="none"></svg>
+      <button type="button" id="guzhengGuideBtn" class="btn ghost small guzheng-guide-btn" onclick="app.toggleGuzhengGuide()">사용법</button>
+    </div>
   </section>
+
+  <!-- 고쟁 줄 사용법 안내 패널: 모달이 아니라 떠 있는 카드라서, 열려 있는 동안에도 뒤에 있는 고쟁 줄을 계속 클릭할 수 있다 -->
+  <div id="guzhengGuidePanel" class="guzheng-guide-panel" style="display:none;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <h4 style="font-size:14.5px; margin:0;">고쟁인 척 하는 <span style="color:#8E24AA;">타로당 13현 고쟁</span> 사용법</h4>
+      <button type="button" class="guzheng-guide-close" onclick="app.closeGuzhengGuide()">✕</button>
+    </div>
+    <div id="guzhengGuideBody"></div>
+  </div>
 
   <!-- HOME -->
   <div class="page" id="page-home">
@@ -871,6 +906,7 @@ const state = {
   sheetSearchQuery: '',
   sheetPage: 1,
   faqCategory: '전체',
+  guzhengGuideText: '',
   data: { notice: [], download: [], faq: [], inquiry: [], guestbook: [], sheets: [], updateLog: [], tuningUpdateLog: [] },
   detail: { notice: null, download: null, inquiry: null, sheets: null },
   pendingSignup: null,
@@ -1167,24 +1203,91 @@ const GUZHENG_NOTE_FREQ = {
   'A5':880.00, 'B5':987.77, 'D6':1174.66
 };
 let heroAudioCtx = null;
+const guzhengBufferCache = {};
+const activeStringSources = {}; // note -> 현재 재생 중인 AudioBufferSourceNode (비브라토 적용 대상)
+
+// Karplus-Strong 알고리즘: 잡음 버스트를 짧은 지연선에 넣고 반복 감쇠시켜
+// 실제로 현을 뜯었을 때와 비슷한 배음/감쇠 특성을 만든다 (단순 오실레이터보다 훨씬 현악기에 가까운 음색)
+function buildPluckedStringBuffer(ctx, freq, duration, damping){
+  const sampleRate = ctx.sampleRate;
+  const N = Math.max(2, Math.round(sampleRate / freq));
+  const totalSamples = Math.floor(sampleRate * duration);
+  const buffer = ctx.createBuffer(1, totalSamples, sampleRate);
+  const data = buffer.getChannelData(0);
+  const ring = new Float32Array(N);
+  for(let i = 0; i < N; i++){ ring[i] = Math.random() * 2 - 1; } // 뜯는 순간의 잡음(여기(勵起))
+  let idx = 0;
+  for(let n = 0; n < totalSamples; n++){
+    const next = (idx + 1) % N;
+    data[n] = ring[idx];
+    ring[idx] = damping * 0.5 * (ring[idx] + ring[next]); // 저역통과 평균 + 감쇠 → 현이 진동하며 잦아드는 느낌
+    idx = next;
+  }
+  return buffer;
+}
+
+// Karplus-Strong은 감쇠가 '한 주기(파장)마다' 적용되기 때문에, 아무 보정 없이 같은 damping 값을 쓰면
+// 고음(주기가 짧아 초당 반복 횟수가 많은 음)일수록 실제 울리는 시간이 짧게 느껴진다.
+// 기준 음(가장 낮은 A3)을 기준으로, 주파수가 높을수록 damping을 1에 더 가깝게 보정해서
+// 모든 음의 유지 시간이 비슷하게 느껴지도록 맞춘다.
+const GUZHENG_REF_FREQ = 220.00; // A3
+const GUZHENG_REF_DAMPING = 0.9975;
+function dampingForFreq(freq){
+  return Math.pow(GUZHENG_REF_DAMPING, GUZHENG_REF_FREQ / freq);
+}
+
 async function playGuzhengNote(note){
   const freq = GUZHENG_NOTE_FREQ[note];
   if(!freq) return;
   try{
     if(!heroAudioCtx) heroAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if(heroAudioCtx.state === 'suspended') await heroAudioCtx.resume();
-    const now = heroAudioCtx.currentTime;
-    const osc = heroAudioCtx.createOscillator();
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(freq, now);
+
+    let buffer = guzhengBufferCache[note];
+    if(!buffer){
+      buffer = buildPluckedStringBuffer(heroAudioCtx, freq, 2.6, dampingForFreq(freq)); // 소리 유지시간을 음 높이와 무관하게 비슷하게 맞춤
+      guzhengBufferCache[note] = buffer;
+    }
+
+    const src = heroAudioCtx.createBufferSource();
+    src.buffer = buffer;
+
+    // 디지털 특유의 거친 배음을 살짝 눌러 나무/현 울림에 가깝게 다듬는다
+    const tone = heroAudioCtx.createBiquadFilter();
+    tone.type = 'lowpass';
+    tone.frequency.value = 5200;
+
     const gain = heroAudioCtx.createGain();
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.35, now + 0.008);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.5);
-    osc.connect(gain).connect(heroAudioCtx.destination);
-    osc.start(now);
-    osc.stop(now + 1.6);
+    gain.gain.value = 0.28; // 기존 대비 볼륨 20% 낮춤 (0.35 → 0.28)
+
+    src.connect(tone).connect(gain).connect(heroAudioCtx.destination);
+    src.start();
+
+    activeStringSources[note] = src;
+    src.addEventListener('ended', () => {
+      if(activeStringSources[note] === src) delete activeStringSources[note];
+    });
   }catch(e){ console.error('고쟁 소리 재생 실패', e); }
+}
+
+// 안족(브릿지) 왼쪽 영역을 눌렀을 때: 그 줄이 현재 소리를 내고 있는 중이라면
+// 재생 속도를 아주 살짝 흔들어(LFO) 실제로 현을 눌러 음을 굽히는 비브라토 효과를 만든다
+function applyVibratoToNote(note){
+  const src = activeStringSources[note];
+  if(!src || !heroAudioCtx) return; // 소리가 안 나는 중이면 아무 일도 일어나지 않는다
+  try{
+    const lfo = heroAudioCtx.createOscillator();
+    lfo.type = 'sine';
+    lfo.frequency.value = 5.5; // 비브라토 속도
+    const depth = heroAudioCtx.createGain();
+    depth.gain.value = 0.14; // 비브라토 폭(음정이 흔들리는 정도) — 훨씬 강하게
+    lfo.connect(depth).connect(src.playbackRate);
+    lfo.start();
+    lfo.stop(heroAudioCtx.currentTime + 1.1);
+    lfo.addEventListener('ended', () => {
+      try{ lfo.disconnect(); depth.disconnect(); }catch(e){}
+    });
+  }catch(e){ console.error('비브라토 적용 실패', e); }
 }
 
 async function fetchPublicIP(){
@@ -1240,6 +1343,28 @@ async function loadSheets(){
   }catch(e){
     console.error('loadSheets error', e);
     state.data.sheets = [];
+  }
+}
+
+/* ---------- 홈 화면 고쟁 줄 사용법 (관리자만 작성/수정 가능) ---------- */
+async function loadGuzhengGuide(){
+  if(!db){ state.guzhengGuideText = ''; return; }
+  try{
+    const doc = await db.collection('content').doc('guzhengGuide').get();
+    state.guzhengGuideText = (doc.exists && doc.data().text) ? doc.data().text : '';
+  }catch(e){
+    console.error('사용법 로드 실패', e);
+    state.guzhengGuideText = '';
+  }
+}
+async function saveGuzhengGuide(text){
+  if(!db) return false;
+  try{
+    await db.collection('content').doc('guzhengGuide').set({ text });
+    return true;
+  }catch(e){
+    console.error('사용법 저장 실패', e);
+    return false;
   }
 }
 
@@ -1464,6 +1589,7 @@ const app = {
     }
     await Promise.all(['notice','download','faq','inquiry','guestbook','updateLog','tuningUpdateLog'].map(loadBoard));
     await loadSheets();
+    await loadGuzhengGuide();
     updateStorageWarning();
     this.renderAll();
     initGuestbookCharLimit();
@@ -1503,19 +1629,24 @@ const app = {
     const NOTES = ['A3','B3','D4','E4','F#4','A4','B4','D5','E5','F#5','A5','B5','D6'];
     const TEAL_NOTES = new Set(['A3','A4','A5']);
     const X1 = 10, X2 = 480;
+    const BRIDGE_SPACING = 30; // 기존(34)보다 살짝 좁혀서 좌우 여백을 더 확보
+    const BRIDGE_START = X1 + Math.round(((X2 - X1) - BRIDGE_SPACING * (n - 1)) / 2);
     let html = '';
     for(let i=0;i<n;i++){
       const y = 20 + i*28;
       const note = NOTES[i]; // i=0(맨 위) -> A3, i=12(맨 아래) -> D6
       const isTeal = TEAL_NOTES.has(note);
-      // 실제로 보이는 얇은 줄과, 클릭이 잘 되도록 위에 겹쳐놓는 투명한 넓은 히트 영역을 함께 만든다
+      const bridgeX = BRIDGE_START + i*BRIDGE_SPACING;
       html += `<line class="string-line${isTeal ? ' teal' : ''}" data-note="${note}" x1="${X1}" y1="${y}" x2="${X2}" y2="${y}" style="animation-delay:${(i*0.18).toFixed(2)}s"></line>`;
-      html += `<line class="string-hit" data-note="${note}" x1="${X1}" y1="${y}" x2="${X2}" y2="${y}"></line>`;
-      const bridgeX = 30 + i*34;
-      html += `<polygon class="bridge" points="${bridgeX-7},${y} ${bridgeX+7},${y} ${bridgeX},${y+12}"></polygon>`;
+      // 안족(브릿지) 오른쪽: 실제로 줄을 뜯어 소리를 내는 영역
+      html += `<line class="string-hit string-hit-right" data-note="${note}" x1="${bridgeX}" y1="${y}" x2="${X2}" y2="${y}"></line>`;
+      // 안족(브릿지) 왼쪽: 그 자체로는 소리가 안 나지만, 오른쪽에서 소리가 나는 동안 누르면 비브라토가 걸리는 영역
+      html += `<line class="string-hit string-hit-left" data-note="${note}" x1="${X1}" y1="${y}" x2="${bridgeX}" y2="${y}"></line>`;
+      // 안족(기러기발) 모양: 위로 뾰족한 삼각형
+      html += `<polygon class="bridge" points="${bridgeX-7},${y+12} ${bridgeX+7},${y+12} ${bridgeX},${y}"></polygon>`;
     }
     svg.innerHTML = html;
-    svg.querySelectorAll('.string-hit').forEach(hit => {
+    svg.querySelectorAll('.string-hit-right').forEach(hit => {
       hit.addEventListener('click', () => {
         playGuzhengNote(hit.dataset.note);
         const line = svg.querySelector('.string-line[data-note="' + hit.dataset.note + '"]');
@@ -1523,6 +1654,11 @@ const app = {
           line.classList.add('plucked');
           setTimeout(() => line.classList.remove('plucked'), 260);
         }
+      });
+    });
+    svg.querySelectorAll('.string-hit-left').forEach(hit => {
+      hit.addEventListener('click', () => {
+        applyVibratoToNote(hit.dataset.note);
       });
     });
   },
@@ -1559,6 +1695,76 @@ const app = {
       sessionStorage.setItem(SEEN_KEY, '1');
       sessionStorage.setItem(LAST_KEY, String(idx));
     }catch(e){}
+  },
+
+  /* ---------- 고쟁 줄 사용법 패널 (모달 아님 — 열려 있어도 뒤의 줄을 계속 클릭할 수 있다) ---------- */
+  toggleGuzhengGuide(){
+    const panel = document.getElementById('guzhengGuidePanel');
+    if(!panel) return;
+    const isHidden = panel.style.display === 'none' || !panel.style.display;
+    if(isHidden){
+      this.renderGuzhengGuide();
+      panel.style.display = 'block';
+      this.positionGuzhengGuidePanel();
+    }else{
+      panel.style.display = 'none';
+    }
+  },
+  positionGuzhengGuidePanel(){
+    const panel = document.getElementById('guzhengGuidePanel');
+    const btn = document.getElementById('guzhengGuideBtn');
+    if(!panel || !btn) return;
+    const btnRect = btn.getBoundingClientRect();
+    const panelWidth = panel.offsetWidth || 280;
+    const panelHeight = panel.offsetHeight || 160;
+    const gap = 8;
+
+    // 버튼 바로 왼쪽에 붙이고, 세로로는 버튼 아랫변에 맞춘다
+    let left = btnRect.left - panelWidth - gap;
+    let top = btnRect.bottom - panelHeight;
+
+    // 화면 밖으로 나가지 않도록 보정
+    if(left < 8) left = 8;
+    if(top < 8) top = 8;
+    const maxTop = window.innerHeight - panelHeight - 8;
+    if(top > maxTop) top = Math.max(8, maxTop);
+
+    panel.style.left = left + 'px';
+    panel.style.top = top + 'px';
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  },
+  closeGuzhengGuide(){
+    const panel = document.getElementById('guzhengGuidePanel');
+    if(panel) panel.style.display = 'none';
+  },
+  renderGuzhengGuide(){
+    const bodyEl = document.getElementById('guzhengGuideBody');
+    if(!bodyEl) return;
+    if(isAdminUser()){
+      bodyEl.innerHTML = `
+        <textarea id="guzhengGuideTextarea" placeholder="고쟁 줄 사용법을 입력하세요">${escapeHtml(state.guzhengGuideText)}</textarea>
+        <div class="form-actions" style="margin-top:8px; margin-bottom:0;">
+          <button class="btn small" onclick="app.saveGuzhengGuideEdit()">저장</button>
+        </div>`;
+    }else{
+      bodyEl.innerHTML = state.guzhengGuideText
+        ? escapeHtml(state.guzhengGuideText)
+        : `<span style="color:var(--ink-soft);">아직 등록된 사용법이 없습니다.</span>`;
+    }
+  },
+  async saveGuzhengGuideEdit(){
+    if(!isAdminUser()) return;
+    const ta = document.getElementById('guzhengGuideTextarea');
+    const text = ta ? ta.value.trim() : '';
+    const ok = await saveGuzhengGuide(text);
+    if(ok){
+      state.guzhengGuideText = text;
+      showToast('사용법이 저장되었습니다');
+      this.renderGuzhengGuide();
+    }else{
+      showToast('저장에 실패했습니다');
+    }
   },
 
   go(page, skipPush){
@@ -1601,6 +1807,8 @@ const app = {
     this.renderMyPage();
     this.renderInquiryForm();
     this.updateAuthArea();
+    const guidePanel = document.getElementById('guzhengGuidePanel');
+    if(guidePanel && guidePanel.style.display !== 'none') this.renderGuzhengGuide();
   },
 
   rteExec(editorId, cmd){
@@ -1949,7 +2157,9 @@ const app = {
     if(!isAdminUser()) return;
     const cfg = BOARD_CONFIG[name];
     const existing = editId ? state.data[name].find(p=>p.id===editId) : null;
+    const inDetailView = !!state.detail[name];
     const toolbarEl = document.getElementById(name+'-toolbar');
+    const detailWrap = document.getElementById(name+'-detail-view');
     let form = document.getElementById(name+'-form');
     if(form) form.remove();
 
@@ -1981,7 +2191,11 @@ const app = {
         <button class="btn" onclick="app.savePost('${name}', ${existing ? `'${existing.id}'` : 'null'})">${existing ? '수정 완료' : '등록'}</button>
         <button class="btn ghost" onclick="document.getElementById('${name}-form').remove()">취소</button>
       </div>`;
-    toolbarEl.insertAdjacentElement('afterend', form);
+    if(inDetailView && detailWrap){
+      detailWrap.insertAdjacentElement('afterbegin', form);
+    }else{
+      toolbarEl.insertAdjacentElement('afterend', form);
+    }
     document.getElementById(editorId+'-wrap').innerHTML = buildRteHtml(editorId, '내용을 입력하세요');
     if(existing) document.getElementById(editorId).innerHTML = sanitizeRichHtml(existing.content);
     document.getElementById(name+'-f-title').focus();
@@ -2399,7 +2613,9 @@ const app = {
       return;
     }
 
+    const inDetailView = !!state.detail.sheets;
     const toolbarEl = document.getElementById('sheets-toolbar');
+    const detailWrap = document.getElementById('sheets-detail-view');
     let form = document.getElementById('sheets-form');
     if(form) form.remove();
     form = document.createElement('div');
@@ -2450,7 +2666,11 @@ const app = {
         <button class="btn" onclick="app.saveSheet(${existing ? `'${existing.id}'` : 'null'})">${existing ? '수정 완료' : '등록'}</button>
         <button class="btn ghost" onclick="document.getElementById('sheets-form').remove()">취소</button>
       </div>`;
-    toolbarEl.insertAdjacentElement('afterend', form);
+    if(inDetailView && detailWrap){
+      detailWrap.insertAdjacentElement('afterbegin', form);
+    }else{
+      toolbarEl.insertAdjacentElement('afterend', form);
+    }
     document.getElementById('sf-content-wrap').innerHTML = buildRteHtml('sf-content', '악보에 대한 설명을 적어주세요');
     if(existing) document.getElementById('sf-content').innerHTML = sanitizeRichHtml(existing.content);
     document.getElementById('sf-title').focus();
@@ -2913,6 +3133,11 @@ document.getElementById('updateLogModal').addEventListener('click', (e)=>{ if(e.
 document.getElementById('tuningUpdateLogModal').addEventListener('click', (e)=>{ if(e.target.id==='tuningUpdateLogModal') app.closeTuningUpdateLogModal(); });
 document.getElementById('liPassword')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') app.submitLogin(); });
 
+
+window.addEventListener('resize', () => {
+  const panel = document.getElementById('guzhengGuidePanel');
+  if(panel && panel.style.display !== 'none') app.positionGuzhengGuidePanel();
+});
 
 app.init();
 </script>

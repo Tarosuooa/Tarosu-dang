@@ -364,7 +364,7 @@ footer{
   .hero h1{font-size:32px;}
   .strings-wrap{display:none;}
   .header-inner{flex-wrap:wrap;}
-  nav{order:3; width:100%; justify-content:flex-start; overflow-x:auto;}
+  nav{order:3; width:100%; justify-content:flex-start;}
 }
 
 /* ---------- auth area ---------- */
@@ -402,6 +402,9 @@ footer{
 }
 .badge.official{background:#E5D9F2; color:#5B2C82; font-weight:700;}
 .badge.member{background:#EFDFC7; color:#6B4226; font-weight:700;}
+.badge.original{background:#D9E8F2; color:#2C5C82; font-weight:700;}
+.badge.imported{background:#F7E6D2; color:#8A5A20; font-weight:700;}
+.badge.share-ok{background:#DFF2D9; color:#3D7A2C; font-weight:700;}
 .badge.new{background:#F7DAD3; color:#8C3B2E; font-weight:800; vertical-align:2px;}
 .sheet-fields{display:grid; grid-template-columns:1fr 1fr; gap:0 16px;}
 .sheet-fields > div{min-width:0;}
@@ -584,8 +587,8 @@ footer{
       <input type="text" id="sheetSearchInput" class="command-input-like" placeholder="제목·내용·작성자 닉네임으로 검색" oninput="app.setSheetSearchQuery(this.value)" style="width:100%; padding:10px 14px; border:1px solid var(--paper-deep); background:#fff; font-family:'Gowun Batang',serif; font-size:14.5px; border-radius:20px; margin-bottom:14px;">
       <div class="category-filter" id="sheetCategoryFilter">
         <button class="cat-btn active" data-cat="전체" onclick="app.setSheetCategory('전체')">전체</button>
-        <button class="cat-btn" data-cat="관리자 제작" onclick="app.setSheetCategory('관리자 제작')">관리자 제작</button>
-        <button class="cat-btn" data-cat="회원 제작" onclick="app.setSheetCategory('회원 제작')">회원 제작</button>
+        <button class="cat-btn" data-cat="직접 제작" onclick="app.setSheetCategory('직접 제작')">직접 제작</button>
+        <button class="cat-btn" data-cat="가져온 악보" onclick="app.setSheetCategory('가져온 악보')">가져온 악보</button>
       </div>
       <div id="sheets-dl-list-view">
         <div class="toolbar" id="sheets-toolbar"></div>
@@ -851,7 +854,7 @@ const SEED = {
   ],
   faq: [
     {id:'seed-f1', question:'고쟁은 어떤 악기인가요?', answer:'고쟁(古筝)은 오동나무 몸통에 여러 줄을 얹어 손가락으로 뜯어 연주하는 중국의 전통 현악기입니다. 대개 21현을 사용합니다.', category:'악기'},
-    {id:'seed-f2', question:'게시판에는 누가 글을 쓸 수 있나요?', answer:'공지사항, 미디어, FAQ, 문의 게시판은 관리자만 작성할 수 있습니다. 방명록은 누구나 자유롭게 남길 수 있습니다. 악보 게시판의 회원 제작 카테고리는 로그인한 회원이라면 누구나 올릴 수 있습니다.', category:'홈페이지'}
+    {id:'seed-f2', question:'게시판에는 누가 글을 쓸 수 있나요?', answer:'공지사항, 미디어, FAQ, 문의 게시판은 관리자만 작성할 수 있습니다. 방명록은 누구나 자유롭게 남길 수 있습니다. 악보 게시판은 로그인한 회원이라면 누구나 올릴 수 있습니다.', category:'홈페이지'}
   ],
   guestbook: [],
   updateLog: [
@@ -889,6 +892,13 @@ function isRecentDate(dateStr){
   const t = new Date(String(dateStr).replace(' ', 'T')).getTime();
   if(isNaN(t)) return false;
   return (Date.now() - t) < 15*24*60*60*1000;
+}
+
+/* ---------- 악보 카테고리 배지 ---------- */
+function sheetCategoryBadgeClass(category){
+  if(category === '직접 제작') return 'original';
+  if(category === '가져온 악보') return 'imported';
+  return 'member'; // 예전 데이터(관리자 제작/회원 제작 등) 대비 기본값
 }
 
 /* ---------- 방명록: 공백 제외 200자 제한 ---------- */
@@ -2303,11 +2313,12 @@ const app = {
         <div class="post-row">
           <div style="flex:1;cursor:pointer" onclick="app.openDetail('sheets','${s.id}')">
             <div class="post-title">
-              <span class="badge ${s.category==='관리자 제작' ? 'official' : 'member'}">${s.category==='관리자 제작' ? '관리자' : '회원'}</span>
+              <span class="badge ${sheetCategoryBadgeClass(s.category)}">${escapeHtml(s.category || '-')}</span>
+              ${s.category==='가져온 악보' && s.shareConfirmed ? '<span class="badge share-ok">공유 허락 확인됨</span>' : ''}
               ${isRecentDate(s.date) ? '<span class="badge new">NEW</span>' : ''}
               ${escapeHtml(s.title)}
             </div>
-            <div class="post-meta">${escapeHtml(s.songName || '')} · ${escapeHtml(s.authorNickname)} · ${escapeHtml(s.date)}</div>
+            <div class="post-meta">${escapeHtml(s.songName || '')} · ${escapeHtml(s.authorNickname)}${s.authorIsAdmin ? ' (관리자)' : ''} · ${escapeHtml(s.date)}</div>
           </div>
           ${(state.currentUser && state.currentUser.uid === s.authorUid) ? `
             <div class="admin-row-actions">
@@ -2347,9 +2358,10 @@ const app = {
             <button class="btn ghost small" onclick="app.copyPostLink('sheets','${post.id}')">🔗 링크 복사</button>
           </div>
           <div class="detail-view">
-            <span class="badge ${post.category==='관리자 제작' ? 'official' : 'member'}">${post.category==='관리자 제작' ? '관리자' : '회원'}</span>
+            <span class="badge ${sheetCategoryBadgeClass(post.category)}">${escapeHtml(post.category || '-')}</span>
+            ${post.category==='가져온 악보' && post.shareConfirmed ? '<span class="badge share-ok">공유 허락 확인됨</span>' : ''}
             <h3 style="margin-top:8px;">${isRecentDate(post.date) ? '<span class="badge new">NEW</span>' : ''}${escapeHtml(post.title)}</h3>
-            <div class="post-meta">${escapeHtml(post.authorNickname)} · ${escapeHtml(post.date)}</div>
+            <div class="post-meta">${escapeHtml(post.authorNickname)}${post.authorIsAdmin ? ' (관리자)' : ''} · ${escapeHtml(post.date)}</div>
             <div class="sheet-fields" style="margin-bottom:16px; font-size:14px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif;">
               <div>곡명: ${escapeHtml(post.songName || '-')}</div>
               <div>가수: ${escapeHtml(post.artistName || '-')}</div>
@@ -2391,6 +2403,21 @@ const app = {
     form.innerHTML = `
       <label>제목</label>
       <input type="text" id="sf-title" maxlength="100" value="${existing ? escapeHtml(existing.title) : ''}">
+      <label>카테고리</label>
+      <div style="display:flex; gap:20px; padding:4px 0 4px;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:14px; font-family:'Noto Sans KR',sans-serif; cursor:pointer;">
+          <input type="radio" name="sf-category" id="sf-cat-original" onchange="app.onSheetCategoryChange()" ${(!existing || existing.category !== '가져온 악보') ? 'checked' : ''}> 직접 제작
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:14px; font-family:'Noto Sans KR',sans-serif; cursor:pointer;">
+          <input type="radio" name="sf-category" id="sf-cat-imported" onchange="app.onSheetCategoryChange()" ${(existing && existing.category === '가져온 악보') ? 'checked' : ''}> 가져온 악보
+        </label>
+      </div>
+      <div id="sf-share-confirm-wrap" style="display:${(existing && existing.category === '가져온 악보') ? 'block' : 'none'};">
+        <label style="display:flex; align-items:flex-start; gap:8px; font-size:13.5px; font-family:'Noto Sans KR',sans-serif; cursor:pointer; margin-top:8px;">
+          <input type="checkbox" id="sf-share-confirm" style="margin-top:3px;" ${(existing && existing.shareConfirmed) ? 'checked' : ''}>
+          <span>악보 제작자로부터 악보 공유가 허락된 악보인지 확인했습니다</span>
+        </label>
+      </div>
       <div class="sheet-fields">
         <div><label>곡명</label><input type="text" id="sf-song" maxlength="80" value="${existing ? escapeHtml(existing.songName || '') : ''}"></div>
         <div><label>가수</label><input type="text" id="sf-artist" maxlength="80" value="${existing ? escapeHtml(existing.artistName || '') : ''}"></div>
@@ -2424,6 +2451,12 @@ const app = {
     document.getElementById('sf-title').focus();
   },
 
+  onSheetCategoryChange(){
+    const isImported = document.getElementById('sf-cat-imported').checked;
+    const wrap = document.getElementById('sf-share-confirm-wrap');
+    if(wrap) wrap.style.display = isImported ? 'block' : 'none';
+  },
+
   async saveSheet(editId){
     if(!state.currentUser){ showToast('로그인 후 이용해주세요'); return; }
     const existing = editId ? state.data.sheets.find(s => s.id === editId) : null;
@@ -2431,8 +2464,9 @@ const app = {
       showToast('본인이 작성한 악보만 수정할 수 있습니다');
       return;
     }
-    // 글쓴이 계정이 관리자인지 여부로 카테고리(배지)가 자동으로 정해집니다. (수정 시에는 기존 카테고리를 유지)
-    const category = existing ? existing.category : (state.currentUser.isAdmin ? '관리자 제작' : '회원 제작');
+
+    const category = document.getElementById('sf-cat-imported').checked ? '가져온 악보' : '직접 제작';
+    const shareConfirmed = category === '가져온 악보' ? document.getElementById('sf-share-confirm').checked : false;
 
     const title = document.getElementById('sf-title').value.trim();
     const songName = document.getElementById('sf-song').value.trim();
@@ -2446,17 +2480,26 @@ const app = {
 
     if(!title){ showToast('제목을 입력해주세요'); return; }
     if(!link){ showToast('악보 링크는 필수 입력이에요'); return; }
+    if(category === '가져온 악보' && !shareConfirmed){
+      showToast('가져온 악보는 공유 허락 확인 체크가 필요해요');
+      return;
+    }
 
     const saveBtn = event.target;
     saveBtn.disabled = true; saveBtn.textContent = editId ? '수정 중...' : '등록 중...';
     try{
       if(editId){
-        await db.collection('sheets').doc(editId).update({ title, content, songName, artistName, makerName, link, media, allowComments });
+        await db.collection('sheets').doc(editId).update({
+          title, content, songName, artistName, makerName, link, media, allowComments,
+          category, shareConfirmed,
+          authorIsAdmin: !!state.currentUser.isAdmin
+        });
       }else{
         const docData = {
-          title, content, songName, artistName, makerName, category, link, media, allowComments,
+          title, content, songName, artistName, makerName, category, shareConfirmed, link, media, allowComments,
           authorUid: state.currentUser.uid,
           authorNickname: state.currentUser.nickname,
+          authorIsAdmin: !!state.currentUser.isAdmin,
           date: nowStr()
         };
         await db.collection('sheets').add(docData);

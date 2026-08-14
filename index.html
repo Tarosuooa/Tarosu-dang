@@ -467,12 +467,12 @@ footer{
   <div class="page" id="page-home">
     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px;">
       <div class="card" style="cursor:pointer" onclick="app.go('notice')"><h3 style="font-size:16px;">공지사항 <span id="homeNoticeNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로당의 새로운 소식을 확인하세요</p></div>
-      <div class="card" style="cursor:pointer" onclick="app.goSheetsTab('dl')"><h3 style="font-size:16px;">악보 다운로드</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로수와 회원들이 올린 악보를 받아보세요</p></div>
+      <div class="card" style="cursor:pointer" onclick="app.goSheetsTab('dl')"><h3 style="font-size:16px;">악보 다운로드 <span id="homeSheetsNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로수와 회원들이 올린 악보를 받아보세요</p></div>
       <div class="card" style="cursor:pointer" onclick="app.goSheetsTab('make')"><h3 style="font-size:16px;">악보 제작</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">숫자 악보 편집기로 직접 악보를 만들어보세요</p></div>
     </div>
 
     <div style="margin-top:16px; display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px;">
-      <div class="card" style="cursor:pointer" onclick="app.go('download')"><h3 style="font-size:16px;">미디어</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">관리자 '타로수'의 연주 영상, 사진 등</p></div>
+      <div class="card" style="cursor:pointer" onclick="app.go('download')"><h3 style="font-size:16px;">미디어 <span id="homeDownloadNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">관리자 '타로수'의 연주 영상, 사진 등</p></div>
       <div class="card" style="cursor:pointer" onclick="app.go('faq')"><h3 style="font-size:16px;">FAQ</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">자주 묻는 질문 모음</p></div>
       <div class="card" style="cursor:pointer" onclick="app.go('guestbook')"><h3 style="font-size:16px;">방명록</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">한 줄의 인사를 남겨주세요</p></div>
     </div>
@@ -504,6 +504,7 @@ footer{
   <div class="page" id="page-faq">
     <div class="section-title"><h2>FAQ</h2><span class="hanja-sub">問答</span></div>
     <div class="divider"></div>
+    <div class="category-filter" id="faqCategoryFilter"></div>
     <div class="toolbar" id="faq-toolbar"></div>
     <div class="list-box" id="faq-list"></div>
   </div>
@@ -579,7 +580,11 @@ footer{
 
     <!-- 악보 제작 (도구 임베드) -->
     <div id="sheets-make-view" style="display:none;">
-      <p style="font-size:13.5px; color:var(--ink-soft); margin:-4px 0 16px;">타로수가 만든 숫자 악보 편집기입니다. 로그인하면 시간 제한 없이 이용할 수 있어요.</p>
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin:-4px 0 4px; flex-wrap:wrap;">
+        <p style="font-size:13.5px; color:var(--ink-soft); margin:0;">타로수가 만든 숫자 악보 편집기입니다. 로그인하면 시간 제한 없이 이용할 수 있어요.</p>
+        <button class="btn ghost small" style="flex:none;" onclick="app.openUpdateLogModal()">업데이트 내역</button>
+      </div>
+      <p style="font-size:12px; color:var(--ink-soft); margin:0 0 16px;">명령어 입력창을 5회 연속 클릭하면 명령어 목록을 확인할 수 있습니다</p>
       <div id="scoreMakerStatus" class="field-hint" style="margin-bottom:10px; font-size:13px;"></div>
       <div id="scoreMakerBlocked" class="card" style="display:none; text-align:center; padding:44px 24px;">
         <h3 style="font-size:17px; margin-bottom:10px;">오늘의 이용 가능 시간을 모두 사용했어요</h3>
@@ -726,6 +731,19 @@ footer{
   </div>
 </div>
 
+<!-- 악보 제작 도구 업데이트 내역 모달 -->
+<div class="modal-overlay" id="updateLogModal">
+  <div class="modal-box wide" style="width:460px; max-height:80vh; display:flex; flex-direction:column;">
+    <h3>업데이트 내역</h3>
+    <p class="sub" id="updateLogCurrentVersion">현재 버전: -</p>
+    <div class="toolbar" id="updateLog-toolbar" style="margin-bottom:12px;"></div>
+    <div class="list-box" id="updateLog-list" style="overflow-y:auto; flex:1 1 auto;"></div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn ghost" onclick="app.closeUpdateLogModal()" style="flex:1;">닫기</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 
@@ -790,6 +808,17 @@ const BOARD_CONFIG = {
   inquiry:  {label:'문의', hasLink:false, hasMedia:false, hasComments:false},
 };
 
+const FAQ_CATEGORIES = ['악보 제작', '악보 업로드&다운로드', '미디어', '악기', '홈페이지', '관리자', '그 외'];
+const FAQ_CATEGORY_COLORS = {
+  '악보 제작':          {bg:'#E5D9F2', text:'#5B2C82'},
+  '악보 업로드&다운로드': {bg:'#D9E8F2', text:'#2C5C82'},
+  '미디어':             {bg:'#F2E0D9', text:'#82502C'},
+  '악기':               {bg:'#DFF2D9', text:'#3D7A2C'},
+  '홈페이지':           {bg:'#F2D9EA', text:'#822C63'},
+  '관리자':             {bg:'#EFDFC7', text:'#6B4226'},
+  '그 외':              {bg:'#E4E4E4', text:'#4A4A4A'}
+};
+
 const SEED = {
   notice: [
     {id:'seed-n1', title:'타로당에 오신 것을 환영합니다', author:'관리자', date:'2026-08-01', content:'타로당을 열었습니다. 앞으로 공지사항은 이곳에서 안내드리겠습니다. 자주 들러주세요.'}
@@ -798,10 +827,13 @@ const SEED = {
     {id:'seed-d1', title:'입문자를 위한 조현표(調絃表)', author:'관리자', date:'2026-08-01', content:'처음 고쟁을 접하시는 분들을 위한 기본 조현표입니다. 필요하신 분은 아래 링크를 참고해주세요.', link:''}
   ],
   faq: [
-    {id:'seed-f1', question:'고쟁은 어떤 악기인가요?', answer:'고쟁(古筝)은 오동나무 몸통에 여러 줄을 얹어 손가락으로 뜯어 연주하는 중국의 전통 현악기입니다. 대개 21현을 사용합니다.'},
-    {id:'seed-f2', question:'게시판에는 누가 글을 쓸 수 있나요?', answer:'공지사항, 미디어, FAQ, 문의 게시판은 관리자만 작성할 수 있습니다. 방명록은 누구나 자유롭게 남길 수 있습니다. 악보 게시판의 회원 제작 카테고리는 로그인한 회원이라면 누구나 올릴 수 있습니다.'}
+    {id:'seed-f1', question:'고쟁은 어떤 악기인가요?', answer:'고쟁(古筝)은 오동나무 몸통에 여러 줄을 얹어 손가락으로 뜯어 연주하는 중국의 전통 현악기입니다. 대개 21현을 사용합니다.', category:'악기'},
+    {id:'seed-f2', question:'게시판에는 누가 글을 쓸 수 있나요?', answer:'공지사항, 미디어, FAQ, 문의 게시판은 관리자만 작성할 수 있습니다. 방명록은 누구나 자유롭게 남길 수 있습니다. 악보 게시판의 회원 제작 카테고리는 로그인한 회원이라면 누구나 올릴 수 있습니다.', category:'홈페이지'}
   ],
-  guestbook: []
+  guestbook: [],
+  updateLog: [
+    {id:'seed-u1', version:'0.0.1', date:'2026-08-01', content:'악보 제작 도구 첫 배포'}
+  ]
 };
 
 const state = {
@@ -810,7 +842,8 @@ const state = {
   currentUser: null,
   sheetTab: 'dl',
   sheetCategory: '전체',
-  data: { notice: [], download: [], faq: [], inquiry: [], guestbook: [], sheets: [] },
+  faqCategory: '전체',
+  data: { notice: [], download: [], faq: [], inquiry: [], guestbook: [], sheets: [], updateLog: [] },
   detail: { notice: null, download: null, inquiry: null, sheets: null },
   pendingSignup: null,
 };
@@ -827,7 +860,7 @@ function isRecentDate(dateStr){
   if(!dateStr) return false;
   const t = new Date(String(dateStr).replace(' ', 'T')).getTime();
   if(isNaN(t)) return false;
-  return (Date.now() - t) < 30*24*60*60*1000;
+  return (Date.now() - t) < 15*24*60*60*1000;
 }
 
 /* ---------- 방명록: 공백 제외 200자 제한 ---------- */
@@ -1086,7 +1119,7 @@ async function fetchPublicIP(){
     return null;
   }
 }
-const PROTECTED_BOARDS = ['notice','download','faq','inquiry'];
+const PROTECTED_BOARDS = ['notice','download','faq','inquiry','updateLog'];
 
 async function loadBoard(name){
   if(!db){ storageAvailable = false; state.data[name] = SEED[name] ? SEED[name].slice() : []; return; }
@@ -1349,7 +1382,7 @@ const app = {
         }
       });
     }
-    await Promise.all(['notice','download','faq','inquiry','guestbook'].map(loadBoard));
+    await Promise.all(['notice','download','faq','inquiry','guestbook','updateLog'].map(loadBoard));
     await loadSheets();
     updateStorageWarning();
     this.renderAll();
@@ -1760,10 +1793,20 @@ const app = {
   },
 
   renderHome(){
-    const badgeEl = document.getElementById('homeNoticeNewBadge');
-    if(badgeEl){
+    const noticeBadgeEl = document.getElementById('homeNoticeNewBadge');
+    if(noticeBadgeEl){
       const hasNew = state.data.notice.some(p => isRecentDate(p.date));
-      badgeEl.style.display = hasNew ? 'inline-block' : 'none';
+      noticeBadgeEl.style.display = hasNew ? 'inline-block' : 'none';
+    }
+    const downloadBadgeEl = document.getElementById('homeDownloadNewBadge');
+    if(downloadBadgeEl){
+      const hasNew = state.data.download.some(p => isRecentDate(p.date));
+      downloadBadgeEl.style.display = hasNew ? 'inline-block' : 'none';
+    }
+    const sheetsBadgeEl = document.getElementById('homeSheetsNewBadge');
+    if(sheetsBadgeEl){
+      const hasNew = state.data.sheets.some(s => isRecentDate(s.date));
+      sheetsBadgeEl.style.display = hasNew ? 'inline-block' : 'none';
     }
   },
 
@@ -1781,7 +1824,7 @@ const app = {
       items.map(p => `
         <div class="post-row">
           <div style="flex:1;cursor:pointer" onclick="app.openDetail('${name}','${p.id}')">
-            <div class="post-title">${name==='notice' && isRecentDate(p.date) ? '<span class="badge new">NEW</span>' : ''}${escapeHtml(p.title)}</div>
+            <div class="post-title">${(name==='notice' || name==='download') && isRecentDate(p.date) ? '<span class="badge new">NEW</span>' : ''}${escapeHtml(p.title)}</div>
             <div class="post-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</div>
           </div>
           ${state.isAdmin ? `
@@ -1807,7 +1850,7 @@ const app = {
             <button class="btn ghost small" onclick="app.copyPostLink('${name}','${post.id}')">🔗 링크 복사</button>
           </div>
           <div class="detail-view">
-            <h3>${name==='notice' && isRecentDate(post.date) ? '<span class="badge new">NEW</span>' : ''}${escapeHtml(post.title)}</h3>
+            <h3>${(name==='notice' || name==='download') && isRecentDate(post.date) ? '<span class="badge new">NEW</span>' : ''}${escapeHtml(post.title)}</h3>
             <div class="post-meta">${escapeHtml(post.author)} · ${escapeHtml(post.date)}</div>
             <div class="detail-body">${sanitizeRichHtml(post.content)}</div>
             ${cfg.hasLink && post.link ? `<a class="dl-link" href="${escapeHtml(post.link)}" target="_blank" rel="noopener">자료 링크 열기 ↗</a>` : ''}
@@ -1971,28 +2014,52 @@ const app = {
     const existingForm = document.getElementById('faq-form');
     if(existingForm) existingForm.remove();
 
+    const filterEl = document.getElementById('faqCategoryFilter');
+    if(filterEl){
+      const cats = ['전체', ...FAQ_CATEGORIES];
+      filterEl.innerHTML = cats.map(c =>
+        `<button class="cat-btn ${state.faqCategory===c ? 'active' : ''}" onclick="app.setFaqCategory('${c}')">${c}</button>`
+      ).join('');
+    }
+
     const listEl = document.getElementById('faq-list');
-    if(state.data.faq.length===0){ listEl.innerHTML = `<div class="empty-note">등록된 FAQ가 없습니다</div>`; return; }
-    listEl.innerHTML = state.data.faq.map((f, i) => `
+    const filtered = state.data.faq.filter(f => state.faqCategory==='전체' || f.category===state.faqCategory);
+    if(filtered.length===0){ listEl.innerHTML = `<div class="empty-note">등록된 FAQ가 없습니다</div>`; return; }
+    listEl.innerHTML = filtered.map(f => {
+      const catColor = f.category ? FAQ_CATEGORY_COLORS[f.category] : null;
+      const badgeHtml = catColor ? `<span class="badge" style="background:${catColor.bg}; color:${catColor.text}; font-weight:700;">${escapeHtml(f.category)}</span>` : '';
+      const isFirst = filtered[0].id === f.id;
+      const isLast = filtered[filtered.length-1].id === f.id;
+      return `
       <div class="faq-item">
         <div class="faq-q" onclick="app.toggleFaq('${f.id}')">
-          <span><span class="mark">問 ·</span> ${escapeHtml(f.question)}</span>
+          <span>${badgeHtml}<span class="mark">問 ·</span> ${escapeHtml(f.question)}</span>
           ${state.isAdmin ? `<span class="admin-row-actions" onclick="event.stopPropagation()">
-              <button class="btn ghost small" onclick="app.moveFaq(${i},-1)" ${i===0 ? 'disabled' : ''} title="위로 이동">▲</button>
-              <button class="btn ghost small" onclick="app.moveFaq(${i},1)" ${i===state.data.faq.length-1 ? 'disabled' : ''} title="아래로 이동">▼</button>
+              <button class="btn ghost small" onclick="app.moveFaq('${f.id}',-1)" ${isFirst ? 'disabled' : ''} title="위로 이동">▲</button>
+              <button class="btn ghost small" onclick="app.moveFaq('${f.id}',1)" ${isLast ? 'disabled' : ''} title="아래로 이동">▼</button>
               <button class="btn ghost small" onclick="app.openFaqForm('${f.id}')">수정</button>
               <button class="btn danger small" onclick="app.deleteFaq('${f.id}')">삭제</button>
             </span>` : `<span class="mark">＋</span>`}
         </div>
         <div class="faq-a" id="faq-a-${f.id}"><strong style="color:var(--jade)">答 ·</strong> <span>${sanitizeRichHtml(f.answer)}</span></div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   },
-  async moveFaq(index, direction){
+  setFaqCategory(cat){
+    state.faqCategory = cat;
+    this.renderFaq();
+  },
+  async moveFaq(id, direction){
     if(!state.isAdmin) return;
-    const target = index + direction;
-    if(target < 0 || target >= state.data.faq.length) return;
-    const arr = state.data.faq;
-    [arr[index], arr[target]] = [arr[target], arr[index]];
+    // 현재 보이는(필터링된) 목록 안에서의 순서를 기준으로 바로 위/아래 항목과 자리를 바꾼다
+    const filtered = state.data.faq.filter(f => state.faqCategory==='전체' || f.category===state.faqCategory);
+    const idxInFiltered = filtered.findIndex(f=>f.id===id);
+    const targetIdxInFiltered = idxInFiltered + direction;
+    if(targetIdxInFiltered < 0 || targetIdxInFiltered >= filtered.length) return;
+    const otherId = filtered[targetIdxInFiltered].id;
+    const fullIdxA = state.data.faq.findIndex(f=>f.id===id);
+    const fullIdxB = state.data.faq.findIndex(f=>f.id===otherId);
+    [state.data.faq[fullIdxA], state.data.faq[fullIdxB]] = [state.data.faq[fullIdxB], state.data.faq[fullIdxA]];
     await saveBoard('faq');
     this.renderFaq();
   },
@@ -2005,9 +2072,18 @@ const app = {
     if(form) form.remove();
     form = document.createElement('div');
     form.className='form-box'; form.id='faq-form';
+    const catRadios = FAQ_CATEGORIES.map(c =>
+      `<label style="display:flex; align-items:center; gap:6px; font-size:13.5px; font-family:'Noto Sans KR',sans-serif; cursor:pointer; margin:0;">
+        <input type="radio" name="faq-f-cat" value="${c}" ${existing && existing.category===c ? 'checked' : ''}> ${c}
+      </label>`
+    ).join('');
     form.innerHTML = `
       <label>질문</label>
       <input type="text" id="faq-f-q" value="${existing?escapeHtml(existing.question):''}" maxlength="150">
+      <label>카테고리</label>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:8px; padding:4px 0 4px;">
+        ${catRadios}
+      </div>
       <label>답변</label>
       <div id="faq-f-a-wrap"></div>
       <div class="form-actions">
@@ -2023,9 +2099,11 @@ const app = {
     const q = document.getElementById('faq-f-q').value.trim();
     const aEl = document.getElementById('faq-f-a');
     const a = sanitizeRichHtml(aEl ? aEl.innerHTML : '');
+    const checkedCat = document.querySelector('input[name="faq-f-cat"]:checked');
+    const category = checkedCat ? checkedCat.value : null;
     if(!q || !richTextHasContent(a)){ showToast('질문과 답변을 입력해주세요'); return; }
-    if(editId){ const item = state.data.faq.find(f=>f.id===editId); item.question=q; item.answer=a; }
-    else{ state.data.faq.push({id:uid(), question:q, answer:a}); }
+    if(editId){ const item = state.data.faq.find(f=>f.id===editId); item.question=q; item.answer=a; item.category=category; }
+    else{ state.data.faq.push({id:uid(), question:q, answer:a, category}); }
     await saveBoard('faq');
     const f=document.getElementById('faq-form'); if(f) f.remove();
     showToast(editId?'수정되었습니다':'등록되었습니다');
@@ -2130,6 +2208,7 @@ const app = {
           <div style="flex:1;cursor:pointer" onclick="app.openDetail('sheets','${s.id}')">
             <div class="post-title">
               <span class="badge ${s.category==='관리자 제작' ? 'official' : 'member'}">${s.category==='관리자 제작' ? '관리자' : '회원'}</span>
+              ${isRecentDate(s.date) ? '<span class="badge new">NEW</span>' : ''}
               ${escapeHtml(s.title)}
             </div>
             <div class="post-meta">${escapeHtml(s.songName || '')} · ${escapeHtml(s.authorNickname)} · ${escapeHtml(s.date)}</div>
@@ -2159,7 +2238,7 @@ const app = {
           </div>
           <div class="detail-view">
             <span class="badge ${post.category==='관리자 제작' ? 'official' : 'member'}">${post.category==='관리자 제작' ? '관리자' : '회원'}</span>
-            <h3 style="margin-top:8px;">${escapeHtml(post.title)}</h3>
+            <h3 style="margin-top:8px;">${isRecentDate(post.date) ? '<span class="badge new">NEW</span>' : ''}${escapeHtml(post.title)}</h3>
             <div class="post-meta">${escapeHtml(post.authorNickname)} · ${escapeHtml(post.date)}</div>
             <div class="sheet-fields" style="margin-bottom:16px; font-size:14px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif;">
               <div>곡명: ${escapeHtml(post.songName || '-')}</div>
@@ -2341,6 +2420,93 @@ const app = {
     }
   },
 
+  /* ---------- 악보 제작 도구 업데이트 내역 ---------- */
+  openUpdateLogModal(){
+    document.getElementById('updateLogModal').classList.add('show');
+    this.renderUpdateLog();
+  },
+  closeUpdateLogModal(){
+    document.getElementById('updateLogModal').classList.remove('show');
+    const f = document.getElementById('updateLog-form');
+    if(f) f.remove();
+  },
+  renderUpdateLog(){
+    const toolbarEl = document.getElementById('updateLog-toolbar');
+    const listEl = document.getElementById('updateLog-list');
+    const versionEl = document.getElementById('updateLogCurrentVersion');
+    if(!toolbarEl || !listEl) return;
+
+    toolbarEl.innerHTML = state.isAdmin ? `<button class="btn small" onclick="app.openUpdateLogForm()">+ 새 업데이트 추가</button>` : '';
+
+    const items = state.data.updateLog.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    if(versionEl){
+      versionEl.textContent = items.length ? `현재 버전: ${items[0].version}` : '현재 버전: -';
+    }
+    listEl.innerHTML = items.length===0 ? `<div class="empty-note">등록된 업데이트 내역이 없습니다</div>` :
+      items.map(u => `
+        <div class="post-row" style="cursor:default;">
+          <div style="flex:1;">
+            <div class="post-title">v${escapeHtml(u.version)}</div>
+            <div class="post-meta" style="margin-bottom:6px;">${escapeHtml(u.date)}</div>
+            <div style="font-size:13.5px; white-space:pre-wrap; word-break:break-word;">${escapeHtml(u.content)}</div>
+          </div>
+          ${state.isAdmin ? `
+            <div class="admin-row-actions">
+              <button class="btn ghost small" onclick="app.openUpdateLogForm('${u.id}')">수정</button>
+              <button class="btn danger small" onclick="app.deleteUpdateLog('${u.id}')">삭제</button>
+            </div>` : ''}
+        </div>`).join('');
+  },
+  openUpdateLogForm(editId){
+    if(!state.isAdmin) return;
+    const existing = editId ? state.data.updateLog.find(u=>u.id===editId) : null;
+    const toolbarEl = document.getElementById('updateLog-toolbar');
+    let form = document.getElementById('updateLog-form');
+    if(form) form.remove();
+    form = document.createElement('div');
+    form.className = 'form-box';
+    form.id = 'updateLog-form';
+    form.innerHTML = `
+      <label>날짜</label>
+      <input type="text" id="ul-f-date" placeholder="예: 2026-08-14" value="${existing ? escapeHtml(existing.date) : todayStr()}">
+      <label>버전</label>
+      <input type="text" id="ul-f-version" placeholder="예: 0.0.2" value="${existing ? escapeHtml(existing.version) : ''}">
+      <label>내용</label>
+      <textarea id="ul-f-content" maxlength="1000" placeholder="업데이트 내용을 입력하세요">${existing ? escapeHtml(existing.content) : ''}</textarea>
+      <div class="form-actions">
+        <button class="btn small" onclick="app.saveUpdateLog(${existing ? `'${existing.id}'` : 'null'})">${existing ? '수정 완료' : '등록'}</button>
+        <button class="btn ghost small" onclick="document.getElementById('updateLog-form').remove()">취소</button>
+      </div>`;
+    toolbarEl.insertAdjacentElement('afterend', form);
+    document.getElementById('ul-f-version').focus();
+  },
+  async saveUpdateLog(editId){
+    if(!state.isAdmin) return;
+    const date = document.getElementById('ul-f-date').value.trim();
+    const version = document.getElementById('ul-f-version').value.trim();
+    const content = document.getElementById('ul-f-content').value.trim();
+    if(!date || !version || !content){ showToast('날짜, 버전, 내용을 모두 입력해주세요'); return; }
+
+    if(editId){
+      const item = state.data.updateLog.find(u=>u.id===editId);
+      item.date = date; item.version = version; item.content = content;
+    }else{
+      state.data.updateLog.push({ id: uid(), date, version, content });
+    }
+    await saveBoard('updateLog');
+    const f = document.getElementById('updateLog-form'); if(f) f.remove();
+    showToast(editId ? '수정되었습니다' : '등록되었습니다');
+    this.renderUpdateLog();
+  },
+  async deleteUpdateLog(id){
+    if(!state.isAdmin) return;
+    if(!confirm('이 업데이트 내역을 삭제하시겠습니까?')) return;
+    state.data.updateLog = state.data.updateLog.filter(u=>u.id!==id);
+    await saveBoard('updateLog');
+    showToast('삭제되었습니다');
+    this.renderUpdateLog();
+  },
+
   async startScoreMakerSession(){
     const statusEl = document.getElementById('scoreMakerStatus');
     const blockedEl = document.getElementById('scoreMakerBlocked');
@@ -2495,6 +2661,7 @@ document.getElementById('adminModal').addEventListener('click', (e)=>{ if(e.targ
 document.getElementById('signupModal').addEventListener('click', (e)=>{ if(e.target.id==='signupModal') app.closeSignupModal(); });
 document.getElementById('loginModal').addEventListener('click', (e)=>{ if(e.target.id==='loginModal') app.closeLoginModal(); });
 document.getElementById('forgotPasswordModal').addEventListener('click', (e)=>{ if(e.target.id==='forgotPasswordModal') app.closeForgotPasswordModal(); });
+document.getElementById('updateLogModal').addEventListener('click', (e)=>{ if(e.target.id==='updateLogModal') app.closeUpdateLogModal(); });
 document.getElementById('adminPwInput')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') app.tryAdminLogin(); });
 document.getElementById('liPassword')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') app.submitLogin(); });
 

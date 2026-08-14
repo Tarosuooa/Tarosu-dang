@@ -405,11 +405,35 @@ footer{
   text-align:center; color:var(--ink-soft); font-size:12.5px; font-family:'Noto Sans KR',sans-serif;
 }
 
+.mobile-guzheng-toggle-btn{ display:none; }
+.mobile-guzheng-close{ display:none; }
+
 @media (max-width:720px){
   .hero h1{font-size:32px;}
   .strings-wrap{display:none;}
   .header-inner{flex-wrap:wrap;}
   nav{order:3; width:100%; justify-content:flex-start;}
+
+  .mobile-guzheng-toggle-btn{
+    display:inline-block; margin-top:16px; padding:9px 16px;
+    border:1px solid var(--gold); background:transparent; color:var(--wood);
+    border-radius:20px; cursor:pointer; font-size:13px;
+    font-family:'Noto Sans KR',sans-serif; letter-spacing:0.5px;
+  }
+  .mobile-guzheng-toggle-btn:active{ background:var(--wood); color:var(--paper); border-color:var(--wood); }
+
+  /* PC와 완전히 같은 요소(고쟁 줄/사용법/볼륨)를, 평소 숨겨둔 걸 화면 위에 펼쳐서 그대로 보여준다 */
+  .strings-wrap.mobile-open{
+    display:block; position:fixed; left:12px; right:12px; top:70px; height:min(70vh, 420px);
+    width:auto; opacity:1; z-index:200;
+    background:var(--paper); border:1px solid var(--gold); border-radius:8px;
+    box-shadow:var(--shadow); padding:8px;
+  }
+  .strings-wrap.mobile-open svg{ width:100%; height:100%; }
+  .mobile-guzheng-close{
+    display:block; position:absolute; top:6px; right:8px; z-index:10;
+    background:none; border:none; font-size:15px; color:var(--ink-soft); cursor:pointer; padding:4px;
+  }
 }
 
 /* ---------- auth area ---------- */
@@ -518,11 +542,13 @@ footer{
     <div class="hero-inner">
       <span class="eyebrow">GUZHENG · 古筝</span>
       <h1 id="heroTagline">타로수가 선명하게<br><em>고쟁</em>을 핥고 있었다.</h1>
-      <p class="tagline">취미 고쟁러 '타로수'의 공간입니다. <br>저의 연주 영상 및 자작 악보를 담았으며,<br>고쟁 악보 제작 및 튜닝 툴도 담았습니다.</p>
+      <p class="tagline">취미 고쟁러 '타로수'의 공간입니다. <br>저의 연주 영상 및 자작 악보를 담았으며,<br>고쟁 악보 제작 및 조율 툴도 담았습니다.</p>
       <p style="margin-top:14px; font-size:16.5px; color:var(--ink-soft);"><a href="https://www.instagram.com/tarosu_gzh/" target="_blank" rel="noopener" style="color:inherit; text-decoration:none;">instagram @tarosu_gzh</a></p>
       <p style="margin-top:2px; font-size:16.5px; color:var(--ink-soft);">E-Mail: tarosu.ooa@gmail.com</p>
+      <button type="button" class="mobile-guzheng-toggle-btn" onclick="app.toggleMobileGuzheng()">타로당 13현 고쟁</button>
     </div>
-    <div class="strings-wrap">
+    <div class="strings-wrap" id="stringsWrap">
+      <button type="button" class="mobile-guzheng-close" onclick="app.toggleMobileGuzheng()">✕</button>
       <svg viewBox="0 0 500 400" preserveAspectRatio="none"></svg>
       <div class="guzheng-controls">
         <button type="button" id="guzhengGuideBtn" class="btn ghost small guzheng-guide-btn" onclick="app.toggleGuzhengGuide()">사용법</button>
@@ -549,10 +575,10 @@ footer{
     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px;">
       <div class="card" style="cursor:pointer" onclick="app.go('notice')"><h3 style="font-size:16px;">공지사항 <span id="homeNoticeNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로당의 새로운 소식을 확인하세요.</p></div>
       <div class="card" style="cursor:pointer" onclick="app.goSheetsTab('dl')"><h3 style="font-size:16px;">악보 다운로드 <span id="homeSheetsNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로수와 회원님들이 공유한 악보를 받아 보세요.</p></div>
-      <div class="card"><h3 style="font-size:16px;">악보 제작 및 튜닝</h3>
+      <div class="card"><h3 style="font-size:16px;">악보 제작 및 조율</h3>
         <div style="display:flex; gap:8px; margin-top:18px;">
           <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('make')">악보 제작</button>
-          <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('tuning')">음정 체크&amp;튜닝</button>
+          <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('tuning')">음정 체크&amp;조율</button>
         </div>
       </div>
     </div>
@@ -648,7 +674,7 @@ footer{
     <div class="subtabs">
       <button class="subtab-btn" id="subtab-dl" onclick="app.setSheetTab('dl')">악보 다운로드</button>
       <button class="subtab-btn" id="subtab-make" onclick="app.setSheetTab('make')">악보 제작</button>
-      <button class="subtab-btn" id="subtab-tuning" onclick="app.setSheetTab('tuning')">음정 체크&amp;튜닝</button>
+      <button class="subtab-btn" id="subtab-tuning" onclick="app.setSheetTab('tuning')">음정 체크&amp;조율</button>
     </div>
 
     <!-- 악보 다운로드 -->
@@ -671,9 +697,10 @@ footer{
     <div id="sheets-make-view" style="display:none;">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin:-4px 0 4px; flex-wrap:wrap;">
         <div id="scoreMakerNoticeDisplay" style="flex:1; min-width:220px;"></div>
-        <div style="display:flex; gap:8px; flex:none;">
+        <div style="display:flex; flex-direction:column; gap:6px; flex:none;">
           <button class="btn ghost small" id="scoreMakerNoticeEditBtn" style="display:none;" onclick="app.openScoreMakerNoticeEdit()">안내 수정</button>
           <button class="btn ghost small" onclick="app.openUpdateLogModal()">업데이트 내역</button>
+          <button class="btn ghost small" id="scoreMakerTipBtn" onclick="app.toggleTipPanel('scoreMaker')">사용 Tip</button>
         </div>
       </div>
       <div id="scoreMakerNoticeEditWrap" style="display:none; margin-bottom:12px;"></div>
@@ -686,13 +713,14 @@ footer{
       <iframe id="scoreMakerFrame" src="" title="숫자 악보 만들기" scrolling="no" style="display:none; width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
     </div>
 
-    <!-- 음정 체크 (도구 임베드) -->
+    <!-- 음정 체크&조율 (도구 임베드) -->
     <div id="sheets-tuning-view" style="display:none;">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin:-4px 0 4px; flex-wrap:wrap;">
         <div id="tuningNoticeDisplay" style="flex:1; min-width:220px;"></div>
-        <div style="display:flex; gap:8px; flex:none;">
+        <div style="display:flex; flex-direction:column; gap:6px; flex:none;">
           <button class="btn ghost small" id="tuningNoticeEditBtn" style="display:none;" onclick="app.openTuningNoticeEdit()">안내 수정</button>
           <button class="btn ghost small" onclick="app.openTuningUpdateLogModal()">업데이트 내역</button>
+          <button class="btn ghost small" id="tuningTipBtn" onclick="app.toggleTipPanel('tuning')">사용 Tip</button>
         </div>
       </div>
       <div id="tuningNoticeEditWrap" style="display:none; margin-bottom:12px;"></div>
@@ -705,6 +733,23 @@ footer{
       <iframe id="tuningFrame" src="" title="고쟁 음정 체크" scrolling="no" style="display:none; width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
     </div>
   </div>
+
+  <!-- 악보 제작 / 음정 체크&조율 툴 '사용 Tip' 패널: 모달이 아니라 떠 있는 카드 -->
+  <div id="scoreMakerTipPanel" class="guzheng-guide-panel" style="display:none;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <h4 style="margin:0; font-size:14.5px;">악보 제작 툴 사용 Tip</h4>
+      <button type="button" class="guzheng-guide-close" onclick="app.closeTipPanel('scoreMaker')">✕</button>
+    </div>
+    <div id="scoreMakerTipBody"></div>
+  </div>
+  <div id="tuningTipPanel" class="guzheng-guide-panel" style="display:none;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <h4 style="margin:0; font-size:14.5px;">음정 체크&amp;조율 툴 사용 Tip</h4>
+      <button type="button" class="guzheng-guide-close" onclick="app.closeTipPanel('tuning')">✕</button>
+    </div>
+    <div id="tuningTipBody"></div>
+  </div>
+
 
   <!-- MYPAGE -->
   <div class="page" id="page-mypage">
@@ -963,6 +1008,7 @@ const state = {
   guzhengGuideText: '',
   scoreMakerNoticeText: '',
   tuningNoticeText: '',
+  tipText: { scoreMaker: '', tuning: '' },
   data: { notice: [], download: [], faq: [], inquiry: [], guestbook: [], sheets: [], updateLog: [], tuningUpdateLog: [] },
   detail: { notice: null, download: null, inquiry: null, sheets: null },
   pendingSignup: null,
@@ -1488,7 +1534,7 @@ async function saveGuzhengGuide(text){
 
 /* ---------- 악보 제작 / 음정 체크 툴 상단 안내 문구 (관리자만 작성/수정 가능) ---------- */
 const DEFAULT_SCORE_MAKER_NOTICE = '타로수가 만든 숫자 악보 편집기입니다. 로그인하면 시간 제한 없이 이용할 수 있어요.<br>명령어 입력창을 5회 연속 클릭하면 명령어 목록을 확인할 수 있습니다';
-const DEFAULT_TUNING_NOTICE = '타로수가 만든 고쟁 음정 체크 및 튜닝 도구입니다.<br>튜닝은 마이크 권한이 켜진 상태에서 마이크와 연결이 되어 있어야 합니다.<br>현재 본인의 고쟁 음(音)과 얼마나 유사한지 피아노 소리를 통해 비교하는 툴입니다.';
+const DEFAULT_TUNING_NOTICE = '타로수가 만든 고쟁 음정 체크 및 조율 도구입니다.<br>조율은 마이크 권한이 켜진 상태에서 마이크와 연결이 되어 있어야 합니다.<br>현재 본인의 고쟁 음(音)과 얼마나 유사한지 피아노 소리를 통해 비교하는 툴입니다.';
 
 async function loadScoreMakerNotice(){
   if(!db){ state.scoreMakerNoticeText = DEFAULT_SCORE_MAKER_NOTICE; return; }
@@ -1527,6 +1573,34 @@ async function saveTuningNotice(text){
     return true;
   }catch(e){
     console.error('음정 체크 안내 문구 저장 실패', e);
+    return false;
+  }
+}
+
+/* ---------- 악보 제작 / 음정 체크&조율 툴 '사용 Tip' (관리자만 작성/수정 가능) ---------- */
+const TIP_CONFIGS = {
+  scoreMaker: { docId: 'scoreMakerTip', panelId: 'scoreMakerTipPanel', btnId: 'scoreMakerTipBtn', bodyId: 'scoreMakerTipBody' },
+  tuning: { docId: 'tuningTip', panelId: 'tuningTipPanel', btnId: 'tuningTipBtn', bodyId: 'tuningTipBody' }
+};
+async function loadTipText(key){
+  const cfg = TIP_CONFIGS[key];
+  if(!db){ state.tipText[key] = ''; return; }
+  try{
+    const doc = await db.collection('content').doc(cfg.docId).get();
+    state.tipText[key] = (doc.exists && doc.data().text) ? doc.data().text : '';
+  }catch(e){
+    console.error('사용 Tip 로드 실패', key, e);
+    state.tipText[key] = '';
+  }
+}
+async function saveTipText(key, text){
+  const cfg = TIP_CONFIGS[key];
+  if(!db) return false;
+  try{
+    await db.collection('content').doc(cfg.docId).set({ text });
+    return true;
+  }catch(e){
+    console.error('사용 Tip 저장 실패', key, e);
     return false;
   }
 }
@@ -1808,6 +1882,8 @@ const app = {
     await loadGuzhengGuide();
     await loadScoreMakerNotice();
     await loadTuningNotice();
+    await loadTipText('scoreMaker');
+    await loadTipText('tuning');
     updateStorageWarning();
     this.renderAll();
     initGuestbookCharLimit();
@@ -1832,7 +1908,7 @@ const app = {
           <div class="nav-submenu">
             <button onclick="app.goSheetsTab('dl')">악보 다운로드</button>
             <button onclick="app.goSheetsTab('make')">악보 제작</button>
-            <button onclick="app.goSheetsTab('tuning')">음정 체크&amp;튜닝</button>
+            <button onclick="app.goSheetsTab('tuning')">음정 체크&amp;조율</button>
           </div>
         </div>`;
       }
@@ -1931,6 +2007,13 @@ const app = {
   },
 
   /* ---------- 고쟁 줄 사용법 패널 (모달 아님 — 열려 있어도 뒤의 줄을 계속 클릭할 수 있다) ---------- */
+  // 모바일에서는 PC와 완전히 같은 고쟁 줄/사용법/볼륨 요소(#stringsWrap)를 복사하지 않고,
+  // 그대로 화면 위에 펼쳐 보이거나 숨기기만 한다. 그래서 한쪽 코드를 고치면 다른 쪽도 항상 자동으로 같이 바뀐다.
+  toggleMobileGuzheng(){
+    const wrap = document.getElementById('stringsWrap');
+    if(!wrap) return;
+    wrap.classList.toggle('mobile-open');
+  },
   setGuzhengVolume(value){
     const pct = Math.max(0, Math.min(100, Number(value) || 0));
     guzhengVolume = pct / 100;
@@ -1977,6 +2060,89 @@ const app = {
     const panel = document.getElementById('guzhengGuidePanel');
     if(panel) panel.style.display = 'none';
   },
+
+  /* ---------- 악보 제작 / 음정 체크&조율 툴 '사용 Tip' 패널 (모달 아님) ---------- */
+  toggleTipPanel(key){
+    const cfg = TIP_CONFIGS[key];
+    if(!cfg) return;
+    const panel = document.getElementById(cfg.panelId);
+    if(!panel) return;
+    const isHidden = panel.style.display === 'none' || !panel.style.display;
+    if(isHidden){
+      this.renderTipPanel(key);
+      panel.style.display = 'block';
+      this.positionTipPanel(key);
+    }else{
+      panel.style.display = 'none';
+    }
+  },
+  positionTipPanel(key){
+    const cfg = TIP_CONFIGS[key];
+    if(!cfg) return;
+    const panel = document.getElementById(cfg.panelId);
+    const btn = document.getElementById(cfg.btnId);
+    if(!panel || !btn) return;
+    const btnRect = btn.getBoundingClientRect();
+    const panelWidth = panel.offsetWidth || 280;
+    const panelHeight = panel.offsetHeight || 160;
+    const gap = 8;
+
+    // 버튼 바로 왼쪽에 붙이고, 세로로는 버튼 아랫변에 맞춘다
+    let left = btnRect.left - panelWidth - gap;
+    let top = btnRect.bottom - panelHeight;
+
+    // 왼쪽 공간이 부족하면 버튼 오른쪽에 붙인다
+    if(left < 8) left = Math.min(window.innerWidth - panelWidth - 8, btnRect.right + gap);
+    if(top < 8) top = 8;
+    const maxTop = window.innerHeight - panelHeight - 8;
+    if(top > maxTop) top = Math.max(8, maxTop);
+
+    panel.style.left = left + 'px';
+    panel.style.top = top + 'px';
+    panel.style.right = 'auto';
+    panel.style.bottom = 'auto';
+  },
+  closeTipPanel(key){
+    const cfg = TIP_CONFIGS[key];
+    if(!cfg) return;
+    const panel = document.getElementById(cfg.panelId);
+    if(panel) panel.style.display = 'none';
+  },
+  renderTipPanel(key){
+    const cfg = TIP_CONFIGS[key];
+    if(!cfg) return;
+    const bodyEl = document.getElementById(cfg.bodyId);
+    if(!bodyEl) return;
+    const editorId = cfg.docId + 'Editor';
+    if(isAdminUser()){
+      bodyEl.innerHTML = `
+        ${this.buildToolNoticeToolbar(editorId)}
+        <div class="rte-editor" id="${editorId}" contenteditable="true" style="min-height:110px; border-radius:0 0 2px 2px;">${sanitizeRichHtml(state.tipText[key])}</div>
+        <div class="form-actions" style="margin-top:8px; margin-bottom:0;">
+          <button class="btn small" onclick="app.saveTipPanelEdit('${key}')">저장</button>
+        </div>`;
+    }else{
+      bodyEl.innerHTML = state.tipText[key]
+        ? sanitizeRichHtml(state.tipText[key])
+        : `<span style="color:var(--ink-soft);">아직 등록된 사용 Tip이 없습니다.</span>`;
+    }
+  },
+  async saveTipPanelEdit(key){
+    if(!isAdminUser()) return;
+    const cfg = TIP_CONFIGS[key];
+    if(!cfg) return;
+    const editorEl = document.getElementById(cfg.docId + 'Editor');
+    const text = sanitizeRichHtml(editorEl ? editorEl.innerHTML : '');
+    const ok = await saveTipText(key, text);
+    if(ok){
+      state.tipText[key] = text;
+      showToast('사용 Tip이 저장되었습니다');
+      this.renderTipPanel(key);
+    }else{
+      showToast('저장에 실패했습니다');
+    }
+  },
+
   renderGuzhengGuide(){
     const bodyEl = document.getElementById('guzhengGuideBody');
     if(!bodyEl) return;
@@ -2022,6 +2188,8 @@ const app = {
         <button type="button" title="굵게" onmousedown="event.preventDefault()" onclick="app.rteExec('${editorId}','bold')"><b>B</b></button>
         <button type="button" class="u-btn" title="밑줄" onmousedown="event.preventDefault()" onclick="app.rteExec('${editorId}','underline')">U</button>
         <span class="rte-sep"></span>
+        <button type="button" class="rte-swatch" title="검정" style="background:#000000; border:1px solid var(--paper-deep);" onmousedown="event.preventDefault()" onclick="app.rteApplyColor('${editorId}','#000000')"></button>
+        <button type="button" class="rte-swatch" title="흰색" style="background:#FFFFFF; border:1px solid var(--paper-deep);" onmousedown="event.preventDefault()" onclick="app.rteApplyColor('${editorId}','#FFFFFF')"></button>
         <button type="button" class="rte-swatch" title="빨강" style="background:#E53935;" onmousedown="event.preventDefault()" onclick="app.rteApplyColor('${editorId}','#E53935')"></button>
         <button type="button" class="rte-swatch" title="파랑" style="background:#1E88E5;" onmousedown="event.preventDefault()" onclick="app.rteApplyColor('${editorId}','#1E88E5')"></button>
         <button type="button" class="rte-swatch" title="보라" style="background:#8E24AA;" onmousedown="event.preventDefault()" onclick="app.rteApplyColor('${editorId}','#8E24AA')"></button>
@@ -2147,6 +2315,10 @@ const app = {
     this.updateAuthArea();
     const guidePanel = document.getElementById('guzhengGuidePanel');
     if(guidePanel && guidePanel.style.display !== 'none') this.renderGuzhengGuide();
+    Object.keys(TIP_CONFIGS).forEach(key => {
+      const panel = document.getElementById(TIP_CONFIGS[key].panelId);
+      if(panel && panel.style.display !== 'none') this.renderTipPanel(key);
+    });
   },
 
   rteExec(editorId, cmd){
@@ -3682,6 +3854,10 @@ document.getElementById('liPassword')?.addEventListener('keydown', (e)=>{ if(e.k
 window.addEventListener('resize', () => {
   const panel = document.getElementById('guzhengGuidePanel');
   if(panel && panel.style.display !== 'none') app.positionGuzhengGuidePanel();
+  Object.keys(TIP_CONFIGS).forEach(key => {
+    const tp = document.getElementById(TIP_CONFIGS[key].panelId);
+    if(tp && tp.style.display !== 'none') app.positionTipPanel(key);
+  });
 });
 
 // 고쟁 줄 위가 아닌 곳에서 마우스를 떼거나, 창 밖으로 나가도 드래그(스트럼) 상태를 확실히 해제한다

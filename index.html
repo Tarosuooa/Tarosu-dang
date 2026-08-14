@@ -137,11 +137,29 @@ main.no-hero{padding-top:44px;}
   opacity:0.9;
 }
 .strings-wrap svg{width:100%; height:100%;}
-.guzheng-guide-btn{
+.guzheng-controls{
   position:absolute; left:6px; bottom:6px; z-index:5;
-  opacity:0.85; font-size:11.5px; padding:5px 11px;
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+}
+.guzheng-guide-btn{
+  opacity:0.85; font-size:11.5px; padding:5px 11px; flex:none;
 }
 .guzheng-guide-btn:hover{ opacity:1; }
+.guzheng-volume{
+  display:flex; align-items:center; gap:5px;
+  background:rgba(251,247,236,0.85); border:1px solid var(--paper-deep);
+  border-radius:12px; padding:4px 10px 4px 8px; opacity:0.85;
+}
+.guzheng-volume:hover{ opacity:1; }
+.guzheng-volume-icon{ font-size:11px; flex:none; }
+.guzheng-volume input[type=range]{
+  width:70px; height:3px; cursor:pointer; accent-color:var(--wood);
+}
+.guzheng-volume-icon + input[type=range]{ margin:0; }
+#guzhengVolumeLabel{
+  font-size:10.5px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif;
+  min-width:28px; text-align:right;
+}
 /* 모달과 달리 화면 전체를 덮는 배경이 없어서, 열려 있는 동안에도 뒤쪽 고쟁 줄을 계속 클릭할 수 있다 */
 .guzheng-guide-panel{
   position:fixed; z-index:70;
@@ -505,7 +523,14 @@ footer{
     </div>
     <div class="strings-wrap">
       <svg viewBox="0 0 500 400" preserveAspectRatio="none"></svg>
-      <button type="button" id="guzhengGuideBtn" class="btn ghost small guzheng-guide-btn" onclick="app.toggleGuzhengGuide()">사용법</button>
+      <div class="guzheng-controls">
+        <button type="button" id="guzhengGuideBtn" class="btn ghost small guzheng-guide-btn" onclick="app.toggleGuzhengGuide()">사용법</button>
+        <div class="guzheng-volume">
+          <span class="guzheng-volume-icon" aria-hidden="true">🔊</span>
+          <input type="range" id="guzhengVolumeSlider" min="0" max="100" value="20" step="1" oninput="app.setGuzhengVolume(this.value)" title="고쟁 줄 소리 볼륨">
+          <span id="guzhengVolumeLabel">20%</span>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -1225,6 +1250,7 @@ const GUZHENG_NOTE_FREQ = {
   'A5':880.00, 'B5':987.77, 'D6':1174.66
 };
 let heroAudioCtx = null;
+let guzhengVolume = 0.2; // 슬라이더로 조절되는 볼륨 (기본 20%)
 const guzhengBufferCache = {};
 const activeStringSources = {}; // note -> 현재 재생 중인 AudioBufferSourceNode (비브라토 적용 대상)
 
@@ -1280,7 +1306,7 @@ async function playGuzhengNote(note){
     tone.frequency.value = 5200;
 
     const gain = heroAudioCtx.createGain();
-    gain.gain.value = 0.28; // 기존 대비 볼륨 20% 낮춤 (0.35 → 0.28)
+    gain.gain.value = guzhengVolume; // 사용법 버튼 옆 볼륨 슬라이더로 실시간 조절됨
 
     src.connect(tone).connect(gain).connect(heroAudioCtx.destination);
     src.start();
@@ -1768,6 +1794,12 @@ const app = {
   },
 
   /* ---------- 고쟁 줄 사용법 패널 (모달 아님 — 열려 있어도 뒤의 줄을 계속 클릭할 수 있다) ---------- */
+  setGuzhengVolume(value){
+    const pct = Math.max(0, Math.min(100, Number(value) || 0));
+    guzhengVolume = pct / 100;
+    const label = document.getElementById('guzhengVolumeLabel');
+    if(label) label.textContent = pct + '%';
+  },
   toggleGuzhengGuide(){
     const panel = document.getElementById('guzhengGuidePanel');
     if(!panel) return;

@@ -120,6 +120,7 @@ main.no-hero{padding-top:44px;}
 .hero{
   position:relative; padding:64px 0 40px; overflow:hidden;
   border-bottom:1px solid var(--paper-deep); margin-bottom:48px;
+  min-height:420px; box-sizing:border-box;
 }
 .hero-inner{position:relative; z-index:2; max-width:640px; pointer-events:none;}
 .hero-inner a{ pointer-events:auto; }
@@ -511,7 +512,7 @@ footer{
   <!-- 고쟁 줄 사용법 안내 패널: 모달이 아니라 떠 있는 카드라서, 열려 있는 동안에도 뒤에 있는 고쟁 줄을 계속 클릭할 수 있다 -->
   <div id="guzhengGuidePanel" class="guzheng-guide-panel" style="display:none;">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-      <h4 style="font-size:14.5px; margin:0;">고쟁인 척 하는 <span style="color:#8E24AA;">타로당 13현 고쟁</span> 사용법</h4>
+      <h4 style="margin:0; line-height:1.5;"><span style="font-size:15px;">고쟁인 척 하는</span><br><span style="font-size:17px;"><span style="color:#8E24AA;">타로당 13현 고쟁</span> 사용법</span></h4>
       <button type="button" class="guzheng-guide-close" onclick="app.closeGuzhengGuide()">✕</button>
     </div>
     <div id="guzhengGuideBody"></div>
@@ -1814,10 +1815,12 @@ const app = {
       bodyEl.innerHTML = `
         <div class="rte-toolbar" style="border-radius:2px 2px 0 0;">
           <button type="button" title="굵게" onmousedown="event.preventDefault()" onclick="app.rteExec('guzhengGuideEditor','bold')"><b>B</b></button>
+          <button type="button" class="u-btn" title="밑줄" onmousedown="event.preventDefault()" onclick="app.rteExec('guzhengGuideEditor','underline')">U</button>
           <span class="rte-sep"></span>
           <button type="button" class="rte-swatch" title="빨강" style="background:#E53935;" onmousedown="event.preventDefault()" onclick="app.rteApplyColor('guzhengGuideEditor','#E53935')"></button>
           <button type="button" class="rte-swatch" title="파랑" style="background:#1E88E5;" onmousedown="event.preventDefault()" onclick="app.rteApplyColor('guzhengGuideEditor','#1E88E5')"></button>
           <button type="button" class="rte-swatch" title="초록" style="background:#43A047;" onmousedown="event.preventDefault()" onclick="app.rteApplyColor('guzhengGuideEditor','#43A047')"></button>
+          <button type="button" class="rte-swatch" title="보라" style="background:#8E24AA;" onmousedown="event.preventDefault()" onclick="app.rteApplyColor('guzhengGuideEditor','#8E24AA')"></button>
         </div>
         <div class="rte-editor" id="guzhengGuideEditor" contenteditable="true" data-placeholder="고쟁 줄 사용법을 입력하세요" style="min-height:110px; border-radius:0 0 2px 2px;">${sanitizeRichHtml(state.guzhengGuideText)}</div>
         <div class="form-actions" style="margin-top:8px; margin-bottom:0;">
@@ -1894,27 +1897,45 @@ const app = {
     el.focus();
     document.execCommand(cmd, false, null);
   },
+  // 브라우저 내장 명령(execCommand)에 맡기지 않고, 선택 영역을 직접 <span>으로 감싼다.
+  // 한자처럼 띄어쓰기 없는 텍스트에서 execCommand의 색상 적용이 브라우저별로 불안정했던 문제를 근본적으로 피하기 위함.
+  wrapSelectionInEditor(editorId, applyStyle){
+    const el = document.getElementById(editorId);
+    if(!el) return;
+    const sel = window.getSelection();
+    if(!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    if(range.collapsed || !el.contains(range.commonAncestorContainer)){
+      showToast('먼저 글씨를 드래그해서 선택해주세요');
+      return;
+    }
+    try{
+      const span = document.createElement('span');
+      applyStyle(span);
+      const content = range.extractContents();
+      span.appendChild(content);
+      range.insertNode(span);
+      // 새로 감싼 부분을 다시 선택 상태로 만들어 연속으로 다른 서식을 이어서 적용할 수 있게 한다
+      const newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+    }catch(e){
+      console.error('서식 적용 실패', e);
+      showToast('서식 적용에 실패했습니다');
+    }
+  },
   rteApplyColor(editorId, hex){
     const el = document.getElementById(editorId);
     if(!el) return;
     el.focus();
-    // 굵게/기울임/밑줄과 동일한 방식(execCommand)을 그대로 사용한다
-    document.execCommand('styleWithCSS', false, true);
-    document.execCommand('foreColor', false, hex);
-    document.execCommand('styleWithCSS', false, false);
+    this.wrapSelectionInEditor(editorId, span => { span.style.color = hex; });
   },
   rteApplyFontSize(editorId, px){
     const el = document.getElementById(editorId);
     if(!el) return;
     el.focus();
-    document.execCommand('fontSize', false, '7'); // 임시로 <font size="7">를 만든 뒤 아래에서 span으로 치환
-    el.querySelectorAll('font[size]').forEach(f => {
-      const span = document.createElement('span');
-      span.style.fontSize = px;
-      if(f.color) span.style.color = f.color;
-      while(f.firstChild) span.appendChild(f.firstChild);
-      f.replaceWith(span);
-    });
+    this.wrapSelectionInEditor(editorId, span => { span.style.fontSize = px; });
   },
 
   updateAuthArea(){

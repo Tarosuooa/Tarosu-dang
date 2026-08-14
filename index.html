@@ -636,35 +636,6 @@ footer{
   © 타로당 芋頭堂 · 이 사이트의 게시물은 관리자만 작성할 수 있으며, 방명록은 누구나 남기실 수 있습니다.
 </footer>
 
-<!-- 관리자 로그인 숨김 트리거: 화면 왼쪽 하단을 Ctrl(또는 Cmd)을 누른 채 5번 클릭 -->
-<div id="adminHotspot" aria-hidden="true" style="position:fixed; left:0; bottom:0; width:48px; height:48px; z-index:40;"></div>
-
-<!-- admin login modal -->
-<div class="modal-overlay" id="adminModal">
-  <div class="modal-box">
-    <h3>관리자 로그인</h3>
-    <p class="sub">비밀번호를 입력해주세요 (대소문자 구분)</p>
-    <input type="password" id="adminPwInput" placeholder="••••••••">
-    <div class="modal-err" id="adminErr"></div>
-    <div class="modal-actions">
-      <button class="btn ghost" onclick="app.closeAdminModal()">취소</button>
-      <button class="btn" onclick="app.tryAdminLogin()">로그인</button>
-    </div>
-  </div>
-</div>
-
-<!-- 관리자 계정 등록 확인 모달 -->
-<div class="modal-overlay" id="adminRegisterModal">
-  <div class="modal-box">
-    <h3>관리자로 등록</h3>
-    <p class="sub">이 계정을 관리자로 등록하시겠습니까?</p>
-    <div class="modal-actions">
-      <button class="btn ghost" onclick="app.declineAdminRegister()">아니오</button>
-      <button class="btn" onclick="app.confirmAdminRegister()">예</button>
-    </div>
-  </div>
-</div>
-
 
 <!-- signup modal -->
 <div class="modal-overlay" id="signupModal">
@@ -784,8 +755,6 @@ const firebaseConfig = {
   measurementId: "G-P3CPQM1G77"
 };
 
-const ADMIN_TOKEN = "tarodang-secure-token-2026";
-const ADMIN_PW = "YUtou0808";
 // '문의' 게시판에서 회원이 보낸 문의 이메일을 받을 주소입니다. 실제 관리자 이메일로 바꿔주세요.
 const ADMIN_CONTACT_EMAIL = "tarosu.ooa@gmail.com";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxBYwITDr719_F6jP5oBdQfnyb45rVXrxPCaZgroX1uGJ0vYygFFj9GwfDqRDW1LnU1/exec";
@@ -863,7 +832,6 @@ const SEED = {
 
 const state = {
   page: 'home',
-  isAdmin: false,
   currentUser: null,
   sheetTab: 'dl',
   sheetCategory: '전체',
@@ -872,6 +840,9 @@ const state = {
   detail: { notice: null, download: null, inquiry: null, sheets: null },
   pendingSignup: null,
 };
+
+// 관리자 여부는 더 이상 비밀번호가 아니라, 로그인한 계정의 Firestore isAdmin 값으로만 판단합니다.
+function isAdminUser(){ return !!(state.currentUser && state.currentUser.isAdmin); }
 
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 function todayStr(){ const d=new Date(); return d.toISOString().slice(0,10); }
@@ -1145,8 +1116,6 @@ async function fetchPublicIP(){
     return null;
   }
 }
-const PROTECTED_BOARDS = ['notice','download','faq','inquiry','updateLog','tuningUpdateLog'];
-
 async function loadBoard(name){
   if(!db){ storageAvailable = false; state.data[name] = SEED[name] ? SEED[name].slice() : []; return; }
   try{
@@ -1171,15 +1140,13 @@ async function saveBoard(name){
     return false;
   }
   try{
-    const payload = { posts: state.data[name] };
-    if(PROTECTED_BOARDS.includes(name)) payload.adminToken = ADMIN_TOKEN;
-    await db.collection('content').doc(name).set(payload);
+    await db.collection('content').doc(name).set({ posts: state.data[name] });
     storageAvailable = true; updateStorageWarning();
     return true;
   }catch(e){
     console.error('saveBoard error', name, e);
     updateStorageWarning();
-    showToast(e && e.code==='permission-denied' ? '⚠ 저장 권한이 없습니다 (Firestore 규칙 확인)' : '⚠ 저장에 실패했습니다');
+    showToast(e && e.code==='permission-denied' ? '⚠ 저장 권한이 없습니다 (관리자 계정으로 로그인했는지 확인해주세요)' : '⚠ 저장에 실패했습니다');
     return false;
   }
 }
@@ -1553,50 +1520,6 @@ const app = {
     this.updateAuthArea();
   },
 
-  onAdminHotspotTrigger(){
-    if(state.isAdmin){
-      state.isAdmin = false;
-      showToast('관리자 로그아웃 되었습니다');
-      this.renderAll();
-    }else{
-      document.getElementById('adminModal').classList.add('show');
-      document.getElementById('adminPwInput').value = '';
-      document.getElementById('adminErr').textContent = '';
-      setTimeout(()=>document.getElementById('adminPwInput').focus(), 50);
-    }
-  },
-  closeAdminModal(){ document.getElementById('adminModal').classList.remove('show'); },
-  async tryAdminLogin(){
-    const val = document.getElementById('adminPwInput').value;
-    if(val === ADMIN_PW){
-      state.isAdmin = true;
-      this.closeAdminModal();
-      showToast('관리자로 로그인되었습니다');
-      this.renderAll();
-      if(state.currentUser && !state.currentUser.isAdmin){
-        document.getElementById('adminRegisterModal').classList.add('show');
-      }
-    }else{
-      document.getElementById('adminErr').textContent = '비밀번호가 올바르지 않습니다';
-    }
-  },
-  declineAdminRegister(){
-    document.getElementById('adminRegisterModal').classList.remove('show');
-  },
-  async confirmAdminRegister(){
-    if(!state.currentUser || !db) return;
-    try{
-      await db.collection('users').doc(state.currentUser.uid).set({ isAdmin: true }, { merge: true });
-      state.currentUser.isAdmin = true;
-      document.getElementById('adminRegisterModal').classList.remove('show');
-      showToast('관리자 계정으로 등록되었습니다');
-      this.updateAuthArea();
-    }catch(e){
-      console.error(e);
-      showToast('관리자 등록에 실패했습니다');
-    }
-  },
-
   rteExec(editorId, cmd){
     const el = document.getElementById(editorId);
     if(!el) return;
@@ -1847,7 +1770,7 @@ const app = {
     const toolbarEl = document.getElementById(name+'-toolbar');
     const cfg = BOARD_CONFIG[name];
 
-    toolbarEl.innerHTML = state.isAdmin
+    toolbarEl.innerHTML = isAdminUser()
       ? `<button class="btn" onclick="app.openForm('${name}')">+ 새 글 작성</button>`
       : '';
 
@@ -1859,7 +1782,7 @@ const app = {
             <div class="post-title">${(name==='notice' || name==='download') && isRecentDate(p.date) ? '<span class="badge new">NEW</span>' : ''}${escapeHtml(p.title)}</div>
             <div class="post-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</div>
           </div>
-          ${state.isAdmin ? `
+          ${isAdminUser() ? `
             <div class="admin-row-actions">
               <button class="btn ghost small" onclick="event.stopPropagation();app.openForm('${name}','${p.id}')">수정</button>
               <button class="btn danger small" onclick="event.stopPropagation();app.deletePost('${name}','${p.id}')">삭제</button>
@@ -1909,7 +1832,7 @@ const app = {
   },
 
   openForm(name, editId){
-    if(!state.isAdmin) return;
+    if(!isAdminUser()) return;
     const cfg = BOARD_CONFIG[name];
     const existing = editId ? state.data[name].find(p=>p.id===editId) : null;
     const toolbarEl = document.getElementById(name+'-toolbar');
@@ -1979,7 +1902,7 @@ const app = {
   },
 
   async deletePost(name, id){
-    if(!state.isAdmin) return;
+    if(!isAdminUser()) return;
     if(!confirm('이 글을 삭제하시겠습니까?')) return;
     state.data[name] = state.data[name].filter(p=>p.id!==id);
     await saveBoard(name);
@@ -2042,7 +1965,7 @@ const app = {
 
   renderFaq(){
     const toolbarEl = document.getElementById('faq-toolbar');
-    toolbarEl.innerHTML = state.isAdmin ? `<button class="btn" onclick="app.openFaqForm()">+ 새 질문 추가</button>` : '';
+    toolbarEl.innerHTML = isAdminUser() ? `<button class="btn" onclick="app.openFaqForm()">+ 새 질문 추가</button>` : '';
     const existingForm = document.getElementById('faq-form');
     if(existingForm) existingForm.remove();
 
@@ -2068,7 +1991,7 @@ const app = {
           <span><span class="mark">問 ·</span> ${escapeHtml(f.question)}</span>
           <span style="display:flex; align-items:center; gap:10px; flex:none;" onclick="event.stopPropagation()">
             ${badgeHtml}
-            ${state.isAdmin ? `<span class="admin-row-actions">
+            ${isAdminUser() ? `<span class="admin-row-actions">
                 <button class="btn ghost small" onclick="app.moveFaq('${f.id}',-1)" ${isFirst ? 'disabled' : ''} title="위로 이동">▲</button>
                 <button class="btn ghost small" onclick="app.moveFaq('${f.id}',1)" ${isLast ? 'disabled' : ''} title="아래로 이동">▼</button>
                 <button class="btn ghost small" onclick="app.openFaqForm('${f.id}')">수정</button>
@@ -2085,7 +2008,7 @@ const app = {
     this.renderFaq();
   },
   async moveFaq(id, direction){
-    if(!state.isAdmin) return;
+    if(!isAdminUser()) return;
     // 현재 보이는(필터링된) 목록 안에서의 순서를 기준으로 바로 위/아래 항목과 자리를 바꾼다
     const filtered = state.data.faq.filter(f => state.faqCategory==='전체' || f.category===state.faqCategory);
     const idxInFiltered = filtered.findIndex(f=>f.id===id);
@@ -2100,7 +2023,7 @@ const app = {
   },
   toggleFaq(id){ document.getElementById('faq-a-'+id).classList.toggle('open'); },
   openFaqForm(editId){
-    if(!state.isAdmin) return;
+    if(!isAdminUser()) return;
     const existing = editId ? state.data.faq.find(f=>f.id===editId) : null;
     const toolbarEl = document.getElementById('faq-toolbar');
     let form = document.getElementById('faq-form');
@@ -2145,7 +2068,7 @@ const app = {
     this.renderFaq();
   },
   async deleteFaq(id){
-    if(!state.isAdmin) return;
+    if(!isAdminUser()) return;
     if(!confirm('이 FAQ를 삭제하시겠습니까?')) return;
     state.data.faq = state.data.faq.filter(f=>f.id!==id);
     await saveBoard('faq');
@@ -2163,7 +2086,7 @@ const app = {
           <span class="gb-author">${escapeHtml(g.author)}</span><span class="gb-date">${escapeHtml(g.date)}</span>
           <div class="gb-text">${escapeHtml(g.text)}</div>
         </div>
-        ${state.isAdmin ? `<button class="btn danger small" onclick="app.deleteGuestbook('${g.id}')">삭제</button>` : ''}
+        ${isAdminUser() ? `<button class="btn danger small" onclick="app.deleteGuestbook('${g.id}')">삭제</button>` : ''}
       </div>`).join('');
   },
   async submitGuestbook(){
@@ -2181,7 +2104,7 @@ const app = {
     this.renderGuestbook();
   },
   async deleteGuestbook(id){
-    if(!state.isAdmin) return;
+    if(!isAdminUser()) return;
     if(!confirm('이 글을 삭제하시겠습니까?')) return;
     state.data.guestbook = state.data.guestbook.filter(g=>g.id!==id);
     await saveBoard('guestbook');
@@ -2483,7 +2406,7 @@ const app = {
     const versionEl = document.getElementById('updateLogCurrentVersion');
     if(!toolbarEl || !listEl) return;
 
-    toolbarEl.innerHTML = state.isAdmin ? `<button class="btn small" onclick="app.openUpdateLogForm()">+ 새 업데이트 추가</button>` : '';
+    toolbarEl.innerHTML = isAdminUser() ? `<button class="btn small" onclick="app.openUpdateLogForm()">+ 새 업데이트 추가</button>` : '';
 
     const items = state.data.updateLog.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
     if(versionEl){
@@ -2497,7 +2420,7 @@ const app = {
             <div class="post-meta" style="margin-bottom:6px;">${escapeHtml(u.date)}</div>
             <div style="font-size:13.5px; white-space:pre-wrap; word-break:break-word;">${escapeHtml(u.content)}</div>
           </div>
-          ${state.isAdmin ? `
+          ${isAdminUser() ? `
             <div class="admin-row-actions">
               <button class="btn ghost small" onclick="app.openUpdateLogForm('${u.id}')">수정</button>
               <button class="btn danger small" onclick="app.deleteUpdateLog('${u.id}')">삭제</button>
@@ -2505,7 +2428,7 @@ const app = {
         </div>`).join('');
   },
   openUpdateLogForm(editId){
-    if(!state.isAdmin) return;
+    if(!isAdminUser()) return;
     const existing = editId ? state.data.updateLog.find(u=>u.id===editId) : null;
     const toolbarEl = document.getElementById('updateLog-toolbar');
     let form = document.getElementById('updateLog-form');
@@ -2528,7 +2451,7 @@ const app = {
     document.getElementById('ul-f-version').focus();
   },
   async saveUpdateLog(editId){
-    if(!state.isAdmin) return;
+    if(!isAdminUser()) return;
     const date = document.getElementById('ul-f-date').value.trim();
     const version = document.getElementById('ul-f-version').value.trim();
     const content = document.getElementById('ul-f-content').value.trim();
@@ -2546,7 +2469,7 @@ const app = {
     this.renderUpdateLog();
   },
   async deleteUpdateLog(id){
-    if(!state.isAdmin) return;
+    if(!isAdminUser()) return;
     if(!confirm('이 업데이트 내역을 삭제하시겠습니까?')) return;
     state.data.updateLog = state.data.updateLog.filter(u=>u.id!==id);
     await saveBoard('updateLog');
@@ -2570,7 +2493,7 @@ const app = {
     const versionEl = document.getElementById('tuningUpdateLogCurrentVersion');
     if(!toolbarEl || !listEl) return;
 
-    toolbarEl.innerHTML = state.isAdmin ? `<button class="btn small" onclick="app.openTuningUpdateLogForm()">+ 새 업데이트 추가</button>` : '';
+    toolbarEl.innerHTML = isAdminUser() ? `<button class="btn small" onclick="app.openTuningUpdateLogForm()">+ 새 업데이트 추가</button>` : '';
 
     const items = state.data.tuningUpdateLog.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
     if(versionEl){
@@ -2584,7 +2507,7 @@ const app = {
             <div class="post-meta" style="margin-bottom:6px;">${escapeHtml(u.date)}</div>
             <div style="font-size:13.5px; white-space:pre-wrap; word-break:break-word;">${escapeHtml(u.content)}</div>
           </div>
-          ${state.isAdmin ? `
+          ${isAdminUser() ? `
             <div class="admin-row-actions">
               <button class="btn ghost small" onclick="app.openTuningUpdateLogForm('${u.id}')">수정</button>
               <button class="btn danger small" onclick="app.deleteTuningUpdateLog('${u.id}')">삭제</button>
@@ -2592,7 +2515,7 @@ const app = {
         </div>`).join('');
   },
   openTuningUpdateLogForm(editId){
-    if(!state.isAdmin) return;
+    if(!isAdminUser()) return;
     const existing = editId ? state.data.tuningUpdateLog.find(u=>u.id===editId) : null;
     const toolbarEl = document.getElementById('tuningUpdateLog-toolbar');
     let form = document.getElementById('tuningUpdateLog-form');
@@ -2615,7 +2538,7 @@ const app = {
     document.getElementById('tul-f-version').focus();
   },
   async saveTuningUpdateLog(editId){
-    if(!state.isAdmin) return;
+    if(!isAdminUser()) return;
     const date = document.getElementById('tul-f-date').value.trim();
     const version = document.getElementById('tul-f-version').value.trim();
     const content = document.getElementById('tul-f-content').value.trim();
@@ -2633,7 +2556,7 @@ const app = {
     this.renderTuningUpdateLog();
   },
   async deleteTuningUpdateLog(id){
-    if(!state.isAdmin) return;
+    if(!isAdminUser()) return;
     if(!confirm('이 업데이트 내역을 삭제하시겠습니까?')) return;
     state.data.tuningUpdateLog = state.data.tuningUpdateLog.filter(u=>u.id!==id);
     await saveBoard('tuningUpdateLog');
@@ -2791,30 +2714,12 @@ const app = {
   }
 };
 
-document.getElementById('adminModal').addEventListener('click', (e)=>{ if(e.target.id==='adminModal') app.closeAdminModal(); });
 document.getElementById('signupModal').addEventListener('click', (e)=>{ if(e.target.id==='signupModal') app.closeSignupModal(); });
 document.getElementById('loginModal').addEventListener('click', (e)=>{ if(e.target.id==='loginModal') app.closeLoginModal(); });
 document.getElementById('forgotPasswordModal').addEventListener('click', (e)=>{ if(e.target.id==='forgotPasswordModal') app.closeForgotPasswordModal(); });
 document.getElementById('updateLogModal').addEventListener('click', (e)=>{ if(e.target.id==='updateLogModal') app.closeUpdateLogModal(); });
 document.getElementById('tuningUpdateLogModal').addEventListener('click', (e)=>{ if(e.target.id==='tuningUpdateLogModal') app.closeTuningUpdateLogModal(); });
-document.getElementById('adminPwInput')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') app.tryAdminLogin(); });
 document.getElementById('liPassword')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') app.submitLogin(); });
-
-(function(){
-  let hotspotCount = 0;
-  let hotspotTimer = null;
-  const hotspot = document.getElementById('adminHotspot');
-  hotspot.addEventListener('click', (e)=>{
-    if(!e.ctrlKey && !e.metaKey) return;
-    hotspotCount++;
-    clearTimeout(hotspotTimer);
-    hotspotTimer = setTimeout(()=>{ hotspotCount = 0; }, 3000);
-    if(hotspotCount >= 5){
-      hotspotCount = 0;
-      app.onAdminHotspotTrigger();
-    }
-  });
-})();
 
 
 app.init();

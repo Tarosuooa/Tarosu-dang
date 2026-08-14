@@ -1310,14 +1310,14 @@ function stopStringTremolo(){
 function beginStringHold(hit, pluckFn){
   stopStringTremolo();
   currentHeldNote = hit.dataset.note;
-  // 잠깐(40ms) 그대로 누르고 있으면, 같은 줄에서 빠르게 반복 연주(트레몰로)가 시작된다
+  // 잠깐(60ms) 그대로 누르고 있으면, 같은 줄에서 빠르게 반복 연주(트레몰로)가 시작된다
   tremoloHoldTimeout = setTimeout(() => {
     if(!stringsDragActive || currentHeldNote !== hit.dataset.note) return;
     tremoloInterval = setInterval(() => {
       if(!stringsDragActive || currentHeldNote !== hit.dataset.note){ stopStringTremolo(); return; }
       pluckFn(hit);
     }, 55);
-  }, 40);
+  }, 60);
 }
 let guzhengVolume = 0.2; // 슬라이더로 조절되는 볼륨 (기본 20%)
 const guzhengBufferCache = {};

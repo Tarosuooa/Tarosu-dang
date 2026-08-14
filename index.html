@@ -457,7 +457,7 @@ footer{
       <span class="eyebrow">GUZHENG · 古筝</span>
       <h1 id="heroTagline">타로수가 선명하게<br><em>고쟁</em>을 핥고 있었다.</h1>
       <p class="tagline">취미 고쟁러 '타로수'의 공간입니다. <br>저의 연주 영상 및 자작 악보를 담았습니다.</p>
-      <p style="margin-top:14px; font-size:12px; color:var(--ink-soft);">instagram @tarosu_gzh</p>
+      <p style="margin-top:14px; font-size:12px; color:var(--ink-soft);"><a href="https://www.instagram.com/tarosu_gzh/" target="_blank" rel="noopener" style="color:inherit; text-decoration:none;">instagram @tarosu_gzh</a></p>
       <p style="margin-top:2px; font-size:12px; color:var(--ink-soft);">E-Mail: tarosu.ooa@gmail.com</p>
     </div>
     <div class="strings-wrap"><svg viewBox="0 0 500 400" preserveAspectRatio="none"></svg></div>
@@ -562,6 +562,7 @@ footer{
     <div class="subtabs">
       <button class="subtab-btn" id="subtab-dl" onclick="app.setSheetTab('dl')">악보 다운로드</button>
       <button class="subtab-btn" id="subtab-make" onclick="app.setSheetTab('make')">악보 제작</button>
+      <button class="subtab-btn" id="subtab-tuning" onclick="app.setSheetTab('tuning')">음정 체크</button>
     </div>
 
     <!-- 악보 다운로드 -->
@@ -592,6 +593,15 @@ footer{
         <button class="btn" onclick="app.openLoginModal()">로그인하고 제한 없이 이용하기</button>
       </div>
       <iframe id="scoreMakerFrame" src="" title="숫자 악보 만들기" style="display:none; width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
+    </div>
+
+    <!-- 음정 체크 (도구 임베드) -->
+    <div id="sheets-tuning-view" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin:-4px 0 16px; flex-wrap:wrap;">
+        <p style="font-size:13.5px; color:var(--ink-soft); margin:0;">타로수가 만든 고쟁 음정 체크 도구입니다.</p>
+        <button class="btn ghost small" style="flex:none;" onclick="app.openTuningUpdateLogModal()">업데이트 내역</button>
+      </div>
+      <iframe id="tuningFrame" src="" title="고쟁 음정 체크" style="width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
     </div>
   </div>
 
@@ -744,6 +754,19 @@ footer{
   </div>
 </div>
 
+<!-- 음정 체크 도구 업데이트 내역 모달 (악보 제작 툴과는 별개의 데이터) -->
+<div class="modal-overlay" id="tuningUpdateLogModal">
+  <div class="modal-box wide" style="width:460px; max-height:80vh; display:flex; flex-direction:column;">
+    <h3>음정 체크 업데이트 내역</h3>
+    <p class="sub" id="tuningUpdateLogCurrentVersion">현재 버전: -</p>
+    <div class="toolbar" id="tuningUpdateLog-toolbar" style="margin-bottom:12px;"></div>
+    <div class="list-box" id="tuningUpdateLog-list" style="overflow-y:auto; flex:1 1 auto;"></div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn ghost" onclick="app.closeTuningUpdateLogModal()" style="flex:1;">닫기</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 
@@ -808,10 +831,11 @@ const BOARD_CONFIG = {
   inquiry:  {label:'문의', hasLink:false, hasMedia:false, hasComments:false},
 };
 
-const FAQ_CATEGORIES = ['악보 제작', '악보 업로드&다운로드', '미디어', '악기', '홈페이지', '관리자', '그 외'];
+const FAQ_CATEGORIES = ['악보 제작', '악보 업로드&다운로드', '음정 체크', '미디어', '악기', '홈페이지', '관리자', '그 외'];
 const FAQ_CATEGORY_COLORS = {
   '악보 제작':          {bg:'#E5D9F2', text:'#5B2C82'},
   '악보 업로드&다운로드': {bg:'#D9E8F2', text:'#2C5C82'},
+  '음정 체크':          {bg:'#D9F2EC', text:'#2C826D'},
   '미디어':             {bg:'#F2E0D9', text:'#82502C'},
   '악기':               {bg:'#DFF2D9', text:'#3D7A2C'},
   '홈페이지':           {bg:'#F2D9EA', text:'#822C63'},
@@ -833,7 +857,8 @@ const SEED = {
   guestbook: [],
   updateLog: [
     {id:'seed-u1', version:'0.0.1', date:'2026-08-01', content:'악보 제작 도구 첫 배포'}
-  ]
+  ],
+  tuningUpdateLog: []
 };
 
 const state = {
@@ -843,7 +868,7 @@ const state = {
   sheetTab: 'dl',
   sheetCategory: '전체',
   faqCategory: '전체',
-  data: { notice: [], download: [], faq: [], inquiry: [], guestbook: [], sheets: [], updateLog: [] },
+  data: { notice: [], download: [], faq: [], inquiry: [], guestbook: [], sheets: [], updateLog: [], tuningUpdateLog: [] },
   detail: { notice: null, download: null, inquiry: null, sheets: null },
   pendingSignup: null,
 };
@@ -966,6 +991,7 @@ function getInstagramEmbed(url){
 function isTwitterUrl(url){
   return /(?:twitter\.com|x\.com)\/[^\/]+\/status\/\d+/i.test(url);
 }
+let tuningFrameLoaded = false;
 let twitterWidgetsLoading = false;
 function ensureTwitterWidgetsLoaded(){
   if(window.twttr && window.twttr.widgets){ window.twttr.widgets.load(); return; }
@@ -1119,7 +1145,7 @@ async function fetchPublicIP(){
     return null;
   }
 }
-const PROTECTED_BOARDS = ['notice','download','faq','inquiry','updateLog'];
+const PROTECTED_BOARDS = ['notice','download','faq','inquiry','updateLog','tuningUpdateLog'];
 
 async function loadBoard(name){
   if(!db){ storageAvailable = false; state.data[name] = SEED[name] ? SEED[name].slice() : []; return; }
@@ -1308,6 +1334,7 @@ function applyNavState(s){
   state.page = s.page || 'home';
   state.sheetTab = s.sheetTab || 'dl';
   state.sheetCategory = s.sheetCategory || '전체';
+  state.faqCategory = '전체';
   state.detail.notice = s.detailNotice || null;
   state.detail.download = s.detailDownload || null;
   state.detail.inquiry = s.detailInquiry || null;
@@ -1325,8 +1352,10 @@ function applyNavState(s){
 
   document.getElementById('subtab-dl').classList.toggle('active', state.sheetTab==='dl');
   document.getElementById('subtab-make').classList.toggle('active', state.sheetTab==='make');
+  document.getElementById('subtab-tuning').classList.toggle('active', state.sheetTab==='tuning');
   document.getElementById('sheets-dl-view').style.display = state.sheetTab==='dl' ? '' : 'none';
   document.getElementById('sheets-make-view').style.display = state.sheetTab==='make' ? '' : 'none';
+  document.getElementById('sheets-tuning-view').style.display = state.sheetTab==='tuning' ? '' : 'none';
   document.querySelectorAll('#sheetCategoryFilter .cat-btn').forEach(b=>{
     b.classList.toggle('active', b.dataset.cat === state.sheetCategory);
   });
@@ -1334,6 +1363,7 @@ function applyNavState(s){
   app.renderAll();
   if(state.page==='sheets' && state.sheetTab==='make') app.startScoreMakerSession();
   else app.stopScoreMakerSession(false);
+  if(state.page==='sheets' && state.sheetTab==='tuning') app.ensureTuningFrameLoaded();
 
   window.scrollTo({top:0, behavior:'smooth'});
   isRestoringHistory = false;
@@ -1382,7 +1412,7 @@ const app = {
         }
       });
     }
-    await Promise.all(['notice','download','faq','inquiry','guestbook','updateLog'].map(loadBoard));
+    await Promise.all(['notice','download','faq','inquiry','guestbook','updateLog','tuningUpdateLog'].map(loadBoard));
     await loadSheets();
     updateStorageWarning();
     this.renderAll();
@@ -1408,6 +1438,7 @@ const app = {
           <div class="nav-submenu">
             <button onclick="app.goSheetsTab('dl')">악보 다운로드</button>
             <button onclick="app.goSheetsTab('make')">악보 제작</button>
+            <button onclick="app.goSheetsTab('tuning')">음정 체크</button>
           </div>
         </div>`;
       }
@@ -1485,6 +1516,7 @@ const app = {
     const leavingScoreMaker = (state.page==='sheets' && state.sheetTab==='make' && page!=='sheets');
     if(leavingScoreMaker) this.stopScoreMakerSession(false);
     if(page==='sheets') state.sheetTab = 'dl';
+    if(page==='faq') state.faqCategory = '전체';
     state.page = page;
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     document.getElementById('page-'+page).classList.add('active');
@@ -1503,7 +1535,7 @@ const app = {
 
   goSheetsTab(tab){
     this.go('sheets');
-    if(tab === 'make') this.setSheetTab('make');
+    if(tab !== 'dl') this.setSheetTab(tab);
   },
 
   renderAll(){
@@ -2033,13 +2065,16 @@ const app = {
       return `
       <div class="faq-item">
         <div class="faq-q" onclick="app.toggleFaq('${f.id}')">
-          <span>${badgeHtml}<span class="mark">問 ·</span> ${escapeHtml(f.question)}</span>
-          ${state.isAdmin ? `<span class="admin-row-actions" onclick="event.stopPropagation()">
-              <button class="btn ghost small" onclick="app.moveFaq('${f.id}',-1)" ${isFirst ? 'disabled' : ''} title="위로 이동">▲</button>
-              <button class="btn ghost small" onclick="app.moveFaq('${f.id}',1)" ${isLast ? 'disabled' : ''} title="아래로 이동">▼</button>
-              <button class="btn ghost small" onclick="app.openFaqForm('${f.id}')">수정</button>
-              <button class="btn danger small" onclick="app.deleteFaq('${f.id}')">삭제</button>
-            </span>` : `<span class="mark">＋</span>`}
+          <span><span class="mark">問 ·</span> ${escapeHtml(f.question)}</span>
+          <span style="display:flex; align-items:center; gap:10px; flex:none;" onclick="event.stopPropagation()">
+            ${badgeHtml}
+            ${state.isAdmin ? `<span class="admin-row-actions">
+                <button class="btn ghost small" onclick="app.moveFaq('${f.id}',-1)" ${isFirst ? 'disabled' : ''} title="위로 이동">▲</button>
+                <button class="btn ghost small" onclick="app.moveFaq('${f.id}',1)" ${isLast ? 'disabled' : ''} title="아래로 이동">▼</button>
+                <button class="btn ghost small" onclick="app.openFaqForm('${f.id}')">수정</button>
+                <button class="btn danger small" onclick="app.deleteFaq('${f.id}')">삭제</button>
+              </span>` : `<span class="mark" onclick="app.toggleFaq('${f.id}')" style="cursor:pointer;">＋</span>`}
+          </span>
         </div>
         <div class="faq-a" id="faq-a-${f.id}"><strong style="color:var(--jade)">答 ·</strong> <span>${sanitizeRichHtml(f.answer)}</span></div>
       </div>`;
@@ -2160,12 +2195,15 @@ const app = {
       state.sheetTab = tab;
       document.getElementById('subtab-dl').classList.toggle('active', tab==='dl');
       document.getElementById('subtab-make').classList.toggle('active', tab==='make');
+      document.getElementById('subtab-tuning').classList.toggle('active', tab==='tuning');
       document.getElementById('sheets-dl-view').style.display = tab==='dl' ? '' : 'none';
       document.getElementById('sheets-make-view').style.display = tab==='make' ? '' : 'none';
+      document.getElementById('sheets-tuning-view').style.display = tab==='tuning' ? '' : 'none';
       state.detail.sheets = null;
       this.renderSheets();
       if(prevTab==='make' && tab!=='make') this.stopScoreMakerSession(false);
       if(tab==='make') this.startScoreMakerSession();
+      if(tab==='tuning') this.ensureTuningFrameLoaded();
       pushNavState();
     }catch(e){
       console.error('setSheetTab 오류', e);
@@ -2175,8 +2213,17 @@ const app = {
   renderSheetTabs(){
     document.getElementById('subtab-dl').classList.toggle('active', state.sheetTab==='dl');
     document.getElementById('subtab-make').classList.toggle('active', state.sheetTab==='make');
+    document.getElementById('subtab-tuning').classList.toggle('active', state.sheetTab==='tuning');
     document.getElementById('sheets-dl-view').style.display = state.sheetTab==='dl' ? '' : 'none';
     document.getElementById('sheets-make-view').style.display = state.sheetTab==='make' ? '' : 'none';
+    document.getElementById('sheets-tuning-view').style.display = state.sheetTab==='tuning' ? '' : 'none';
+  },
+  ensureTuningFrameLoaded(){
+    if(tuningFrameLoaded) return;
+    const iframeEl = document.getElementById('tuningFrame');
+    if(!iframeEl) return;
+    tuningFrameLoaded = true;
+    iframeEl.src = 'https://tarosuooa.github.io/Guzheng-Tuning-Tarosu/';
   },
 
   setSheetCategory(cat){
@@ -2507,6 +2554,93 @@ const app = {
     this.renderUpdateLog();
   },
 
+  /* ---------- 음정 체크 도구 업데이트 내역 (악보 제작 툴과는 별개의 데이터) ---------- */
+  openTuningUpdateLogModal(){
+    document.getElementById('tuningUpdateLogModal').classList.add('show');
+    this.renderTuningUpdateLog();
+  },
+  closeTuningUpdateLogModal(){
+    document.getElementById('tuningUpdateLogModal').classList.remove('show');
+    const f = document.getElementById('tuningUpdateLog-form');
+    if(f) f.remove();
+  },
+  renderTuningUpdateLog(){
+    const toolbarEl = document.getElementById('tuningUpdateLog-toolbar');
+    const listEl = document.getElementById('tuningUpdateLog-list');
+    const versionEl = document.getElementById('tuningUpdateLogCurrentVersion');
+    if(!toolbarEl || !listEl) return;
+
+    toolbarEl.innerHTML = state.isAdmin ? `<button class="btn small" onclick="app.openTuningUpdateLogForm()">+ 새 업데이트 추가</button>` : '';
+
+    const items = state.data.tuningUpdateLog.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    if(versionEl){
+      versionEl.textContent = items.length ? `현재 버전: ${items[0].version}` : '현재 버전: -';
+    }
+    listEl.innerHTML = items.length===0 ? `<div class="empty-note">등록된 업데이트 내역이 없습니다</div>` :
+      items.map(u => `
+        <div class="post-row" style="cursor:default;">
+          <div style="flex:1;">
+            <div class="post-title">v${escapeHtml(u.version)}</div>
+            <div class="post-meta" style="margin-bottom:6px;">${escapeHtml(u.date)}</div>
+            <div style="font-size:13.5px; white-space:pre-wrap; word-break:break-word;">${escapeHtml(u.content)}</div>
+          </div>
+          ${state.isAdmin ? `
+            <div class="admin-row-actions">
+              <button class="btn ghost small" onclick="app.openTuningUpdateLogForm('${u.id}')">수정</button>
+              <button class="btn danger small" onclick="app.deleteTuningUpdateLog('${u.id}')">삭제</button>
+            </div>` : ''}
+        </div>`).join('');
+  },
+  openTuningUpdateLogForm(editId){
+    if(!state.isAdmin) return;
+    const existing = editId ? state.data.tuningUpdateLog.find(u=>u.id===editId) : null;
+    const toolbarEl = document.getElementById('tuningUpdateLog-toolbar');
+    let form = document.getElementById('tuningUpdateLog-form');
+    if(form) form.remove();
+    form = document.createElement('div');
+    form.className = 'form-box';
+    form.id = 'tuningUpdateLog-form';
+    form.innerHTML = `
+      <label>날짜</label>
+      <input type="text" id="tul-f-date" placeholder="예: 2026-08-14" value="${existing ? escapeHtml(existing.date) : todayStr()}">
+      <label>버전</label>
+      <input type="text" id="tul-f-version" placeholder="예: 0.0.1" value="${existing ? escapeHtml(existing.version) : ''}">
+      <label>내용</label>
+      <textarea id="tul-f-content" maxlength="1000" placeholder="업데이트 내용을 입력하세요">${existing ? escapeHtml(existing.content) : ''}</textarea>
+      <div class="form-actions">
+        <button class="btn small" onclick="app.saveTuningUpdateLog(${existing ? `'${existing.id}'` : 'null'})">${existing ? '수정 완료' : '등록'}</button>
+        <button class="btn ghost small" onclick="document.getElementById('tuningUpdateLog-form').remove()">취소</button>
+      </div>`;
+    toolbarEl.insertAdjacentElement('afterend', form);
+    document.getElementById('tul-f-version').focus();
+  },
+  async saveTuningUpdateLog(editId){
+    if(!state.isAdmin) return;
+    const date = document.getElementById('tul-f-date').value.trim();
+    const version = document.getElementById('tul-f-version').value.trim();
+    const content = document.getElementById('tul-f-content').value.trim();
+    if(!date || !version || !content){ showToast('날짜, 버전, 내용을 모두 입력해주세요'); return; }
+
+    if(editId){
+      const item = state.data.tuningUpdateLog.find(u=>u.id===editId);
+      item.date = date; item.version = version; item.content = content;
+    }else{
+      state.data.tuningUpdateLog.push({ id: uid(), date, version, content });
+    }
+    await saveBoard('tuningUpdateLog');
+    const f = document.getElementById('tuningUpdateLog-form'); if(f) f.remove();
+    showToast(editId ? '수정되었습니다' : '등록되었습니다');
+    this.renderTuningUpdateLog();
+  },
+  async deleteTuningUpdateLog(id){
+    if(!state.isAdmin) return;
+    if(!confirm('이 업데이트 내역을 삭제하시겠습니까?')) return;
+    state.data.tuningUpdateLog = state.data.tuningUpdateLog.filter(u=>u.id!==id);
+    await saveBoard('tuningUpdateLog');
+    showToast('삭제되었습니다');
+    this.renderTuningUpdateLog();
+  },
+
   async startScoreMakerSession(){
     const statusEl = document.getElementById('scoreMakerStatus');
     const blockedEl = document.getElementById('scoreMakerBlocked');
@@ -2662,6 +2796,7 @@ document.getElementById('signupModal').addEventListener('click', (e)=>{ if(e.tar
 document.getElementById('loginModal').addEventListener('click', (e)=>{ if(e.target.id==='loginModal') app.closeLoginModal(); });
 document.getElementById('forgotPasswordModal').addEventListener('click', (e)=>{ if(e.target.id==='forgotPasswordModal') app.closeForgotPasswordModal(); });
 document.getElementById('updateLogModal').addEventListener('click', (e)=>{ if(e.target.id==='updateLogModal') app.closeUpdateLogModal(); });
+document.getElementById('tuningUpdateLogModal').addEventListener('click', (e)=>{ if(e.target.id==='tuningUpdateLogModal') app.closeTuningUpdateLogModal(); });
 document.getElementById('adminPwInput')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') app.tryAdminLogin(); });
 document.getElementById('liPassword')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') app.submitLogin(); });
 

@@ -88,6 +88,20 @@ nav{display:flex; align-items:center; gap:2px; flex-wrap:wrap;}
 .nav-btn.active{color:var(--wood); font-weight:700;}
 .nav-btn.active::after{transform:scaleX(1); background:var(--wood);}
 
+.nav-item-wrap{ position:relative; }
+.nav-submenu{
+  display:none; position:absolute; top:100%; left:0; z-index:60;
+  background:#fbf7ec; border:1px solid var(--paper-deep); border-radius:2px;
+  box-shadow:var(--shadow); min-width:130px; padding:6px 0;
+}
+.nav-item-wrap:hover .nav-submenu{ display:block; }
+.nav-submenu button{
+  display:block; width:100%; text-align:left; background:none; border:none;
+  padding:9px 16px; cursor:pointer; font-size:13.5px; color:var(--ink-soft);
+  font-family:'Noto Sans KR',sans-serif; white-space:nowrap; transition:background .15s, color .15s;
+}
+.nav-submenu button:hover{ background:var(--paper-dark); color:var(--wood); }
+
 .admin-pill{
   border:1px solid var(--gold); background:transparent; color:var(--wood);
   padding:8px 16px; border-radius:20px; font-size:13px; cursor:pointer;
@@ -236,6 +250,7 @@ main.no-hero{padding-top:44px;}
 .btn.ghost{background:transparent; color:var(--wood);}
 .btn.danger{background:var(--danger); border-color:var(--danger);}
 .btn.small{padding:5px 11px; font-size:12px;}
+.btn:disabled{opacity:0.35; cursor:default; pointer-events:none;}
 
 .form-box{
   background:#fbf7ec; border:1px solid var(--gold); padding:22px; margin-bottom:22px;
@@ -439,10 +454,11 @@ footer{
 
   <section class="hero" id="heroSection">
     <div class="hero-inner">
-      <span class="eyebrow">GUZHENG · 古筝 · 스물한 줄의 이야기</span>
+      <span class="eyebrow">GUZHENG · 古筝</span>
       <h1 id="heroTagline">타로수가 선명하게<br><em>고쟁</em>을 핥고 있었다.</h1>
       <p class="tagline">취미 고쟁러 '타로수'의 공간입니다. <br>저의 연주 영상 및 자작 악보를 담았습니다.</p>
-      <p style="margin-top:6px; font-size:12px; color:var(--ink-soft);">instagram @tarosu_gzh</p>
+      <p style="margin-top:14px; font-size:12px; color:var(--ink-soft);">instagram @tarosu_gzh</p>
+      <p style="margin-top:2px; font-size:12px; color:var(--ink-soft);">E-Mail: tarosu.ooa@gmail.com</p>
     </div>
     <div class="strings-wrap"><svg viewBox="0 0 500 400" preserveAspectRatio="none"></svg></div>
   </section>
@@ -1352,9 +1368,18 @@ const app = {
 
   buildNav(){
     const nav = document.getElementById('nav');
-    nav.innerHTML = NAV_ITEMS.map(it =>
-      `<button class="nav-btn" id="nav-${it.id}" onclick="app.go('${it.id}')">${it.label}</button>`
-    ).join('');
+    nav.innerHTML = NAV_ITEMS.map(it => {
+      if(it.id === 'sheets'){
+        return `<div class="nav-item-wrap">
+          <button class="nav-btn" id="nav-${it.id}" onclick="app.go('${it.id}')">${it.label}</button>
+          <div class="nav-submenu">
+            <button onclick="app.goSheetsTab('dl')">악보 다운로드</button>
+            <button onclick="app.goSheetsTab('make')">악보 제작</button>
+          </div>
+        </div>`;
+      }
+      return `<button class="nav-btn" id="nav-${it.id}" onclick="app.go('${it.id}')">${it.label}</button>`;
+    }).join('');
   },
 
   buildStrings(){
@@ -1948,17 +1973,28 @@ const app = {
 
     const listEl = document.getElementById('faq-list');
     if(state.data.faq.length===0){ listEl.innerHTML = `<div class="empty-note">등록된 FAQ가 없습니다</div>`; return; }
-    listEl.innerHTML = state.data.faq.map(f => `
+    listEl.innerHTML = state.data.faq.map((f, i) => `
       <div class="faq-item">
         <div class="faq-q" onclick="app.toggleFaq('${f.id}')">
           <span><span class="mark">問 ·</span> ${escapeHtml(f.question)}</span>
           ${state.isAdmin ? `<span class="admin-row-actions" onclick="event.stopPropagation()">
+              <button class="btn ghost small" onclick="app.moveFaq(${i},-1)" ${i===0 ? 'disabled' : ''} title="위로 이동">▲</button>
+              <button class="btn ghost small" onclick="app.moveFaq(${i},1)" ${i===state.data.faq.length-1 ? 'disabled' : ''} title="아래로 이동">▼</button>
               <button class="btn ghost small" onclick="app.openFaqForm('${f.id}')">수정</button>
               <button class="btn danger small" onclick="app.deleteFaq('${f.id}')">삭제</button>
             </span>` : `<span class="mark">＋</span>`}
         </div>
         <div class="faq-a" id="faq-a-${f.id}"><strong style="color:var(--jade)">答 ·</strong> <span>${sanitizeRichHtml(f.answer)}</span></div>
       </div>`).join('');
+  },
+  async moveFaq(index, direction){
+    if(!state.isAdmin) return;
+    const target = index + direction;
+    if(target < 0 || target >= state.data.faq.length) return;
+    const arr = state.data.faq;
+    [arr[index], arr[target]] = [arr[target], arr[index]];
+    await saveBoard('faq');
+    this.renderFaq();
   },
   toggleFaq(id){ document.getElementById('faq-a-'+id).classList.toggle('open'); },
   openFaqForm(editId){

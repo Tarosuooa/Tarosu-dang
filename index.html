@@ -546,15 +546,20 @@ footer{
   <!-- HOME -->
   <div class="page" id="page-home">
     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px;">
-      <div class="card" style="cursor:pointer" onclick="app.go('notice')"><h3 style="font-size:16px;">공지사항 <span id="homeNoticeNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로당의 새로운 소식을 확인하세요</p></div>
-      <div class="card" style="cursor:pointer" onclick="app.goSheetsTab('dl')"><h3 style="font-size:16px;">악보 다운로드 <span id="homeSheetsNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로수와 회원들이 올린 악보를 받아보세요</p></div>
-      <div class="card" style="cursor:pointer" onclick="app.goSheetsTab('make')"><h3 style="font-size:16px;">악보 제작</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">숫자 악보 편집기로 직접 악보를 만들어보세요</p></div>
+      <div class="card" style="cursor:pointer" onclick="app.go('notice')"><h3 style="font-size:16px;">공지사항 <span id="homeNoticeNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로당의 새로운 소식을 확인하세요.</p></div>
+      <div class="card" style="cursor:pointer" onclick="app.goSheetsTab('dl')"><h3 style="font-size:16px;">악보 다운로드 <span id="homeSheetsNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로수와 회원님들이 공유한 악보를 받아 보세요.</p></div>
+      <div class="card"><h3 style="font-size:16px;">악보 제작 및 튜닝</h3>
+        <div style="display:flex; gap:8px; margin-top:18px;">
+          <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('make')">악보 제작</button>
+          <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('tuning')">음정 체크&amp;튜닝</button>
+        </div>
+      </div>
     </div>
 
     <div style="margin-top:16px; display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px;">
       <div class="card" style="cursor:pointer" onclick="app.go('download')"><h3 style="font-size:16px;">미디어 <span id="homeDownloadNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">관리자 '타로수'의 연주 영상, 사진 등</p></div>
       <div class="card" style="cursor:pointer" onclick="app.go('faq')"><h3 style="font-size:16px;">FAQ</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">자주 묻는 질문 모음</p></div>
-      <div class="card" style="cursor:pointer" onclick="app.go('guestbook')"><h3 style="font-size:16px;">방명록</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">한 줄의 인사를 남겨주세요</p></div>
+      <div class="card" style="cursor:pointer" onclick="app.go('guestbook')"><h3 style="font-size:16px;">방명록</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">한 줄의 인사를 남겨주세요.</p></div>
     </div>
   </div>
 
@@ -735,7 +740,7 @@ footer{
 </main>
 
 <footer>
-  © 타로당 芋頭堂 · 이 사이트의 게시물은 관리자만 작성할 수 있으며, 방명록은 누구나 남기실 수 있습니다.
+  © 타로당 芋頭堂 · 타로수(tarosu.ooa@gmail.com)
 </footer>
 
 
@@ -1292,6 +1297,8 @@ const GUZHENG_NOTE_FREQ = {
   'A5':880.00, 'B5':987.77, 'D6':1174.66
 };
 let heroAudioCtx = null;
+// 고쟁 줄을 누른 채로 드래그하면(스트럼) 지나가는 줄들이 순서대로 재생되도록 하는 상태
+let stringsDragActive = false;
 let guzhengVolume = 0.2; // 슬라이더로 조절되는 볼륨 (기본 20%)
 const guzhengBufferCache = {};
 const activeStringSources = {}; // note -> 현재 재생 중인 AudioBufferSourceNode (비브라토 적용 대상)
@@ -1836,15 +1843,20 @@ const app = {
       html += `<polygon class="bridge" points="${bridgeX-7},${y+12} ${bridgeX+7},${y+12} ${bridgeX},${y}"></polygon>`;
     }
     svg.innerHTML = html;
+
+    const pluckString = (hit) => {
+      playGuzhengNote(hit.dataset.note);
+      const line = svg.querySelector('.string-line[data-note="' + hit.dataset.note + '"]');
+      if(line){
+        line.classList.add('plucked');
+        setTimeout(() => line.classList.remove('plucked'), 260);
+      }
+    };
     svg.querySelectorAll('.string-hit-right').forEach(hit => {
-      hit.addEventListener('click', () => {
-        playGuzhengNote(hit.dataset.note);
-        const line = svg.querySelector('.string-line[data-note="' + hit.dataset.note + '"]');
-        if(line){
-          line.classList.add('plucked');
-          setTimeout(() => line.classList.remove('plucked'), 260);
-        }
-      });
+      // 클릭이 아니라 '누르는 순간' 바로 소리가 나게 한다
+      hit.addEventListener('mousedown', (e) => { e.preventDefault(); stringsDragActive = true; pluckString(hit); });
+      // 누른 상태로 다른 줄 위를 지나가면(스트럼), 그 줄도 순서대로 재생한다
+      hit.addEventListener('mouseenter', () => { if(stringsDragActive) pluckString(hit); });
     });
     svg.querySelectorAll('.string-hit-left').forEach(hit => {
       hit.addEventListener('click', () => {
@@ -3640,6 +3652,10 @@ window.addEventListener('resize', () => {
   const panel = document.getElementById('guzhengGuidePanel');
   if(panel && panel.style.display !== 'none') app.positionGuzhengGuidePanel();
 });
+
+// 고쟁 줄 위가 아닌 곳에서 마우스를 떼거나, 창 밖으로 나가도 드래그(스트럼) 상태를 확실히 해제한다
+window.addEventListener('mouseup', () => { stringsDragActive = false; });
+window.addEventListener('blur', () => { stringsDragActive = false; });
 
 app.init();
 </script>

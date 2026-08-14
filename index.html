@@ -1919,6 +1919,11 @@ const app = {
             <div class="detail-body">${sanitizeRichHtml(post.content)}</div>
             ${cfg.hasLink && post.link ? `<a class="dl-link" href="${escapeHtml(post.link)}" target="_blank" rel="noopener">자료 링크 열기 ↗</a>` : ''}
             ${cfg.hasMedia ? buildMediaEmbedsHtml(post.media) : ''}
+            ${isAdminUser() ? `
+              <div class="form-actions" style="margin-top:18px;">
+                <button class="btn ghost small" onclick="app.openForm('${name}','${post.id}')">수정</button>
+                <button class="btn danger small" onclick="app.deletePost('${name}','${post.id}')">삭제</button>
+              </div>` : ''}
             ${cfg.hasComments && commentsAllowed(post) ? `<div id="comments-container-${post.id}"></div>` : ''}
           </div>`;
         if(cfg.hasComments && commentsAllowed(post)) loadAndRenderComments(name, post.id);
@@ -2014,6 +2019,7 @@ const app = {
     if(!isAdminUser()) return;
     if(!confirm('이 글을 삭제하시겠습니까?')) return;
     state.data[name] = state.data[name].filter(p=>p.id!==id);
+    if(state.detail[name] === id) state.detail[name] = null;
     await saveBoard(name);
     showToast('삭제되었습니다');
     this.renderBoard(name);
@@ -2314,7 +2320,6 @@ const app = {
           <div style="flex:1;cursor:pointer" onclick="app.openDetail('sheets','${s.id}')">
             <div class="post-title">
               <span class="badge ${sheetCategoryBadgeClass(s.category)}">${escapeHtml(s.category || '-')}</span>
-              ${s.category==='가져온 악보' && s.shareConfirmed ? '<span class="badge share-ok">공유 허락 확인됨</span>' : ''}
               ${isRecentDate(s.date) ? '<span class="badge new">NEW</span>' : ''}
               ${escapeHtml(s.title)}
             </div>
@@ -2359,13 +2364,13 @@ const app = {
           </div>
           <div class="detail-view">
             <span class="badge ${sheetCategoryBadgeClass(post.category)}">${escapeHtml(post.category || '-')}</span>
-            ${post.category==='가져온 악보' && post.shareConfirmed ? '<span class="badge share-ok">공유 허락 확인됨</span>' : ''}
             <h3 style="margin-top:8px;">${isRecentDate(post.date) ? '<span class="badge new">NEW</span>' : ''}${escapeHtml(post.title)}</h3>
             <div class="post-meta">${escapeHtml(post.authorNickname)}${post.authorIsAdmin ? ' (관리자)' : ''} · ${escapeHtml(post.date)}</div>
             <div class="sheet-fields" style="margin-bottom:16px; font-size:14px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif;">
               <div>곡명: ${escapeHtml(post.songName || '-')}</div>
               <div>가수: ${escapeHtml(post.artistName || '-')}</div>
               <div>악보 제작자: ${escapeHtml(post.makerName || '-')}</div>
+              ${post.category==='가져온 악보' && post.shareConfirmed ? `<div style="grid-column:1 / -1; color:#1E5FA8; margin-top:4px;">본 게시물 작성자는 첨부한 악보의 제작자가 악보 공유를 허락하였다는 점을 인지하였습니다.</div>` : ''}
             </div>
             <div class="detail-body">${sanitizeRichHtml(post.content)}</div>
             ${post.link ? `<a class="dl-link" href="${escapeHtml(post.link)}" target="_blank" rel="noopener">악보 링크 열기 ↗</a>` : ''}
@@ -2415,7 +2420,7 @@ const app = {
       <div id="sf-share-confirm-wrap" style="display:${(existing && existing.category === '가져온 악보') ? 'block' : 'none'};">
         <label style="display:flex; align-items:flex-start; gap:8px; font-size:13.5px; font-family:'Noto Sans KR',sans-serif; cursor:pointer; margin-top:8px;">
           <input type="checkbox" id="sf-share-confirm" style="margin-top:3px;" ${(existing && existing.shareConfirmed) ? 'checked' : ''}>
-          <span>악보 제작자로부터 악보 공유가 허락된 악보인지 확인했습니다</span>
+          <span>악보 제작자가 악보 공유를 허락하였다는 점을 확인했습니다. <span style="color:var(--danger);">(무단 공유일 시 그에 대한 모든 책임은 본 게시물 업로더가 갖습니다)</span></span>
         </label>
       </div>
       <div class="sheet-fields">
@@ -2520,6 +2525,7 @@ const app = {
     if(!confirm('이 악보를 삭제하시겠습니까?')) return;
     try{
       await db.collection('sheets').doc(id).delete();
+      if(state.detail.sheets === id) state.detail.sheets = null;
       await loadSheets();
       showToast('삭제되었습니다');
       this.renderSheets();

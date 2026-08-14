@@ -1299,6 +1299,26 @@ const GUZHENG_NOTE_FREQ = {
 let heroAudioCtx = null;
 // 고쟁 줄을 누른 채로 드래그하면(스트럼) 지나가는 줄들이 순서대로 재생되도록 하는 상태
 let stringsDragActive = false;
+// 한 줄을 꾹 누르고 있으면(움직이지 않고) 빠르게 반복 연주되는 트레몰로(摇指) 상태
+let tremoloHoldTimeout = null;
+let tremoloInterval = null;
+let currentHeldNote = null;
+function stopStringTremolo(){
+  if(tremoloHoldTimeout){ clearTimeout(tremoloHoldTimeout); tremoloHoldTimeout = null; }
+  if(tremoloInterval){ clearInterval(tremoloInterval); tremoloInterval = null; }
+}
+function beginStringHold(hit, pluckFn){
+  stopStringTremolo();
+  currentHeldNote = hit.dataset.note;
+  // 잠깐(40ms) 그대로 누르고 있으면, 같은 줄에서 빠르게 반복 연주(트레몰로)가 시작된다
+  tremoloHoldTimeout = setTimeout(() => {
+    if(!stringsDragActive || currentHeldNote !== hit.dataset.note) return;
+    tremoloInterval = setInterval(() => {
+      if(!stringsDragActive || currentHeldNote !== hit.dataset.note){ stopStringTremolo(); return; }
+      pluckFn(hit);
+    }, 55);
+  }, 40);
+}
 let guzhengVolume = 0.2; // 슬라이더로 조절되는 볼륨 (기본 20%)
 const guzhengBufferCache = {};
 const activeStringSources = {}; // note -> 현재 재생 중인 AudioBufferSourceNode (비브라토 적용 대상)
@@ -1854,9 +1874,19 @@ const app = {
     };
     svg.querySelectorAll('.string-hit-right').forEach(hit => {
       // 클릭이 아니라 '누르는 순간' 바로 소리가 나게 한다
-      hit.addEventListener('mousedown', (e) => { e.preventDefault(); stringsDragActive = true; pluckString(hit); });
+      hit.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        stringsDragActive = true;
+        pluckString(hit);
+        beginStringHold(hit, pluckString); // 같은 줄을 꾹 누르고 있으면 트레몰로(摇指)로 이어진다
+      });
       // 누른 상태로 다른 줄 위를 지나가면(스트럼), 그 줄도 순서대로 재생한다
-      hit.addEventListener('mouseenter', () => { if(stringsDragActive) pluckString(hit); });
+      hit.addEventListener('mouseenter', () => {
+        if(stringsDragActive){
+          pluckString(hit);
+          beginStringHold(hit, pluckString); // 슬라이드해서 도착한 줄에서도 계속 누르고 있으면 트레몰로가 시작된다
+        }
+      });
     });
     svg.querySelectorAll('.string-hit-left').forEach(hit => {
       hit.addEventListener('click', () => {
@@ -3654,8 +3684,8 @@ window.addEventListener('resize', () => {
 });
 
 // 고쟁 줄 위가 아닌 곳에서 마우스를 떼거나, 창 밖으로 나가도 드래그(스트럼) 상태를 확실히 해제한다
-window.addEventListener('mouseup', () => { stringsDragActive = false; });
-window.addEventListener('blur', () => { stringsDragActive = false; });
+window.addEventListener('mouseup', () => { stringsDragActive = false; stopStringTremolo(); currentHeldNote = null; });
+window.addEventListener('blur', () => { stringsDragActive = false; stopStringTremolo(); currentHeldNote = null; });
 
 app.init();
 </script>

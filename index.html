@@ -649,6 +649,21 @@ footer{
       <div id="iqFormFields">
         <label>내 이메일 (답변받으실 주소)</label>
         <input type="text" id="iqEmail" placeholder="you@example.com">
+        <label>유형 (중복 선택 가능)</label>
+        <div style="display:flex; gap:16px; flex-wrap:wrap; padding:4px 0 4px;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:14px; font-family:'Noto Sans KR',sans-serif; cursor:pointer;">
+            <input type="checkbox" id="iqType-inquiry"> 문의
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:14px; font-family:'Noto Sans KR',sans-serif; cursor:pointer;">
+            <input type="checkbox" id="iqType-bug"> 오류 제보
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:14px; font-family:'Noto Sans KR',sans-serif; cursor:pointer;">
+            <input type="checkbox" id="iqType-suggestion"> 건의 사항
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:14px; font-family:'Noto Sans KR',sans-serif; cursor:pointer;">
+            <input type="checkbox" id="iqType-etc"> 그 외
+          </label>
+        </div>
         <label>제목</label>
         <input type="text" id="iqTitle" maxlength="100" placeholder="문의 제목을 입력하세요">
         <label>내용</label>
@@ -658,12 +673,6 @@ footer{
         <div class="form-actions"><button class="btn" id="iqSendBtn" onclick="app.sendInquiryEmail()">전송</button></div>
       </div>
     </div>
-
-    <div id="inquiry-list-view">
-      <div class="toolbar" id="inquiry-toolbar"></div>
-      <div class="list-box" id="inquiry-list"></div>
-    </div>
-    <div id="inquiry-detail-view" style="display:none;"></div>
   </div>
 
   <!-- GUESTBOOK -->
@@ -2034,7 +2043,7 @@ function parseDeepLinkFromHash(){
   const page = params.get('page');
   const id = params.get('id');
   if(!page || !id) return null;
-  if(!['notice','noticeUpdate','download','inquiry','sheets'].includes(page)) return null;
+  if(!['notice','noticeUpdate','download','sheets'].includes(page)) return null;
   return { page, id };
 }
 
@@ -2737,7 +2746,6 @@ const app = {
     this.renderBoard('noticeUpdate');
     this.renderProfile();
     this.renderBoard('download');
-    this.renderBoard('inquiry');
     this.renderFaq();
     this.renderGuestbook();
     this.renderSheetTabs();
@@ -3614,8 +3622,21 @@ const app = {
     const title = document.getElementById('iqTitle').value.trim();
     const content = document.getElementById('iqContent').value.trim();
     const media = parseMediaUrls(document.getElementById('iqMedia').value);
+
+    const typeMap = [
+      { id: 'iqType-inquiry', label: '문의' },
+      { id: 'iqType-bug', label: '오류 제보' },
+      { id: 'iqType-suggestion', label: '건의 사항' },
+      { id: 'iqType-etc', label: '그 외' }
+    ];
+    const checkedTypes = typeMap.filter(t => document.getElementById(t.id) && document.getElementById(t.id).checked).map(t => t.label);
+
     if(!validEmail(email)){ showToast('올바른 이메일 주소를 입력해주세요'); return; }
     if(!title || !content){ showToast('제목과 내용을 입력해주세요'); return; }
+
+    // 체크된 유형을 메일 본문 맨 앞에 함께 적어 보낸다 (화면의 내용 입력창 자체는 건드리지 않는다)
+    const typesLine = checkedTypes.length ? `[선택한 유형: ${checkedTypes.join(', ')}]\n\n` : '';
+    const contentWithTypes = typesLine + content;
 
     const btn = document.getElementById('iqSendBtn');
     btn.disabled = true; btn.textContent = '전송 중...';
@@ -3627,7 +3648,8 @@ const app = {
           type: 'inquiry',
           to: ADMIN_CONTACT_EMAIL,
           replyTo: email,
-          title, content, media,
+          title, content: contentWithTypes, media,
+          types: checkedTypes,
           nickname: state.currentUser.nickname
         })
       });
@@ -3637,6 +3659,7 @@ const app = {
       document.getElementById('iqTitle').value = '';
       document.getElementById('iqContent').value = '';
       document.getElementById('iqMedia').value = '';
+      typeMap.forEach(t => { const el = document.getElementById(t.id); if(el) el.checked = false; });
     }catch(e){
       console.error(e);
       showToast('문의 전송에 실패했습니다. Apps Script 설정을 확인해주세요');

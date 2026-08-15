@@ -163,7 +163,7 @@ main.no-hero{padding-top:44px;}
 }
 /* 모달과 달리 화면 전체를 덮는 배경이 없어서, 열려 있는 동안에도 뒤쪽 고쟁 줄을 계속 클릭할 수 있다 */
 .guzheng-guide-panel{
-  position:fixed; z-index:70;
+  position:fixed; z-index:210;
   width:400px; max-width:calc(100vw - 40px);
   background:#fbf7ec; border:1px solid var(--gold); border-radius:4px;
   box-shadow:var(--shadow); padding:14px 16px;
@@ -424,7 +424,7 @@ footer{
 
   /* PC와 완전히 같은 요소(고쟁 줄/사용법/볼륨)를, 평소 숨겨둔 걸 화면 위에 펼쳐서 그대로 보여준다 */
   .strings-wrap.mobile-open{
-    display:block; position:fixed; left:12px; right:12px; top:70px; height:min(70vh, 420px);
+    display:block; position:fixed; left:12px; right:12px; top:60px; height:min(52vh, 320px);
     width:auto; opacity:1; z-index:200;
     background:var(--paper); border:1px solid var(--gold); border-radius:8px;
     box-shadow:var(--shadow); padding:8px;
@@ -573,7 +573,13 @@ footer{
   <!-- HOME -->
   <div class="page" id="page-home">
     <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px;">
-      <div class="card" style="cursor:pointer" onclick="app.go('notice')"><h3 style="font-size:16px;">공지사항 <span id="homeNoticeNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로당의 새로운 소식을 확인하세요.</p></div>
+      <div class="card"><h3 style="font-size:16px;">소식 <span id="homeNoticeNewBadge" class="badge new" style="display:none;">NEW</span></h3>
+        <div style="display:flex; gap:8px; margin-top:18px; flex-wrap:wrap;">
+          <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('notice')">공지사항</button>
+          <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('noticeUpdate')">업데이트</button>
+          <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('profile')">프로필</button>
+        </div>
+      </div>
       <div class="card" style="cursor:pointer" onclick="app.goSheetsTab('dl')"><h3 style="font-size:16px;">악보 다운로드 <span id="homeSheetsNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로수와 회원님들이 공유한 악보를 받아 보세요.</p></div>
       <div class="card"><h3 style="font-size:16px;">악보 제작 및 조율</h3>
         <div style="display:flex; gap:8px; margin-top:18px;">
@@ -592,13 +598,39 @@ footer{
 
   <!-- NOTICE -->
   <div class="page" id="page-notice">
-    <div class="section-title"><h2>공지사항</h2><span class="hanja-sub">公告</span></div>
+    <div class="section-title"><h2>소식</h2><span class="hanja-sub">消息</span></div>
     <div class="divider"></div>
-    <div id="notice-list-view">
-      <div class="toolbar" id="notice-toolbar"></div>
-      <div class="list-box" id="notice-list"></div>
+
+    <div class="subtabs">
+      <button class="subtab-btn" id="noticesubtab-notice" onclick="app.setNoticeTab('notice')">공지사항</button>
+      <button class="subtab-btn" id="noticesubtab-noticeUpdate" onclick="app.setNoticeTab('noticeUpdate')">업데이트</button>
+      <button class="subtab-btn" id="noticesubtab-profile" onclick="app.setNoticeTab('profile')">프로필</button>
     </div>
-    <div id="notice-detail-view" style="display:none;"></div>
+
+    <!-- 공지사항 -->
+    <div id="notice-tab-notice">
+      <div id="notice-list-view">
+        <div class="toolbar" id="notice-toolbar"></div>
+        <div class="list-box" id="notice-list"></div>
+      </div>
+      <div id="notice-detail-view" style="display:none;"></div>
+    </div>
+
+    <!-- 업데이트 -->
+    <div id="notice-tab-noticeUpdate" style="display:none;">
+      <div id="noticeUpdate-list-view">
+        <div class="toolbar" id="noticeUpdate-toolbar"></div>
+        <div class="list-box" id="noticeUpdate-list"></div>
+      </div>
+      <div id="noticeUpdate-detail-view" style="display:none;"></div>
+    </div>
+
+    <!-- 프로필: 게시물 목록이 아니라 왼쪽 위 사진 + 오른쪽 제목/내용 -->
+    <div id="notice-tab-profile" style="display:none;">
+      <div class="toolbar" id="profile-toolbar"></div>
+      <div class="card" id="profile-display" style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;"></div>
+      <div id="profile-edit-wrap" style="display:none; margin-top:14px;"></div>
+    </div>
   </div>
 
   <!-- DOWNLOAD -->
@@ -781,6 +813,10 @@ footer{
       <div class="field-hint" id="mpPwErr" style="color:var(--danger); min-height:16px;"></div>
       <button class="btn" onclick="app.changePassword()" style="margin-top:8px;">비밀번호 변경</button>
     </div>
+
+    <div style="text-align:right; margin-top:6px;">
+      <button class="btn danger small" style="font-size:11px; padding:4px 10px; opacity:0.7;" onclick="app.openWithdrawModal()">회원 탈퇴</button>
+    </div>
   </div>
 
 </main>
@@ -878,6 +914,30 @@ footer{
   </div>
 </div>
 
+<!-- 회원 탈퇴 모달: 본인 이메일로 받은 인증번호를 입력해야 탈퇴 가능 -->
+<div class="modal-overlay" id="withdrawModal">
+  <div class="modal-box wide">
+    <h3>회원 탈퇴</h3>
+    <p class="sub">탈퇴하면 계정 정보는 복구할 수 없어요.<br>본인 확인을 위해 가입하신 이메일로 인증번호를 보내드려요.</p>
+    <label>이메일</label>
+    <div class="verify-row">
+      <input type="text" id="wdEmail" readonly style="background:var(--paper-dark);">
+      <button class="btn small" onclick="app.sendWithdrawCode()" id="wdSendBtn">인증번호 받기</button>
+    </div>
+    <label>인증번호 (6자리)</label>
+    <div class="verify-row">
+      <input type="text" id="wdCode" maxlength="6" placeholder="숫자 6자리" inputmode="numeric">
+      <button class="btn small ghost" onclick="app.checkWithdrawCode()">확인</button>
+    </div>
+    <div class="field-hint" id="wdCodeStatus"></div>
+    <div class="modal-err" id="wdErr" style="height:auto; margin-top:10px;"></div>
+    <div class="modal-actions" style="margin-top:8px;">
+      <button class="btn ghost" onclick="app.closeWithdrawModal()">취소</button>
+      <button class="btn danger" onclick="app.confirmWithdraw()">탈퇴하기</button>
+    </div>
+  </div>
+</div>
+
 <!-- 악보 제작 도구 업데이트 내역 모달 -->
 <div class="modal-overlay" id="updateLogModal">
   <div class="modal-box wide" style="width:460px; max-height:80vh; display:flex; flex-direction:column;">
@@ -953,7 +1013,7 @@ const HERO_TAGLINES = [
 
 const NAV_ITEMS = [
   {id:'home', label:'홈'},
-  {id:'notice', label:'공지사항'},
+  {id:'notice', label:'소식'},
   {id:'download', label:'미디어'},
   {id:'sheets', label:'악보'},
   {id:'faq', label:'FAQ'},
@@ -962,9 +1022,10 @@ const NAV_ITEMS = [
 ];
 
 const BOARD_CONFIG = {
-  notice:   {label:'공지', hasLink:false, hasMedia:true, hasComments:true},
-  download: {label:'자료', hasLink:true, hasMedia:true, hasComments:true},
-  inquiry:  {label:'문의', hasLink:false, hasMedia:false, hasComments:false},
+  notice:       {label:'공지', hasLink:false, hasMedia:true, hasComments:true},
+  noticeUpdate: {label:'업데이트', hasLink:false, hasMedia:true, hasComments:true},
+  download:     {label:'자료', hasLink:true, hasMedia:true, hasComments:true},
+  inquiry:      {label:'문의', hasLink:false, hasMedia:false, hasComments:false},
 };
 
 const FAQ_CATEGORIES = ['악보 제작', '악보 업로드&다운로드', '음정 체크&조율', '미디어', '악기', '홈페이지', '관리자', '그 외'];
@@ -983,6 +1044,7 @@ const SEED = {
   notice: [
     {id:'seed-n1', title:'타로당에 오신 것을 환영합니다', author:'관리자', date:'2026-08-01', content:'타로당을 열었습니다. 앞으로 공지사항은 이곳에서 안내드리겠습니다. 자주 들러주세요.'}
   ],
+  noticeUpdate: [],
   download: [
     {id:'seed-d1', title:'입문자를 위한 조현표(調絃表)', author:'관리자', date:'2026-08-01', content:'처음 고쟁을 접하시는 분들을 위한 기본 조현표입니다. 필요하신 분은 아래 링크를 참고해주세요.', link:''}
   ],
@@ -1005,13 +1067,16 @@ const state = {
   sheetSearchQuery: '',
   sheetPage: 1,
   faqCategory: '전체',
+  noticeTab: 'notice', // 소식 하위 탭: notice(공지사항) / noticeUpdate(업데이트) / profile(프로필)
   guzhengGuideText: '',
   scoreMakerNoticeText: '',
   tuningNoticeText: '',
   tipText: { scoreMaker: '', tuning: '' },
-  data: { notice: [], download: [], faq: [], inquiry: [], guestbook: [], sheets: [], updateLog: [], tuningUpdateLog: [] },
-  detail: { notice: null, download: null, inquiry: null, sheets: null },
+  profile: { photoUrl: '', title: '', content: '' },
+  data: { notice: [], noticeUpdate: [], download: [], faq: [], inquiry: [], guestbook: [], sheets: [], updateLog: [], tuningUpdateLog: [] },
+  detail: { notice: null, noticeUpdate: null, download: null, inquiry: null, sheets: null },
   pendingSignup: null,
+  pendingWithdraw: null,
 };
 
 // 관리자 여부는 더 이상 비밀번호가 아니라, 로그인한 계정의 Firestore isAdmin 값으로만 판단합니다.
@@ -1366,6 +1431,37 @@ function beginStringHold(hit, pluckFn){
     }, 55);
   }, 60);
 }
+
+// 모바일 터치 전용: 손가락(touch identifier)별로 독립적인 트레몰로/스트럼 상태를 관리한다 (최대 3개 동시)
+const touchHeldNotes = {};   // touchId -> 현재 누르고 있는 note
+const touchTremoloTimers = {}; // touchId -> { holdTimeout, interval }
+function endTouchOnString(touchId){
+  const timers = touchTremoloTimers[touchId];
+  if(timers){
+    if(timers.holdTimeout) clearTimeout(timers.holdTimeout);
+    if(timers.interval) clearInterval(timers.interval);
+  }
+  delete touchTremoloTimers[touchId];
+  delete touchHeldNotes[touchId];
+}
+function startTouchOnString(touchId, hit, pluckFn){
+  endTouchOnString(touchId); // 이전에 이 손가락이 누르고 있던 줄의 타이머는 정리
+  touchHeldNotes[touchId] = hit.dataset.note;
+  pluckFn(hit); // 누르는 즉시(또는 다른 줄로 슬라이드한 즉시) 소리가 난다
+  const timers = { holdTimeout: null, interval: null };
+  touchTremoloTimers[touchId] = timers;
+  timers.holdTimeout = setTimeout(() => {
+    if(touchHeldNotes[touchId] !== hit.dataset.note) return;
+    timers.interval = setInterval(() => {
+      if(touchHeldNotes[touchId] !== hit.dataset.note){
+        if(timers.interval) clearInterval(timers.interval);
+        return;
+      }
+      pluckFn(hit);
+    }, 55);
+  }, 60);
+}
+
 let guzhengVolume = 0.2; // 슬라이더로 조절되는 볼륨 (기본 20%)
 const guzhengBufferCache = {};
 const activeStringSources = {}; // note -> 현재 재생 중인 AudioBufferSourceNode (비브라토 적용 대상)
@@ -1510,6 +1606,30 @@ async function loadSheets(){
   }
 }
 
+// 닉네임을 바꾸면, 이 사람이 예전에 올린 악보(sheets)/댓글(comments)의 작성자 닉네임 표시도 전부 같은 값으로 갱신한다
+async function propagateNicknameChange(uid, newNickname){
+  if(!db) return;
+  try{
+    const [sheetsSnap, commentsSnap] = await Promise.all([
+      db.collection('sheets').where('authorUid', '==', uid).get(),
+      db.collection('comments').where('authorUid', '==', uid).get()
+    ]);
+    const batchDocs = [...sheetsSnap.docs, ...commentsSnap.docs];
+    if(batchDocs.length === 0) return;
+    // Firestore 배치는 500건 제한이 있어 넉넉히 나눠 처리한다
+    const CHUNK = 400;
+    for(let i = 0; i < batchDocs.length; i += CHUNK){
+      const batch = db.batch();
+      batchDocs.slice(i, i + CHUNK).forEach(doc => {
+        batch.update(doc.ref, { authorNickname: newNickname });
+      });
+      await batch.commit();
+    }
+  }catch(e){
+    console.error('닉네임 일괄 반영 실패', e);
+  }
+}
+
 /* ---------- 홈 화면 고쟁 줄 사용법 (관리자만 작성/수정 가능) ---------- */
 async function loadGuzhengGuide(){
   if(!db){ state.guzhengGuideText = ''; return; }
@@ -1574,6 +1694,22 @@ async function saveTuningNotice(text){
   }catch(e){
     console.error('음정 체크 안내 문구 저장 실패', e);
     return false;
+  }
+}
+
+/* ---------- 소식 > 프로필 ---------- */
+async function loadProfile(){
+  if(!db){ state.profile = {photoUrl:'', title:'', content:''}; return; }
+  try{
+    const doc = await db.collection('content').doc('profile').get();
+    state.profile = doc.exists ? {
+      photoUrl: doc.data().photoUrl || '',
+      title: doc.data().title || '',
+      content: doc.data().content || ''
+    } : {photoUrl:'', title:'', content:''};
+  }catch(e){
+    console.error('프로필 로드 실패', e);
+    state.profile = {photoUrl:'', title:'', content:''};
   }
 }
 
@@ -1759,7 +1895,7 @@ function parseDeepLinkFromHash(){
   const page = params.get('page');
   const id = params.get('id');
   if(!page || !id) return null;
-  if(!['notice','download','inquiry','sheets'].includes(page)) return null;
+  if(!['notice','noticeUpdate','download','inquiry','sheets'].includes(page)) return null;
   return { page, id };
 }
 
@@ -1769,7 +1905,9 @@ function captureNavState(){
     page: state.page,
     sheetTab: state.sheetTab,
     sheetCategory: state.sheetCategory,
+    noticeTab: state.noticeTab,
     detailNotice: state.detail.notice,
+    detailNoticeUpdate: state.detail.noticeUpdate,
     detailDownload: state.detail.download,
     detailInquiry: state.detail.inquiry,
     detailSheets: state.detail.sheets
@@ -1786,7 +1924,9 @@ function applyNavState(s){
   state.sheetTab = s.sheetTab || 'dl';
   state.sheetCategory = s.sheetCategory || '전체';
   state.faqCategory = '전체';
+  state.noticeTab = s.noticeTab || 'notice';
   state.detail.notice = s.detailNotice || null;
+  state.detail.noticeUpdate = s.detailNoticeUpdate || null;
   state.detail.download = s.detailDownload || null;
   state.detail.inquiry = s.detailInquiry || null;
   state.detail.sheets = s.detailSheets || null;
@@ -1877,22 +2017,33 @@ const app = {
     }else{
       logDailyVisit(); // Firebase Auth를 못 쓰는 경우에도(설정 미완료 등) 최소한 시도는 한다
     }
-    await Promise.all(['notice','download','faq','inquiry','guestbook','updateLog','tuningUpdateLog'].map(loadBoard));
+    await Promise.all(['notice','noticeUpdate','download','faq','inquiry','guestbook','updateLog','tuningUpdateLog'].map(loadBoard));
     await loadSheets();
     await loadGuzhengGuide();
     await loadScoreMakerNotice();
     await loadTuningNotice();
     await loadTipText('scoreMaker');
     await loadTipText('tuning');
+    await loadProfile();
     updateStorageWarning();
     this.renderAll();
     initGuestbookCharLimit();
 
     const deepLink = parseDeepLinkFromHash();
     if(deepLink){
-      this.go(deepLink.page, true);
-      state.detail[deepLink.page] = deepLink.id;
-      if(deepLink.page === 'sheets') this.renderSheets(); else this.renderBoard(deepLink.page);
+      if(deepLink.page === 'noticeUpdate'){
+        this.go('notice', true);
+        this.setNoticeTab('noticeUpdate');
+        state.detail.noticeUpdate = deepLink.id;
+        this.renderBoard('noticeUpdate');
+      }else{
+        this.go(deepLink.page, true);
+        state.detail[deepLink.page] = deepLink.id;
+        if(deepLink.page === 'sheets') this.renderSheets(); else this.renderBoard(deepLink.page);
+      }
+    }else if(history.state && history.state.page && document.getElementById('page-' + history.state.page)){
+      // 새로고침해도 무조건 홈으로 가지 않고, 직전에 보고 있던 페이지 상태를 그대로 복원한다
+      applyNavState(history.state);
     }else{
       this.go('home', true);
     }
@@ -1909,6 +2060,16 @@ const app = {
             <button onclick="app.goSheetsTab('dl')">악보 다운로드</button>
             <button onclick="app.goSheetsTab('make')">악보 제작</button>
             <button onclick="app.goSheetsTab('tuning')">음정 체크&amp;조율</button>
+          </div>
+        </div>`;
+      }
+      if(it.id === 'notice'){
+        return `<div class="nav-item-wrap">
+          <button class="nav-btn" id="nav-${it.id}" onclick="app.go('${it.id}')">${it.label}</button>
+          <div class="nav-submenu">
+            <button onclick="app.goNoticeTab('notice')">공지사항</button>
+            <button onclick="app.goNoticeTab('noticeUpdate')">업데이트</button>
+            <button onclick="app.goNoticeTab('profile')">프로필</button>
           </div>
         </div>`;
       }
@@ -1970,6 +2131,39 @@ const app = {
         applyVibratoToNote(hit.dataset.note);
       });
     });
+
+    /* ---------- 모바일 터치 지원: 손가락 최대 3개까지 동시에 각각 독립적으로 뜯기/스트럼/트레몰로 ---------- */
+    const MAX_MOBILE_TOUCHES = 3;
+    svg.addEventListener('touchstart', (e) => {
+      for(const touch of Array.from(e.changedTouches)){
+        if(!touchHeldNotes[touch.identifier] && Object.keys(touchHeldNotes).length >= MAX_MOBILE_TOUCHES) continue; // 3개 초과 무시
+        const el = document.elementFromPoint(touch.clientX, touch.clientY);
+        if(el && el.classList && el.classList.contains('string-hit-right')){
+          e.preventDefault();
+          startTouchOnString(touch.identifier, el, pluckString);
+        }else if(el && el.classList && el.classList.contains('string-hit-left')){
+          e.preventDefault();
+          applyVibratoToNote(el.dataset.note);
+        }
+      }
+    }, { passive: false });
+    svg.addEventListener('touchmove', (e) => {
+      for(const touch of Array.from(e.changedTouches)){
+        if(!touchHeldNotes[touch.identifier]) continue;
+        const el = document.elementFromPoint(touch.clientX, touch.clientY);
+        if(el && el.classList && el.classList.contains('string-hit-right') && el.dataset.note !== touchHeldNotes[touch.identifier]){
+          e.preventDefault();
+          startTouchOnString(touch.identifier, el, pluckString); // 다른 줄로 이동 = 스트럼(순서대로 재생) + 그 줄에서 다시 트레몰로 대기 시작
+        }
+      }
+    }, { passive: false });
+    const endTouches = (e) => {
+      for(const touch of Array.from(e.changedTouches)){
+        endTouchOnString(touch.identifier);
+      }
+    };
+    svg.addEventListener('touchend', endTouches);
+    svg.addEventListener('touchcancel', endTouches);
   },
 
   pickRandomHeroTagline(){
@@ -2035,7 +2229,35 @@ const app = {
   positionGuzhengGuidePanel(){
     const panel = document.getElementById('guzhengGuidePanel');
     const btn = document.getElementById('guzhengGuideBtn');
+    const stringsWrap = document.getElementById('stringsWrap');
     if(!panel || !btn) return;
+
+    const isMobileOpen = stringsWrap && stringsWrap.classList.contains('mobile-open');
+    if(isMobileOpen){
+      // 모바일: 고쟁 창과 절대 겹치지 않도록, 고쟁 창 바로 아래에 붙인다
+      const wrapRect = stringsWrap.getBoundingClientRect();
+      const panelWidth = Math.min(panel.offsetWidth || 280, window.innerWidth - 16);
+      let left = wrapRect.left;
+      const maxLeft = window.innerWidth - panelWidth - 8;
+      if(left > maxLeft) left = Math.max(8, maxLeft);
+      if(left < 8) left = 8;
+      const top = wrapRect.bottom + 8; // 겹치지 않는 것이 최우선이라 위쪽으로는 보정하지 않는다
+      const availableHeight = Math.max(120, window.innerHeight - top - 8);
+
+      panel.style.left = left + 'px';
+      panel.style.top = top + 'px';
+      panel.style.right = 'auto';
+      panel.style.bottom = 'auto';
+      panel.style.width = panelWidth + 'px';
+      panel.style.maxHeight = availableHeight + 'px';
+      panel.style.overflowY = 'auto';
+      return;
+    }
+
+    // PC: 기존처럼 버튼 왼쪽에 붙인다
+    panel.style.width = '';
+    panel.style.maxHeight = '';
+    panel.style.overflowY = '';
     const btnRect = btn.getBoundingClientRect();
     const panelWidth = panel.offsetWidth || 280;
     const panelHeight = panel.offsetHeight || 160;
@@ -2275,6 +2497,7 @@ const app = {
     const leavingTuning = (state.page==='sheets' && state.sheetTab==='tuning' && page!=='sheets');
     if(leavingTuning) this.stopTuningSession(false);
     if(page==='sheets') state.sheetTab = 'dl';
+    if(page==='notice') state.noticeTab = 'notice';
     if(page==='faq') state.faqCategory = '전체';
     state.page = page;
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -2285,7 +2508,7 @@ const app = {
     document.getElementById('heroSection').style.display = page==='home' ? '' : 'none';
     document.querySelector('main').classList.toggle('no-hero', page!=='home');
     if(page==='home' && !skipPush) this.pickRandomHeroTagline();
-    state.detail.notice = null; state.detail.download = null; state.detail.inquiry = null;
+    state.detail.notice = null; state.detail.noticeUpdate = null; state.detail.download = null; state.detail.inquiry = null;
     state.detail.sheets = null;
     this.renderAll();
     if(page==='mypage') this.renderVisitStats();
@@ -2298,10 +2521,101 @@ const app = {
     if(tab !== 'dl') this.setSheetTab(tab);
   },
 
+  goNoticeTab(tab){
+    this.go('notice');
+    if(tab !== 'notice') this.setNoticeTab(tab);
+  },
+  setNoticeTab(tab){
+    state.noticeTab = tab;
+    state.detail.notice = null;
+    state.detail.noticeUpdate = null;
+    document.getElementById('noticesubtab-notice').classList.toggle('active', tab==='notice');
+    document.getElementById('noticesubtab-noticeUpdate').classList.toggle('active', tab==='noticeUpdate');
+    document.getElementById('noticesubtab-profile').classList.toggle('active', tab==='profile');
+    document.getElementById('notice-tab-notice').style.display = tab==='notice' ? '' : 'none';
+    document.getElementById('notice-tab-noticeUpdate').style.display = tab==='noticeUpdate' ? '' : 'none';
+    document.getElementById('notice-tab-profile').style.display = tab==='profile' ? '' : 'none';
+    this.renderNoticeTabs();
+    if(tab==='notice') this.renderBoard('notice');
+    else if(tab==='noticeUpdate') this.renderBoard('noticeUpdate');
+    else if(tab==='profile') this.renderProfile();
+    pushNavState();
+  },
+  renderNoticeTabs(){
+    document.getElementById('noticesubtab-notice').classList.toggle('active', state.noticeTab==='notice');
+    document.getElementById('noticesubtab-noticeUpdate').classList.toggle('active', state.noticeTab==='noticeUpdate');
+    document.getElementById('noticesubtab-profile').classList.toggle('active', state.noticeTab==='profile');
+    document.getElementById('notice-tab-notice').style.display = state.noticeTab==='notice' ? '' : 'none';
+    document.getElementById('notice-tab-noticeUpdate').style.display = state.noticeTab==='noticeUpdate' ? '' : 'none';
+    document.getElementById('notice-tab-profile').style.display = state.noticeTab==='profile' ? '' : 'none';
+  },
+
+  /* ---------- 프로필 (게시물 목록이 아니라 왼쪽 사진 + 오른쪽 제목/내용, 관리자만 수정) ---------- */
+  renderProfile(){
+    const toolbarEl = document.getElementById('profile-toolbar');
+    const displayEl = document.getElementById('profile-display');
+    if(!toolbarEl || !displayEl) return;
+    toolbarEl.innerHTML = isAdminUser() ? `<button class="btn small" onclick="app.openProfileEdit()">프로필 수정</button>` : '';
+    const p = state.profile || {photoUrl:'', title:'', content:''};
+    const photoHtml = p.photoUrl
+      ? `<img src="${escapeHtml(p.photoUrl)}" alt="프로필 사진" style="width:140px; height:140px; object-fit:cover; border-radius:8px; border:1px solid var(--paper-deep); flex:none;">`
+      : `<div style="width:140px; height:140px; border-radius:8px; border:1px solid var(--paper-deep); background:var(--paper-dark); flex:none; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-size:12.5px;">사진 없음</div>`;
+    displayEl.innerHTML = `
+      ${photoHtml}
+      <div style="flex:1; min-width:200px;">
+        <h3 style="font-size:18px; margin-bottom:10px;">${p.title ? escapeHtml(p.title) : '<span style="color:var(--ink-soft);">등록된 프로필이 없습니다</span>'}</h3>
+        <div style="font-size:14.5px; white-space:pre-wrap; word-break:break-word;">${p.content ? sanitizeRichHtml(p.content) : ''}</div>
+      </div>`;
+  },
+  openProfileEdit(){
+    if(!isAdminUser()) return;
+    const wrap = document.getElementById('profile-edit-wrap');
+    if(!wrap) return;
+    const p = state.profile || {photoUrl:'', title:'', content:''};
+    wrap.style.display = 'block';
+    wrap.innerHTML = `
+      <div class="form-box">
+        <label>프로필 사진 링크 (URL)</label>
+        <input type="text" id="profile-f-photo" placeholder="https://..." value="${escapeHtml(p.photoUrl || '')}">
+        <label>제목</label>
+        <input type="text" id="profile-f-title" maxlength="60" value="${escapeHtml(p.title || '')}">
+        <label>내용</label>
+        <div id="profile-f-content-wrap"></div>
+        <div class="form-actions">
+          <button class="btn small" onclick="app.saveProfileEdit()">저장</button>
+          <button class="btn ghost small" onclick="document.getElementById('profile-edit-wrap').style.display='none';">취소</button>
+        </div>
+      </div>`;
+    document.getElementById('profile-f-content-wrap').innerHTML = buildRteHtml('profile-f-content', '소개 내용을 입력하세요');
+    if(p.content) document.getElementById('profile-f-content').innerHTML = sanitizeRichHtml(p.content);
+  },
+  async saveProfileEdit(){
+    if(!isAdminUser()) return;
+    const photoUrl = document.getElementById('profile-f-photo').value.trim();
+    const title = document.getElementById('profile-f-title').value.trim();
+    const contentEl = document.getElementById('profile-f-content');
+    const content = sanitizeRichHtml(contentEl ? contentEl.innerHTML : '');
+    if(!db){ showToast('Firebase가 설정되지 않았습니다'); return; }
+    try{
+      await db.collection('content').doc('profile').set({ photoUrl, title, content });
+      state.profile = { photoUrl, title, content };
+      const wrap = document.getElementById('profile-edit-wrap');
+      if(wrap) wrap.style.display = 'none';
+      showToast('프로필이 저장되었습니다');
+      this.renderProfile();
+    }catch(e){
+      console.error(e);
+      showToast('저장에 실패했습니다');
+    }
+  },
+
   renderAll(){
     if(state.page==='mypage' && !state.currentUser){ this.go('home'); return; }
     this.renderHome();
+    this.renderNoticeTabs();
     this.renderBoard('notice');
+    this.renderBoard('noticeUpdate');
+    this.renderProfile();
     this.renderBoard('download');
     this.renderBoard('inquiry');
     this.renderFaq();
@@ -2434,18 +2748,46 @@ const app = {
   },
 
   async saveNickname(){
-    if(!state.currentUser || !auth || !auth.currentUser) return;
+    if(!state.currentUser || !auth || !auth.currentUser || !db) return;
     const nickname = document.getElementById('mpNickname').value.trim();
     if(!nickname){ showToast('닉네임을 입력해주세요'); return; }
+    if(nickname === state.currentUser.nickname){ showToast('현재 닉네임과 같습니다'); return; }
+
+    const btn = event.target;
+    const originalLabel = btn ? btn.textContent : '';
+    if(btn){ btn.disabled = true; btn.textContent = '변경 중...'; }
     try{
+      // 최근 30일 동안의 닉네임 변경 횟수를 확인 (최대 2회)
+      const udoc = await db.collection('users').doc(state.currentUser.uid).get();
+      const now = Date.now();
+      const THIRTY_DAYS = 30*24*60*60*1000;
+      const prevChanges = (udoc.exists && Array.isArray(udoc.data().nicknameChanges)) ? udoc.data().nicknameChanges : [];
+      const recentChanges = prevChanges.filter(ts => (now - ts) < THIRTY_DAYS);
+      if(recentChanges.length >= 2){
+        const oldestRecent = Math.min(...recentChanges);
+        const availableAt = new Date(oldestRecent + THIRTY_DAYS);
+        showToast(`닉네임은 30일 동안 최대 2번만 바꿀 수 있어요. ${availableAt.getMonth()+1}월 ${availableAt.getDate()}일 이후 다시 시도해주세요`);
+        return;
+      }
+
+      const oldNickname = state.currentUser.nickname;
       await auth.currentUser.updateProfile({ displayName: nickname });
-      await db.collection('users').doc(state.currentUser.uid).set({ nickname }, { merge: true });
+      recentChanges.push(now);
+      await db.collection('users').doc(state.currentUser.uid).set({ nickname, nicknameChanges: recentChanges }, { merge: true });
       state.currentUser.nickname = nickname;
       this.updateAuthArea();
-      showToast('닉네임이 변경되었습니다');
+      showToast('닉네임이 변경되었습니다. 이전에 작성한 글의 닉네임도 함께 바뀌는 중이에요...');
+
+      // 이전에 작성한 게시물(악보)/댓글의 작성자 닉네임도 전부 함께 바꾼다
+      await propagateNicknameChange(state.currentUser.uid, nickname);
+      showToast('작성하신 글의 닉네임도 모두 갱신되었습니다');
+      await loadSheets();
+      this.renderSheets();
     }catch(e){
       console.error(e);
       showToast('닉네임 변경에 실패했습니다');
+    }finally{
+      if(btn){ btn.disabled = false; btn.textContent = originalLabel || '닉네임 저장'; }
     }
   },
 
@@ -2473,6 +2815,108 @@ const app = {
       console.error(e);
       if(e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') errEl.textContent = '현재 비밀번호가 올바르지 않습니다';
       else errEl.textContent = '비밀번호 변경에 실패했습니다: ' + (e.message || '알 수 없는 오류');
+    }
+  },
+
+  /* ---------- 회원 탈퇴 ---------- */
+  openWithdrawModal(){
+    if(!state.currentUser) return;
+    document.getElementById('withdrawModal').classList.add('show');
+    document.getElementById('wdEmail').value = state.currentUser.email;
+    document.getElementById('wdCode').value = '';
+    document.getElementById('wdCodeStatus').textContent = '';
+    document.getElementById('wdErr').textContent = '';
+    state.pendingWithdraw = null;
+  },
+  closeWithdrawModal(){
+    document.getElementById('withdrawModal').classList.remove('show');
+  },
+  async sendWithdrawCode(){
+    if(!state.currentUser) return;
+    const email = state.currentUser.email;
+    const errEl = document.getElementById('wdErr');
+    errEl.textContent = '';
+    if(!GAS_CONFIGURED){ errEl.textContent = '이메일 인증 발송이 아직 설정되지 않았습니다'; return; }
+    const code = String(Math.floor(100000 + Math.random()*900000));
+    const sendBtn = document.getElementById('wdSendBtn');
+    sendBtn.disabled = true; sendBtn.textContent = '전송 중...';
+    try{
+      const res = await fetch(GAS_WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ to: email, code })
+      });
+      const result = await res.json().catch(()=>null);
+      if(result && result.status !== 'ok'){ throw new Error(result.message || '발송 실패'); }
+      state.pendingWithdraw = { code, expiresAt: Date.now() + 5*60*1000, verified: false };
+      document.getElementById('wdCodeStatus').textContent = '인증번호를 전송했습니다 (5분 이내 입력)';
+      document.getElementById('wdCodeStatus').style.color = '';
+      showToast('인증번호를 이메일로 전송했습니다');
+    }catch(e){
+      console.error(e);
+      errEl.textContent = '인증번호 전송에 실패했습니다. Apps Script 배포 설정을 확인해주세요';
+    }
+    sendBtn.disabled = false; sendBtn.textContent = '인증번호 받기';
+  },
+  checkWithdrawCode(){
+    const input = document.getElementById('wdCode').value.trim();
+    const statusEl = document.getElementById('wdCodeStatus');
+    if(!state.pendingWithdraw){ statusEl.textContent = '먼저 인증번호를 받아주세요'; return; }
+    if(Date.now() > state.pendingWithdraw.expiresAt){ statusEl.textContent = '인증번호가 만료되었습니다. 다시 받아주세요'; statusEl.style.color = 'var(--danger)'; return; }
+    if(input === state.pendingWithdraw.code){
+      state.pendingWithdraw.verified = true;
+      statusEl.textContent = '✓ 인증되었습니다';
+      statusEl.style.color = 'var(--jade)';
+    }else{
+      statusEl.textContent = '인증번호가 일치하지 않습니다';
+      statusEl.style.color = 'var(--danger)';
+    }
+  },
+  async confirmWithdraw(){
+    if(!state.currentUser || !auth || !auth.currentUser || !db) return;
+    const errEl = document.getElementById('wdErr');
+    errEl.textContent = '';
+    if(!state.pendingWithdraw || !state.pendingWithdraw.verified){
+      errEl.textContent = '이메일 인증을 먼저 완료해주세요';
+      return;
+    }
+    if(!confirm('정말로 탈퇴하시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
+
+    const uid = state.currentUser.uid;
+    const WITHDRAWN_TITLE = '탈퇴한 회원님께서 작성하는 글입니다';
+    try{
+      // 1) 이 계정이 작성한 악보 게시물들의 제목을 고정 문구로 바꾸고, 클릭해서 못 들어가도록 표시해둔다.
+      //    (계정 삭제 전에 처리해야, 본인 소유 문서를 수정할 수 있는 권한이 아직 살아있다)
+      const sheetsSnap = await db.collection('sheets').where('authorUid', '==', uid).get();
+      if(sheetsSnap.docs.length){
+        const CHUNK = 400;
+        for(let i = 0; i < sheetsSnap.docs.length; i += CHUNK){
+          const batch = db.batch();
+          sheetsSnap.docs.slice(i, i + CHUNK).forEach(doc => {
+            batch.update(doc.ref, { title: WITHDRAWN_TITLE, deletedAuthor: true });
+          });
+          await batch.commit();
+        }
+      }
+
+      // 2) 회원 정보 문서 삭제
+      try{ await db.collection('users').doc(uid).delete(); }catch(e2){ console.error('회원 문서 삭제 실패', e2); }
+
+      // 3) Firebase 인증 계정 자체를 삭제 (최근 로그인이 오래됐으면 재로그인이 필요할 수 있다)
+      await auth.currentUser.delete();
+
+      this.closeWithdrawModal();
+      state.currentUser = null;
+      showToast('탈퇴 처리가 완료되었습니다');
+      await loadSheets();
+      this.go('home');
+    }catch(e){
+      console.error(e);
+      if(e.code === 'auth/requires-recent-login'){
+        errEl.textContent = '보안을 위해 다시 로그인한 뒤 탈퇴를 시도해주세요';
+      }else{
+        errEl.textContent = '탈퇴 처리에 실패했습니다: ' + (e.message || '알 수 없는 오류');
+      }
     }
   },
 
@@ -2637,7 +3081,7 @@ const app = {
   renderHome(){
     const noticeBadgeEl = document.getElementById('homeNoticeNewBadge');
     if(noticeBadgeEl){
-      const hasNew = state.data.notice.some(p => isRecentDate(p.date));
+      const hasNew = state.data.notice.some(p => isRecentDate(p.date)) || state.data.noticeUpdate.some(p => isRecentDate(p.date));
       noticeBadgeEl.style.display = hasNew ? 'inline-block' : 'none';
     }
     const downloadBadgeEl = document.getElementById('homeDownloadNewBadge');
@@ -2666,7 +3110,7 @@ const app = {
       items.map(p => `
         <div class="post-row">
           <div style="flex:1;cursor:pointer" onclick="app.openDetail('${name}','${p.id}')">
-            <div class="post-title">${escapeHtml(p.title)}${(name==='notice' || name==='download') && isRecentDate(p.date) ? ' <span class="badge new">NEW</span>' : ''}</div>
+            <div class="post-title">${escapeHtml(p.title)}${(name==='notice' || name==='noticeUpdate' || name==='download') && isRecentDate(p.date) ? ' <span class="badge new">NEW</span>' : ''}</div>
             <div class="post-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</div>
           </div>
           ${isAdminUser() ? `
@@ -2692,7 +3136,7 @@ const app = {
             <button class="btn ghost small" onclick="app.copyPostLink('${name}','${post.id}')">🔗 링크 복사</button>
           </div>
           <div class="detail-view">
-            <h3>${escapeHtml(post.title)}${(name==='notice' || name==='download') && isRecentDate(post.date) ? ' <span class="badge new">NEW</span>' : ''}</h3>
+            <h3>${escapeHtml(post.title)}${(name==='notice' || name==='noticeUpdate' || name==='download') && isRecentDate(post.date) ? ' <span class="badge new">NEW</span>' : ''}</h3>
             <div class="post-meta">${escapeHtml(post.author)} · ${escapeHtml(post.date)}</div>
             <div class="detail-body">${sanitizeRichHtml(post.content)}</div>
             ${cfg.hasLink && post.link ? `<a class="dl-link" href="${escapeHtml(post.link)}" target="_blank" rel="noopener">자료 링크 열기 ↗</a>` : ''}
@@ -3093,7 +3537,22 @@ const app = {
     const pageItems = items.slice(startIdx, startIdx + PAGE_SIZE);
 
     listEl.innerHTML = items.length===0 ? `<div class="empty-note">${q ? '검색 결과가 없습니다' : '등록된 악보가 없습니다'}</div>` :
-      pageItems.map(s => `
+      pageItems.map(s => {
+        if(s.deletedAuthor){
+          // 탈퇴한 회원의 게시물: 목록에서 클릭할 수 없고, 관리자만 삭제 가능
+          return `
+        <div class="post-row">
+          <div style="flex:1; color:var(--ink-soft);">
+            <div class="post-title">${escapeHtml(s.title)}</div>
+            <div class="post-meta">${escapeHtml(s.date)}</div>
+          </div>
+          ${isAdminUser() ? `
+            <div class="admin-row-actions">
+              <button class="btn danger small" onclick="event.stopPropagation();app.deleteSheet('${s.id}')">삭제</button>
+            </div>` : ''}
+        </div>`;
+        }
+        return `
         <div class="post-row">
           <div style="flex:1;cursor:pointer" onclick="app.openDetail('sheets','${s.id}')">
             <div class="post-title">
@@ -3108,7 +3567,8 @@ const app = {
               <button class="btn ghost small" onclick="event.stopPropagation();app.openSheetForm('${s.id}')">수정</button>
               <button class="btn danger small" onclick="event.stopPropagation();app.deleteSheet('${s.id}')">삭제</button>
             </div>` : ''}
-        </div>`).join('');
+        </div>`;
+      }).join('');
 
     if(paginationEl){
       if(items.length <= PAGE_SIZE){
@@ -3134,7 +3594,14 @@ const app = {
       listWrap.style.display='none'; filterBox.style.display='none';
       if(searchInputEl) searchInputEl.style.display='none';
       detailWrap.style.display='';
-      if(post){
+      if(post && post.deletedAuthor){
+        detailWrap.innerHTML = `
+          <div class="back-link" style="margin-bottom:18px;" onclick="app.closeDetail('sheets')">← 목록으로</div>
+          <div class="detail-view">
+            <h3>${escapeHtml(post.title)}</h3>
+            <div class="post-meta" style="color:var(--ink-soft);">이 게시물은 탈퇴한 회원이 작성했습니다.</div>
+          </div>`;
+      }else if(post){
         detailWrap.innerHTML = `
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; gap:10px; flex-wrap:wrap;">
             <div class="back-link" style="margin:0;" onclick="app.closeDetail('sheets')">← 목록으로</div>

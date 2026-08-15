@@ -1797,30 +1797,40 @@ function getOrCreateLocalVisitorId(){
   }
 }
 async function logDailyVisit(){
-  if(!db) return;
-  if(isAdminUser()) return; // 관리자 계정으로 로그인한 상태의 방문은 집계하지 않는다
+  const isDebug = location.search.includes('debugvisit');
+  const dbg = (msg) => { if(isDebug) alert('[방문기록 디버그] ' + msg); };
 
+  if(!db){ dbg('Firestore(db)가 연결되어 있지 않아 시도조차 못 했어요.'); return; }
+  if(isAdminUser()){ dbg('관리자 계정으로 로그인되어 있어서, 설계상 집계를 건너뜁니다.'); return; }
+
+  dbg('시작: IP 조회를 시도합니다...');
   const kstDate = kstDateStr();
   let dedupKey = await fetchPublicIP();
   let keyPrefix = 'ip';
   if(!dedupKey){
+    dbg('IP 조회 실패 → 기기별 로컬 식별자로 대체합니다.');
     dedupKey = getOrCreateLocalVisitorId();
     keyPrefix = 'dev';
+  }else{
+    dbg('IP 조회 성공: ' + dedupKey);
   }
-  if(!dedupKey) return; // IP도, 로컬 식별자도 못 만들면 중복 방지가 불가능하므로 집계하지 않는다
+  if(!dedupKey){ dbg('로컬 식별자도 만들 수 없어(localStorage 차단 등) 집계를 포기합니다.'); return; }
   const dedupKeySafe = dedupKey.replace(/[^a-zA-Z0-9._:-]/g, '_');
   const markerRef = db.collection('visitMarkers').doc(kstDate + '_' + keyPrefix + '_' + dedupKeySafe);
   const dailyRef = db.collection('dailyVisits').doc(kstDate);
 
   try{
+    let alreadyCounted = false;
     await db.runTransaction(async (tx) => {
       const markerDoc = await tx.get(markerRef);
-      if(markerDoc.exists) return; // 오늘(한국시간) 이 방문자는 이미 집계됨
+      if(markerDoc.exists){ alreadyCounted = true; return; } // 오늘(한국시간) 이 방문자는 이미 집계됨
       tx.set(markerRef, { date: kstDate, loggedAt: Date.now() });
       tx.set(dailyRef, { count: firebase.firestore.FieldValue.increment(1) }, { merge: true });
     });
+    dbg(alreadyCounted ? '오늘 이 기기는 이미 집계되어 있어 추가로 세지 않았습니다. (정상)' : '✓ 성공적으로 오늘 방문자 수에 1이 더해졌습니다!');
   }catch(e){
     console.error('방문 기록 실패', e);
+    dbg('✗ 저장 실패: [' + (e && e.code ? e.code : '?') + '] ' + (e && e.message ? e.message : String(e)));
   }
 }
 async function loadVisitStats(days){
@@ -2023,11 +2033,13 @@ window.addEventListener('popstate', (e)=>{ applyNavState(e.state); });
 
 const app = {
   async init(){
-    this.pickRandomHeroTagline();
-    this.buildNav();
-    this.buildStrings();
-    syncIframeHeightToContent(document.getElementById('scoreMakerFrame'));
-    syncIframeHeightToContent(document.getElementById('tuningFrame'));
+    try{ this.pickRandomHeroTagline(); }catch(e){ console.error('pickRandomHeroTagline 오류', e); }
+    try{ this.buildNav(); }catch(e){ console.error('buildNav 오류', e); }
+    try{ this.buildStrings(); }catch(e){ console.error('buildStrings 오류', e); }
+    try{
+      syncIframeHeightToContent(document.getElementById('scoreMakerFrame'));
+      syncIframeHeightToContent(document.getElementById('tuningFrame'));
+    }catch(e){ console.error('iframe 높이 동기화 오류', e); }
     updateStorageWarning();
     if(auth){
       auth.onAuthStateChanged(async (user)=>{
@@ -2053,13 +2065,14 @@ const app = {
         }else{
           state.currentUser = null;
         }
-        this.updateAuthArea();
-        this.renderAll();
-        // 관리자 여부가 확정된 뒤, 페이지 로드당 딱 한 번만 방문을 기록한다 (관리자 계정이면 기록하지 않음)
+        // 관리자 여부가 확정된 직후, 화면 렌더링보다 먼저 방문을 기록한다.
+        // (아래 렌더링 단계에서 무슨 문제가 생기더라도 방문 기록만큼은 이미 시도된 상태가 되도록 순서를 앞으로 뺐다)
         if(!visitLoggedThisPageLoad){
           visitLoggedThisPageLoad = true;
           logDailyVisit();
         }
+        try{ this.updateAuthArea(); }catch(e){ console.error('updateAuthArea 오류', e); }
+        try{ this.renderAll(); }catch(e){ console.error('renderAll 오류', e); }
         const smFrame = document.getElementById('scoreMakerFrame');
         if(smFrame && smFrame.contentWindow && scoreMakerState.frameSrcSet){
           try{ smFrame.contentWindow.postMessage({ type:'auth', loggedIn: !!state.currentUser }, '*'); }catch(e){}

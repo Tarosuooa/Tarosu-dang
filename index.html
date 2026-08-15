@@ -674,7 +674,8 @@ footer{
       <label>이름</label>
       <input type="text" id="gbAuthor" maxlength="20" placeholder="이름을 남겨주세요">
       <label>메시지</label>
-      <textarea id="gbText" maxlength="1000" placeholder="한 줄의 인사를 남겨주세요"></textarea>
+      <textarea id="gbText" maxlength="1000" placeholder="방문해 주셔서 감사합니다! 자유롭게 적어 주세요 :)
+광고, 스팸, 욕설 등 부적절한 내용은 삭제될 수 있어요."></textarea>
       <div class="field-hint" id="gbCharCount" style="text-align:right;">0/200자 (공백 제외)</div>
       <div class="form-actions"><button class="btn" onclick="app.submitGuestbook()">글 남기기</button></div>
     </div>
@@ -1735,7 +1736,7 @@ const HOME_CARD_HTML = {
     </div>`,
   download: () => `<h3 style="font-size:16px;">미디어 <span id="homeDownloadNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">관리자 '타로수'의 연주 영상, 사진 등</p>`,
   faq: () => `<h3 style="font-size:16px;">FAQ</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">자주 묻는 질문 모음</p>`,
-  guestbook: () => `<h3 style="font-size:16px;">방명록</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">한 줄의 인사를 남겨주세요.</p>`
+  guestbook: () => `<h3 style="font-size:16px;">방명록</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">자유롭게 적어 주세요 :)</p>`
 };
 const HOME_CARD_CLICK = {
   notice: null, sheetsMake: null, // 버튼이 있는 카드는 카드 전체 클릭 이동을 쓰지 않는다

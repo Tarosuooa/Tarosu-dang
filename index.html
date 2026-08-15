@@ -572,28 +572,7 @@ footer{
 
   <!-- HOME -->
   <div class="page" id="page-home">
-    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px;">
-      <div class="card"><h3 style="font-size:16px;">소식 <span id="homeNoticeNewBadge" class="badge new" style="display:none;">NEW</span></h3>
-        <div style="display:flex; gap:8px; margin-top:18px; flex-wrap:wrap;">
-          <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('notice')">공지사항</button>
-          <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('noticeUpdate')">업데이트</button>
-          <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('profile')">프로필</button>
-        </div>
-      </div>
-      <div class="card" style="cursor:pointer" onclick="app.goSheetsTab('dl')"><h3 style="font-size:16px;">악보 다운로드 <span id="homeSheetsNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로수와 회원님들이 공유한 악보를 받아 보세요.</p></div>
-      <div class="card"><h3 style="font-size:16px;">악보 제작 및 조율</h3>
-        <div style="display:flex; gap:8px; margin-top:18px;">
-          <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('make')">악보 제작</button>
-          <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('tuning')">음정 체크&amp;조율</button>
-        </div>
-      </div>
-    </div>
-
-    <div style="margin-top:16px; display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px;">
-      <div class="card" style="cursor:pointer" onclick="app.go('download')"><h3 style="font-size:16px;">미디어 <span id="homeDownloadNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">관리자 '타로수'의 연주 영상, 사진 등</p></div>
-      <div class="card" style="cursor:pointer" onclick="app.go('faq')"><h3 style="font-size:16px;">FAQ</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">자주 묻는 질문 모음</p></div>
-      <div class="card" style="cursor:pointer" onclick="app.go('guestbook')"><h3 style="font-size:16px;">방명록</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">한 줄의 인사를 남겨주세요.</p></div>
-    </div>
+    <div id="homeCardsContainer" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px;"></div>
   </div>
 
   <!-- NOTICE -->
@@ -1073,6 +1052,7 @@ const state = {
   tuningNoticeText: '',
   tipText: { scoreMaker: '', tuning: '' },
   profile: { photoUrl: '', title: '', content: '' },
+  homeCardOrder: null, // null이면 기본 순서 사용, 배열이면 그 순서대로 표시
   data: { notice: [], noticeUpdate: [], download: [], faq: [], inquiry: [], guestbook: [], sheets: [], updateLog: [], tuningUpdateLog: [] },
   detail: { notice: null, noticeUpdate: null, download: null, inquiry: null, sheets: null },
   pendingSignup: null,
@@ -1713,6 +1693,61 @@ async function loadProfile(){
   }
 }
 
+/* ---------- 홈 화면 카드: 관리자가 순서를 자유롭게 바꿀 수 있다 ---------- */
+const HOME_CARD_IDS = ['notice', 'sheetsDl', 'sheetsMake', 'download', 'faq', 'guestbook'];
+const HOME_CARD_HTML = {
+  notice: () => `<h3 style="font-size:16px;">소식 <span id="homeNoticeNewBadge" class="badge new" style="display:none;">NEW</span></h3>
+    <div style="display:flex; gap:8px; margin-top:18px; flex-wrap:wrap;">
+      <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('notice')">공지사항</button>
+      <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('noticeUpdate')">업데이트</button>
+      <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('profile')">프로필</button>
+    </div>`,
+  sheetsDl: () => `<h3 style="font-size:16px;">악보 다운로드 <span id="homeSheetsNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로수와 회원님들이 공유한 악보를 받아 보세요.</p>`,
+  sheetsMake: () => `<h3 style="font-size:16px;">악보 제작 및 조율</h3>
+    <div style="display:flex; gap:8px; margin-top:18px; flex-wrap:wrap;">
+      <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('make')">악보 제작</button>
+      <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('tuning')">음정 체크&amp;조율</button>
+    </div>`,
+  download: () => `<h3 style="font-size:16px;">미디어 <span id="homeDownloadNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">관리자 '타로수'의 연주 영상, 사진 등</p>`,
+  faq: () => `<h3 style="font-size:16px;">FAQ</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">자주 묻는 질문 모음</p>`,
+  guestbook: () => `<h3 style="font-size:16px;">방명록</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">한 줄의 인사를 남겨주세요.</p>`
+};
+const HOME_CARD_CLICK = {
+  notice: null, sheetsMake: null, // 버튼이 있는 카드는 카드 전체 클릭 이동을 쓰지 않는다
+  sheetsDl: "app.goSheetsTab('dl')",
+  download: "app.go('download')",
+  faq: "app.go('faq')",
+  guestbook: "app.go('guestbook')"
+};
+async function loadHomeCardOrder(){
+  if(!db){ state.homeCardOrder = null; return; }
+  try{
+    const doc = await db.collection('content').doc('homeCardOrder').get();
+    const order = (doc.exists && Array.isArray(doc.data().order)) ? doc.data().order : null;
+    // 저장된 값이 있어도, 카드 구성이 바뀌었을 수 있으니 지금 존재하는 카드 id로만 정리한다
+    if(order){
+      const cleaned = order.filter(id => HOME_CARD_IDS.includes(id));
+      HOME_CARD_IDS.forEach(id => { if(!cleaned.includes(id)) cleaned.push(id); });
+      state.homeCardOrder = cleaned;
+    }else{
+      state.homeCardOrder = null;
+    }
+  }catch(e){
+    console.error('홈 카드 순서 로드 실패', e);
+    state.homeCardOrder = null;
+  }
+}
+async function saveHomeCardOrder(order){
+  if(!db) return false;
+  try{
+    await db.collection('content').doc('homeCardOrder').set({ order });
+    return true;
+  }catch(e){
+    console.error('홈 카드 순서 저장 실패', e);
+    return false;
+  }
+}
+
 /* ---------- 악보 제작 / 음정 체크&조율 툴 '사용 Tip' (관리자만 작성/수정 가능) ---------- */
 const TIP_CONFIGS = {
   scoreMaker: { docId: 'scoreMakerTip', panelId: 'scoreMakerTipPanel', btnId: 'scoreMakerTipBtn', bodyId: 'scoreMakerTipBody' },
@@ -2025,6 +2060,7 @@ const app = {
     await loadTipText('scoreMaker');
     await loadTipText('tuning');
     await loadProfile();
+    await loadHomeCardOrder();
     updateStorageWarning();
     this.renderAll();
     initGuestbookCharLimit();
@@ -3079,6 +3115,20 @@ const app = {
   },
 
   renderHome(){
+    const container = document.getElementById('homeCardsContainer');
+    if(container){
+      const order = state.homeCardOrder || HOME_CARD_IDS;
+      container.innerHTML = order.map((id, i) => {
+        const clickAttr = HOME_CARD_CLICK[id] ? ` onclick="${HOME_CARD_CLICK[id]}" style="cursor:pointer; position:relative;"` : ' style="position:relative;"';
+        const moveButtons = isAdminUser() ? `
+          <div style="position:absolute; top:8px; right:8px; display:flex; gap:4px;" onclick="event.stopPropagation()">
+            <button class="btn ghost small" style="padding:2px 7px; font-size:11px;" onclick="app.moveHomeCard(${i},-1)" ${i===0 ? 'disabled' : ''} title="왼쪽/위로 이동">◀</button>
+            <button class="btn ghost small" style="padding:2px 7px; font-size:11px;" onclick="app.moveHomeCard(${i},1)" ${i===order.length-1 ? 'disabled' : ''} title="오른쪽/아래로 이동">▶</button>
+          </div>` : '';
+        return `<div class="card"${clickAttr}>${moveButtons}${HOME_CARD_HTML[id] ? HOME_CARD_HTML[id]() : ''}</div>`;
+      }).join('');
+    }
+
     const noticeBadgeEl = document.getElementById('homeNoticeNewBadge');
     if(noticeBadgeEl){
       const hasNew = state.data.notice.some(p => isRecentDate(p.date)) || state.data.noticeUpdate.some(p => isRecentDate(p.date));
@@ -3095,30 +3145,52 @@ const app = {
       sheetsBadgeEl.style.display = hasNew ? 'inline-block' : 'none';
     }
   },
+  async moveHomeCard(index, direction){
+    if(!isAdminUser()) return;
+    const order = (state.homeCardOrder || HOME_CARD_IDS).slice();
+    const target = index + direction;
+    if(target < 0 || target >= order.length) return;
+    [order[index], order[target]] = [order[target], order[index]];
+    state.homeCardOrder = order;
+    this.renderHome();
+    await saveHomeCardOrder(order);
+  },
 
   renderBoard(name){
     const listEl = document.getElementById(name+'-list');
     const toolbarEl = document.getElementById(name+'-toolbar');
     const cfg = BOARD_CONFIG[name];
+    const canPin = ['notice','noticeUpdate','download'].includes(name);
 
     toolbarEl.innerHTML = isAdminUser()
       ? `<button class="btn" onclick="app.openForm('${name}')">+ 새 글 작성</button>`
       : '';
 
     const items = state.data[name].slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
-    listEl.innerHTML = items.length===0 ? `<div class="empty-note">등록된 글이 없습니다</div>` :
-      items.map(p => `
+    const pinnedItems = canPin ? items.filter(p => p.pinned) : [];
+    const pinnedCount = pinnedItems.length;
+
+    const renderRow = (p, isPinnedSection) => `
         <div class="post-row">
           <div style="flex:1;cursor:pointer" onclick="app.openDetail('${name}','${p.id}')">
-            <div class="post-title">${escapeHtml(p.title)}${(name==='notice' || name==='noticeUpdate' || name==='download') && isRecentDate(p.date) ? ' <span class="badge new">NEW</span>' : ''}</div>
+            <div class="post-title">${isPinnedSection ? '📌 ' : ''}${escapeHtml(p.title)}${(name==='notice' || name==='noticeUpdate' || name==='download') && isRecentDate(p.date) ? ' <span class="badge new">NEW</span>' : ''}</div>
             <div class="post-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</div>
           </div>
           ${isAdminUser() ? `
             <div class="admin-row-actions">
+              ${canPin ? `<button class="btn ghost small" onclick="event.stopPropagation();app.togglePin('${name}','${p.id}')" title="${p.pinned ? '고정 취소' : '상단에 고정'}">${p.pinned ? '📌 취소' : '📌 고정'}</button>` : ''}
               <button class="btn ghost small" onclick="event.stopPropagation();app.openForm('${name}','${p.id}')">수정</button>
               <button class="btn danger small" onclick="event.stopPropagation();app.deletePost('${name}','${p.id}')">삭제</button>
             </div>` : ''}
-        </div>`).join('');
+        </div>`;
+
+    const pinnedHtml = pinnedItems.length ? `
+      <div style="padding:10px 20px; font-size:12px; color:var(--wood); font-family:'Noto Sans KR',sans-serif; font-weight:700; border-bottom:1px solid var(--paper-deep);">📌 고정된 글 (${pinnedCount}/5)</div>
+      ${pinnedItems.map(p => renderRow(p, true)).join('')}
+      <div style="border-bottom:2px solid var(--gold);"></div>` : '';
+
+    listEl.innerHTML = items.length===0 ? `<div class="empty-note">등록된 글이 없습니다</div>` :
+      pinnedHtml + items.map(p => renderRow(p, false)).join('');
 
     const existingForm = document.getElementById(name+'-form');
     if(existingForm) existingForm.remove();
@@ -3136,13 +3208,14 @@ const app = {
             <button class="btn ghost small" onclick="app.copyPostLink('${name}','${post.id}')">🔗 링크 복사</button>
           </div>
           <div class="detail-view">
-            <h3>${escapeHtml(post.title)}${(name==='notice' || name==='noticeUpdate' || name==='download') && isRecentDate(post.date) ? ' <span class="badge new">NEW</span>' : ''}</h3>
+            <h3>${post.pinned ? '📌 ' : ''}${escapeHtml(post.title)}${(name==='notice' || name==='noticeUpdate' || name==='download') && isRecentDate(post.date) ? ' <span class="badge new">NEW</span>' : ''}</h3>
             <div class="post-meta">${escapeHtml(post.author)} · ${escapeHtml(post.date)}</div>
             <div class="detail-body">${sanitizeRichHtml(post.content)}</div>
             ${cfg.hasLink && post.link ? `<a class="dl-link" href="${escapeHtml(post.link)}" target="_blank" rel="noopener">자료 링크 열기 ↗</a>` : ''}
             ${cfg.hasMedia ? buildMediaEmbedsHtml(post.media) : ''}
             ${isAdminUser() ? `
               <div class="form-actions" style="margin-top:18px;">
+                ${canPin ? `<button class="btn ghost small" onclick="app.togglePin('${name}','${post.id}')">${post.pinned ? '📌 고정 취소' : '📌 상단에 고정'}</button>` : ''}
                 <button class="btn ghost small" onclick="app.openForm('${name}','${post.id}')">수정</button>
                 <button class="btn danger small" onclick="app.deletePost('${name}','${post.id}')">삭제</button>
               </div>` : ''}
@@ -3153,6 +3226,22 @@ const app = {
     }else{
       listWrap.style.display=''; detailWrap.style.display='none'; detailWrap.innerHTML='';
     }
+  },
+  async togglePin(name, id){
+    if(!isAdminUser()) return;
+    const post = state.data[name].find(p=>p.id===id);
+    if(!post) return;
+    if(!post.pinned){
+      const pinnedCount = state.data[name].filter(p=>p.pinned).length;
+      if(pinnedCount >= 5){
+        showToast('최대 5개까지만 고정할 수 있어요');
+        return;
+      }
+    }
+    post.pinned = !post.pinned;
+    await saveBoard(name);
+    showToast(post.pinned ? '상단에 고정되었습니다' : '고정이 취소되었습니다');
+    this.renderBoard(name);
   },
 
   openDetail(name, id){
@@ -3322,29 +3411,61 @@ const app = {
 
     const listEl = document.getElementById('faq-list');
     const filtered = state.data.faq.filter(f => state.faqCategory==='전체' || f.category===state.faqCategory);
-    if(filtered.length===0){ listEl.innerHTML = `<div class="empty-note">등록된 FAQ가 없습니다</div>`; return; }
-    listEl.innerHTML = filtered.map(f => {
+    const pinnedFaqs = state.data.faq.filter(f => f.pinned);
+
+    const buildFaqItem = (f, idSuffix, isPinnedCopy) => {
       const catColor = f.category ? FAQ_CATEGORY_COLORS[f.category] : null;
       const badgeHtml = catColor ? `<span class="badge" style="background:${catColor.bg}; color:${catColor.text}; font-weight:700;">${escapeHtml(f.category)}</span>` : '';
-      const isFirst = filtered[0].id === f.id;
-      const isLast = filtered[filtered.length-1].id === f.id;
+      const isFirst = filtered[0] && filtered[0].id === f.id;
+      const isLast = filtered[filtered.length-1] && filtered[filtered.length-1].id === f.id;
+      const answerId = 'faq-a-' + idSuffix;
       return `
       <div class="faq-item">
-        <div class="faq-q" onclick="app.toggleFaq('${f.id}')">
-          <span><span class="mark">問 ·</span> ${escapeHtml(f.question)}</span>
+        <div class="faq-q" onclick="app.toggleFaqAnswer('${answerId}')">
+          <span>${isPinnedCopy ? '📌 ' : ''}<span class="mark">問 ·</span> ${escapeHtml(f.question)}</span>
           <span style="display:flex; align-items:center; gap:10px; flex:none;" onclick="event.stopPropagation()">
             ${badgeHtml}
             ${isAdminUser() ? `<span class="admin-row-actions">
-                <button class="btn ghost small" onclick="app.moveFaq('${f.id}',-1)" ${isFirst ? 'disabled' : ''} title="위로 이동">▲</button>
-                <button class="btn ghost small" onclick="app.moveFaq('${f.id}',1)" ${isLast ? 'disabled' : ''} title="아래로 이동">▼</button>
+                <button class="btn ghost small" onclick="app.togglePinFaq('${f.id}')" title="${f.pinned ? '고정 취소' : '상단에 고정'}">${f.pinned ? '📌 취소' : '📌 고정'}</button>
+                ${!isPinnedCopy ? `<button class="btn ghost small" onclick="app.moveFaq('${f.id}',-1)" ${isFirst ? 'disabled' : ''} title="위로 이동">▲</button>
+                <button class="btn ghost small" onclick="app.moveFaq('${f.id}',1)" ${isLast ? 'disabled' : ''} title="아래로 이동">▼</button>` : ''}
                 <button class="btn ghost small" onclick="app.openFaqForm('${f.id}')">수정</button>
                 <button class="btn danger small" onclick="app.deleteFaq('${f.id}')">삭제</button>
-              </span>` : `<span class="mark" onclick="app.toggleFaq('${f.id}')" style="cursor:pointer;">＋</span>`}
+              </span>` : `<span class="mark" onclick="app.toggleFaqAnswer('${answerId}')" style="cursor:pointer;">＋</span>`}
           </span>
         </div>
-        <div class="faq-a" id="faq-a-${f.id}"><strong style="color:var(--jade)">答 ·</strong> <span>${sanitizeRichHtml(f.answer)}</span></div>
+        <div class="faq-a" id="${answerId}"><strong style="color:var(--jade)">答 ·</strong> <span>${sanitizeRichHtml(f.answer)}</span></div>
       </div>`;
-    }).join('');
+    };
+
+    const pinnedHtml = pinnedFaqs.length ? `
+      <div style="padding:10px 20px; font-size:12px; color:var(--wood); font-family:'Noto Sans KR',sans-serif; font-weight:700; border-bottom:1px solid var(--paper-deep);">📌 고정된 질문 (${pinnedFaqs.length}/5)</div>
+      ${pinnedFaqs.map(f => buildFaqItem(f, 'pin-' + f.id, true)).join('')}
+      <div style="border-bottom:2px solid var(--gold);"></div>` : '';
+
+    if(filtered.length===0 && pinnedFaqs.length===0){ listEl.innerHTML = `<div class="empty-note">등록된 FAQ가 없습니다</div>`; return; }
+    listEl.innerHTML = pinnedHtml + (filtered.length===0 ? `<div class="empty-note">등록된 FAQ가 없습니다</div>` :
+      filtered.map(f => buildFaqItem(f, f.id, false)).join(''));
+  },
+  toggleFaqAnswer(elId){
+    const el = document.getElementById(elId);
+    if(el) el.classList.toggle('open');
+  },
+  async togglePinFaq(id){
+    if(!isAdminUser()) return;
+    const f = state.data.faq.find(x=>x.id===id);
+    if(!f) return;
+    if(!f.pinned){
+      const pinnedCount = state.data.faq.filter(x=>x.pinned).length;
+      if(pinnedCount >= 5){
+        showToast('최대 5개까지만 고정할 수 있어요');
+        return;
+      }
+    }
+    f.pinned = !f.pinned;
+    await saveBoard('faq');
+    showToast(f.pinned ? '상단에 고정되었습니다' : '고정이 취소되었습니다');
+    this.renderFaq();
   },
   setFaqCategory(cat){
     state.faqCategory = cat;

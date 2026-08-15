@@ -1802,9 +1802,22 @@ function getOrCreateLocalVisitorId(){
     return null; // 사생활 보호 모드 등으로 localStorage조차 막혀 있으면 그냥 포기한다
   }
 }
+function showDebugVisitPanel(msg){
+  let panel = document.getElementById('debugVisitPanel');
+  if(!panel){
+    panel = document.createElement('div');
+    panel.id = 'debugVisitPanel';
+    panel.style.cssText = 'position:fixed; left:8px; right:8px; bottom:8px; max-height:50vh; overflow-y:auto; z-index:99999; background:rgba(20,15,10,0.95); color:#fff; font-size:12px; line-height:1.6; padding:10px 12px; border-radius:8px; font-family:monospace; white-space:pre-wrap; word-break:break-all; box-shadow:0 2px 12px rgba(0,0,0,0.4);';
+    document.body.appendChild(panel);
+  }
+  const line = document.createElement('div');
+  line.textContent = '▸ ' + msg;
+  panel.appendChild(line);
+  panel.scrollTop = panel.scrollHeight;
+}
 async function logDailyVisit(){
   const isDebug = location.search.includes('debugvisit');
-  const dbg = (msg) => { if(isDebug) alert('[방문기록 디버그] ' + msg); };
+  const dbg = (msg) => { if(isDebug) showDebugVisitPanel(msg); };
 
   if(!db){ dbg('Firestore(db)가 연결되어 있지 않아 시도조차 못 했어요.'); return; }
   if(isAdminUser()){ dbg('관리자 계정으로 로그인되어 있어서, 설계상 집계를 건너뜁니다.'); return; }
@@ -1814,7 +1827,7 @@ async function logDailyVisit(){
   let dedupKey = await fetchPublicIP();
   let keyPrefix = 'ip';
   if(!dedupKey){
-    dbg('IP 조회 실패 → 기기별 로컬 식별자로 대체합니다.');
+    dbg('IP 조회 실패(또는 4초 타임아웃) → 기기별 로컬 식별자로 대체합니다.');
     dedupKey = getOrCreateLocalVisitorId();
     keyPrefix = 'dev';
   }else{
@@ -1824,9 +1837,11 @@ async function logDailyVisit(){
   const dedupKeySafe = dedupKey.replace(/[^a-zA-Z0-9._:-]/g, '_');
   const markerRef = db.collection('visitMarkers').doc(kstDate + '_' + keyPrefix + '_' + dedupKeySafe);
   const dailyRef = db.collection('dailyVisits').doc(kstDate);
+  dbg('오늘 날짜(KST): ' + kstDate + ' / 식별자: ' + keyPrefix + '_' + dedupKeySafe);
 
   try{
     let alreadyCounted = false;
+    dbg('Firestore에 저장을 시도합니다...');
     await db.runTransaction(async (tx) => {
       const markerDoc = await tx.get(markerRef);
       if(markerDoc.exists){ alreadyCounted = true; return; } // 오늘(한국시간) 이 방문자는 이미 집계됨

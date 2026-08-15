@@ -1782,21 +1782,40 @@ async function saveTipText(key, text){
 }
 
 /* ---------- 방문자 통계 (IP + 한국시간(KST) 자정 기준 1일 1회, 관리자 계정은 집계 제외) ---------- */
+// 일부 모바일 환경(광고 차단 앱, 사설 DNS 등)은 api.ipify.org 같은 'IP 조회' 서비스를 자체적으로 차단한다.
+// 그런 경우에도 집계 자체가 통째로 실패하지 않도록, 기기에 저장해둔 고유 식별자로 대신 중복을 방지한다.
+function getOrCreateLocalVisitorId(){
+  try{
+    let id = localStorage.getItem('tarodang_visitor_id');
+    if(!id){
+      id = 'local_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 10);
+      localStorage.setItem('tarodang_visitor_id', id);
+    }
+    return id;
+  }catch(e){
+    return null; // 사생활 보호 모드 등으로 localStorage조차 막혀 있으면 그냥 포기한다
+  }
+}
 async function logDailyVisit(){
   if(!db) return;
   if(isAdminUser()) return; // 관리자 계정으로 로그인한 상태의 방문은 집계하지 않는다
 
   const kstDate = kstDateStr();
-  const ip = await fetchPublicIP();
-  if(!ip) return; // IP를 확인할 수 없으면 중복 방지가 불가능하므로 집계하지 않는다
-  const ipKey = ip.replace(/[^a-zA-Z0-9._:-]/g, '_');
-  const markerRef = db.collection('visitMarkers').doc(kstDate + '_' + ipKey);
+  let dedupKey = await fetchPublicIP();
+  let keyPrefix = 'ip';
+  if(!dedupKey){
+    dedupKey = getOrCreateLocalVisitorId();
+    keyPrefix = 'dev';
+  }
+  if(!dedupKey) return; // IP도, 로컬 식별자도 못 만들면 중복 방지가 불가능하므로 집계하지 않는다
+  const dedupKeySafe = dedupKey.replace(/[^a-zA-Z0-9._:-]/g, '_');
+  const markerRef = db.collection('visitMarkers').doc(kstDate + '_' + keyPrefix + '_' + dedupKeySafe);
   const dailyRef = db.collection('dailyVisits').doc(kstDate);
 
   try{
     await db.runTransaction(async (tx) => {
       const markerDoc = await tx.get(markerRef);
-      if(markerDoc.exists) return; // 오늘(한국시간) 이 IP는 이미 집계됨
+      if(markerDoc.exists) return; // 오늘(한국시간) 이 방문자는 이미 집계됨
       tx.set(markerRef, { date: kstDate, loggedAt: Date.now() });
       tx.set(dailyRef, { count: firebase.firestore.FieldValue.increment(1) }, { merge: true });
     });
@@ -2757,6 +2776,13 @@ const app = {
       resultEl.textContent = '⚠ Firebase(Firestore)가 아예 연결되지 않았어요. firebaseConfig 설정을 확인해주세요.';
       return;
     }
+
+    // 1) 이 기기(지금 이 브라우저)에서 IP 조회가 되는지 먼저 확인한다
+    const ip = await fetchPublicIP();
+    const ipLine = ip
+      ? `✓ IP 조회 성공: ${ip} (이 기기 네트워크에서는 정상)`
+      : `✗ IP 조회 실패 — 광고 차단 앱/사설 DNS 등이 api.ipify.org를 막고 있을 수 있어요. (이제는 기기별 로컬 식별자로 자동 대체돼요)`;
+
     const testDate = kstDateStr();
     const testDocId = '_connectionTest_' + Date.now();
     try{
@@ -2768,15 +2794,15 @@ const app = {
       await db.collection('visitMarkers').doc(testDocId).set({ test: true, at: Date.now() });
       await db.collection('visitMarkers').doc(testDocId).delete(); // 테스트용 문서는 바로 정리
       resultEl.style.color = 'var(--jade)';
-      resultEl.textContent = '✓ 성공! dailyVisits / visitMarkers에 정상적으로 쓸 수 있어요.\n(이 카드를 다시 열면 방문자 통계도 갱신되어 보일 거예요)';
+      resultEl.textContent = `✓ 저장 권한 정상!\n${ipLine}`;
       await this.renderVisitStats();
     }catch(e){
       console.error('방문 기록 연결 테스트 실패', e);
       resultEl.style.color = 'var(--danger)';
       if(e && e.code === 'permission-denied'){
-        resultEl.textContent = '✗ 권한 거부(permission-denied)예요.\nFirebase 콘솔 → Firestore Database → Rules에 dailyVisits, visitMarkers 규칙이 게시되어 있는지 다시 확인해주세요.';
+        resultEl.textContent = `✗ 권한 거부(permission-denied)예요.\nFirebase 콘솔 → Firestore Database → Rules에 dailyVisits, visitMarkers 규칙이 게시되어 있는지 다시 확인해주세요.\n${ipLine}`;
       }else{
-        resultEl.textContent = '✗ 실패: ' + (e && e.code ? '[' + e.code + '] ' : '') + (e && e.message ? e.message : String(e));
+        resultEl.textContent = `✗ 실패: ${e && e.code ? '[' + e.code + '] ' : ''}${e && e.message ? e.message : String(e)}\n${ipLine}`;
       }
     }
   },

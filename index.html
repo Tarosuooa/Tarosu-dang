@@ -125,6 +125,7 @@ main.no-hero{padding-top:44px;}
 }
 .hero-inner{position:relative; z-index:2; max-width:640px; pointer-events:none;}
 .hero-inner a, .hero-inner button{ pointer-events:auto; }
+#heroTaglineEditWrap{ pointer-events:auto; }
 .hero .eyebrow{
   font-family:'Noto Sans KR',sans-serif; font-size:12.5px; letter-spacing:4px;
   color:var(--wood); text-transform:uppercase; margin-bottom:14px; display:block;
@@ -542,7 +543,11 @@ footer{
     <div class="hero-inner">
       <span class="eyebrow">GUZHENG · 古筝</span>
       <h1 id="heroTagline">타로수가 선명하게<br><em>고쟁</em>을 핥고 있었다.</h1>
-      <p class="tagline">취미 고쟁러 '타로수'의 공간입니다. <br>저의 연주 영상 및 자작 악보를 담았으며,<br>고쟁 악보 제작 및 조율 툴도 담았습니다.</p>
+      <div style="position:relative; max-width:480px;">
+        <p class="tagline" id="heroTaglineDisplay" style="height:calc(3 * 1.7 * 16.5px); overflow:hidden;"></p>
+        <button type="button" id="heroTaglineEditBtn" class="btn ghost small" style="display:none; position:absolute; top:0; right:0; padding:3px 9px; font-size:11px;" onclick="app.openHeroTaglineEdit()">수정</button>
+      </div>
+      <div id="heroTaglineEditWrap" style="display:none; max-width:480px; margin-bottom:8px;"></div>
       <p style="margin-top:14px; font-size:16.5px; color:var(--ink-soft);"><a href="https://www.instagram.com/tarosu_gzh/" target="_blank" rel="noopener" style="color:inherit; text-decoration:none;">instagram @tarosu_gzh</a></p>
       <p style="margin-top:2px; font-size:16.5px; color:var(--ink-soft);">E-Mail: tarosu.ooa@gmail.com</p>
       <button type="button" class="mobile-guzheng-toggle-btn" onclick="app.toggleMobileGuzheng()">타로당 13현 고쟁</button>
@@ -769,8 +774,15 @@ footer{
 
     <div class="card" id="visitStatsCard" style="display:none;">
       <h3 style="font-size:16px; margin-bottom:4px;">방문자 통계 <span class="field-hint" style="margin:0;">(관리자 전용)</span></h3>
-      <div id="visitStatsToday" style="font-size:14px; margin:10px 0 16px;"></div>
-      <div id="visitStatsChart" style="display:flex; align-items:flex-end; gap:4px; height:140px; border-bottom:1px solid var(--paper-deep); padding-bottom:2px;"></div>
+      <div id="visitStatsToday" style="font-size:14px; margin:10px 0 12px;"></div>
+      <div id="visitStatsPresetRow" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;"></div>
+      <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:12px;">
+        <input type="date" id="visitStatsFrom" style="padding:6px 8px; border:1px solid var(--paper-deep); border-radius:2px; font-size:12.5px;">
+        <span style="font-size:12.5px; color:var(--ink-soft);">~</span>
+        <input type="date" id="visitStatsTo" style="padding:6px 8px; border:1px solid var(--paper-deep); border-radius:2px; font-size:12.5px;">
+        <button class="btn small" onclick="app.applyVisitCustomRange()">조회</button>
+      </div>
+      <div id="visitStatsChart" style="height:150px;"></div>
       <div id="visitStatsLabels" style="display:flex; gap:4px; margin-top:6px; font-size:10.5px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif;"></div>
       <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--paper-deep);">
         <button class="btn ghost small" onclick="app.testVisitLogging()">방문 기록 연결 테스트</button>
@@ -1058,6 +1070,8 @@ const state = {
   tipText: { scoreMaker: '', tuning: '' },
   profile: { photoUrl: '', title: '', content: '' },
   homeCardOrder: null, // null이면 기본 순서 사용, 배열이면 그 순서대로 표시
+  heroTaglineText: null, // null이면 기본 3줄 문구 사용
+  visitStatsRange: null, // { fromDate, toDate, presetDays }
   data: { notice: [], noticeUpdate: [], download: [], faq: [], inquiry: [], guestbook: [], sheets: [], updateLog: [], tuningUpdateLog: [] },
   detail: { notice: null, noticeUpdate: null, download: null, inquiry: null, sheets: null },
   pendingSignup: null,
@@ -1759,6 +1773,29 @@ async function saveHomeCardOrder(order){
   }
 }
 
+/* ---------- 홈 화면 타이틀 하단 3줄 문구 (관리자만 작성/수정 가능, 정확히 3줄까지만) ---------- */
+const DEFAULT_HERO_TAGLINE = "취미 고쟁러 '타로수'의 공간입니다. <br>저의 연주 영상 및 자작 악보를 담았으며,<br>고쟁 악보 제작 및 조율 툴도 담았습니다.";
+async function loadHeroTagline(){
+  if(!db){ state.heroTaglineText = null; return; }
+  try{
+    const doc = await db.collection('content').doc('heroTagline').get();
+    state.heroTaglineText = (doc.exists && doc.data().text) ? doc.data().text : null;
+  }catch(e){
+    console.error('홈 타이틀 하단 문구 로드 실패', e);
+    state.heroTaglineText = null;
+  }
+}
+async function saveHeroTagline(text){
+  if(!db) return false;
+  try{
+    await db.collection('content').doc('heroTagline').set({ text });
+    return true;
+  }catch(e){
+    console.error('홈 타이틀 하단 문구 저장 실패', e);
+    return false;
+  }
+}
+
 /* ---------- 악보 제작 / 음정 체크&조율 툴 '사용 Tip' (관리자만 작성/수정 가능) ---------- */
 const TIP_CONFIGS = {
   scoreMaker: { docId: 'scoreMakerTip', panelId: 'scoreMakerTipPanel', btnId: 'scoreMakerTipBtn', bodyId: 'scoreMakerTipBody' },
@@ -1854,10 +1891,16 @@ async function logDailyVisit(){
     dbg('✗ 저장 실패: [' + (e && e.code ? e.code : '?') + '] ' + (e && e.message ? e.message : String(e)));
   }
 }
-async function loadVisitStats(days){
+async function loadVisitStatsRange(fromDateStr, toDateStr){
   const dateStrs = [];
-  for(let i = days - 1; i >= 0; i--){ dateStrs.push(kstDateStr(i)); }
+  const d = new Date(fromDateStr + 'T00:00:00Z');
+  const end = new Date(toDateStr + 'T00:00:00Z');
+  while(d.getTime() <= end.getTime()){
+    dateStrs.push(d.toISOString().slice(0, 10));
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
   if(!db) return dateStrs.map(ds => ({ date: ds, count: 0 }));
+  if(dateStrs.length === 0) return [];
   try{
     const snap = await db.collection('dailyVisits')
       .where(firebase.firestore.FieldPath.documentId(), '>=', dateStrs[0])
@@ -1870,6 +1913,11 @@ async function loadVisitStats(days){
     console.error('방문자 통계 로드 실패', e);
     return dateStrs.map(ds => ({ date: ds, count: 0 }));
   }
+}
+async function loadVisitStats(days){
+  const fromDateStr = kstDateStr(days - 1);
+  const toDateStr = kstDateStr(0);
+  return loadVisitStatsRange(fromDateStr, toDateStr);
 }
 
 /* ---------- 댓글 / 답글 ---------- */
@@ -2119,6 +2167,7 @@ const app = {
     await loadTipText('tuning');
     await loadProfile();
     await loadHomeCardOrder();
+    await loadHeroTagline();
     updateStorageWarning();
     this.renderAll();
     initGuestbookCharLimit();
@@ -2706,6 +2755,7 @@ const app = {
   renderAll(){
     if(state.page==='mypage' && !state.currentUser){ this.go('home'); return; }
     this.renderHome();
+    this.renderHeroTagline();
     this.renderNoticeTabs();
     this.renderBoard('notice');
     this.renderBoard('noticeUpdate');
@@ -2847,6 +2897,41 @@ const app = {
     if(!isAdminUser()){ card.style.display = 'none'; return; }
     card.style.display = '';
 
+    // 기간 프리셋 버튼 (한 번만 그린다)
+    const presetRow = document.getElementById('visitStatsPresetRow');
+    if(presetRow && !presetRow.dataset.built){
+      const presets = [
+        {label:'14일', days:14}, {label:'1개월', days:30}, {label:'3개월', days:90},
+        {label:'6개월', days:180}, {label:'1년', days:365}
+      ];
+      presetRow.innerHTML = presets.map(p =>
+        `<button class="btn ghost small" id="visitPreset-${p.days}" onclick="app.setVisitRangePreset(${p.days})">${p.label}</button>`
+      ).join('');
+      presetRow.dataset.built = '1';
+    }
+
+    if(!state.visitStatsRange){
+      state.visitStatsRange = { fromDate: kstDateStr(13), toDate: kstDateStr(0), presetDays: 14 };
+    }
+    await this.loadAndRenderVisitStats();
+  },
+
+  setVisitRangePreset(days){
+    state.visitStatsRange = { fromDate: kstDateStr(days - 1), toDate: kstDateStr(0), presetDays: days };
+    this.loadAndRenderVisitStats();
+  },
+
+  applyVisitCustomRange(){
+    const fromDate = document.getElementById('visitStatsFrom').value;
+    const toDate = document.getElementById('visitStatsTo').value;
+    if(!fromDate || !toDate){ showToast('시작일과 종료일을 모두 선택해주세요'); return; }
+    if(fromDate > toDate){ showToast('시작일이 종료일보다 늦을 수 없어요'); return; }
+    state.visitStatsRange = { fromDate, toDate, presetDays: null };
+    this.loadAndRenderVisitStats();
+  },
+
+  async loadAndRenderVisitStats(){
+    const range = state.visitStatsRange;
     const todayEl = document.getElementById('visitStatsToday');
     const chartEl = document.getElementById('visitStatsChart');
     const labelsEl = document.getElementById('visitStatsLabels');
@@ -2854,8 +2939,18 @@ const app = {
     if(chartEl) chartEl.innerHTML = '';
     if(labelsEl) labelsEl.innerHTML = '';
 
-    const DAYS = 14;
-    const stats = await loadVisitStats(DAYS);
+    // 프리셋 버튼 활성 표시
+    document.querySelectorAll('#visitStatsPresetRow button').forEach(btn => {
+      const days = Number(btn.id.replace('visitPreset-', ''));
+      btn.classList.toggle('active', range.presetDays === days);
+    });
+    // 직접 지정한 범위를 날짜 입력창에도 반영
+    const fromInput = document.getElementById('visitStatsFrom');
+    const toInput = document.getElementById('visitStatsTo');
+    if(fromInput) fromInput.value = range.fromDate;
+    if(toInput) toInput.value = range.toDate;
+
+    const stats = await loadVisitStatsRange(range.fromDate, range.toDate);
     const todayKey = kstDateStr();
     const todayCount = (stats.find(s => s.date === todayKey) || { count: 0 }).count;
 
@@ -2863,24 +2958,44 @@ const app = {
       todayEl.innerHTML = `오늘(${escapeHtml(todayKey)}) 방문자 수: <strong style="color:var(--wood); font-size:18px;">${todayCount}명</strong>`;
     }
 
-    const maxCount = Math.max(1, ...stats.map(s => s.count));
     if(chartEl){
-      chartEl.innerHTML = stats.map(s => {
-        const heightPct = Math.max(2, Math.round((s.count / maxCount) * 100));
-        const isToday = s.date === todayKey;
-        return `<div style="flex:1; display:flex; align-items:flex-end; height:100%;" title="${escapeHtml(s.date)}: ${s.count}명">
-          <div style="width:100%; height:${heightPct}%; background:${isToday ? 'var(--wood)' : 'var(--gold)'}; border-radius:2px 2px 0 0; transition:height .3s;"></div>
-        </div>`;
-      }).join('');
+      chartEl.innerHTML = this.buildVisitLineChartSvg(stats, todayKey);
     }
     if(labelsEl){
-      const labelStep = Math.ceil(DAYS / 7);
+      const n = stats.length;
+      const labelStep = Math.max(1, Math.ceil(n / 8)); // 라벨이 너무 빽빽해지지 않도록 간격을 둔다
       labelsEl.innerHTML = stats.map((s, i) => {
-        const show = (i % labelStep === 0) || i === stats.length - 1;
+        const show = (i % labelStep === 0) || i === n - 1;
         const mmdd = s.date.slice(5).replace('-', '/');
-        return `<div style="flex:1; text-align:center;">${show ? mmdd : ''}</div>`;
+        return `<div style="flex:1; text-align:center; min-width:0;">${show ? mmdd : ''}</div>`;
       }).join('');
     }
+  },
+
+  buildVisitLineChartSvg(stats, todayKey){
+    const n = stats.length;
+    if(n === 0) return `<div class="empty-note" style="padding:20px;">데이터가 없습니다</div>`;
+    const W = 600, H = 150, PAD = 10;
+    const maxCount = Math.max(1, ...stats.map(s => s.count));
+    const stepX = n > 1 ? (W - PAD * 2) / (n - 1) : 0;
+    const points = stats.map((s, i) => {
+      const x = PAD + i * stepX;
+      const y = H - PAD - (s.count / maxCount) * (H - PAD * 2);
+      return { x, y, s };
+    });
+    const lineStr = points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+    const areaStr = `${PAD},${H - PAD} ${lineStr} ${W - PAD},${H - PAD}`;
+    // 점이 너무 많으면(긴 기간) 촘촘한 원 표시는 생략해서 지저분해지지 않게 한다
+    const showDots = n <= 62;
+    const dots = showDots ? points.map(p => {
+      const isToday = p.s.date === todayKey;
+      return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isToday ? 3.2 : 2.2}" fill="${isToday ? 'var(--wood)' : 'var(--gold)'}"><title>${escapeHtml(p.s.date)}: ${p.s.count}명</title></circle>`;
+    }).join('') : '';
+    return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%; height:100%; display:block;">
+      <polygon points="${areaStr}" fill="var(--gold)" opacity="0.15"></polygon>
+      <polyline points="${lineStr}" fill="none" stroke="var(--wood)" stroke-width="2"></polyline>
+      ${dots}
+    </svg>`;
   },
 
   async saveNickname(){
@@ -3254,6 +3369,59 @@ const app = {
     state.homeCardOrder = order;
     this.renderHome();
     await saveHomeCardOrder(order);
+  },
+
+  /* ---------- 홈 타이틀 하단 3줄 문구 (관리자만 수정, 절대 높이로 정확히 3줄까지만 입력 가능) ---------- */
+  renderHeroTagline(){
+    const displayEl = document.getElementById('heroTaglineDisplay');
+    const editBtn = document.getElementById('heroTaglineEditBtn');
+    if(!displayEl) return;
+    const text = state.heroTaglineText || DEFAULT_HERO_TAGLINE;
+    displayEl.innerHTML = sanitizeRichHtml(text);
+    if(editBtn) editBtn.style.display = isAdminUser() ? '' : 'none';
+  },
+  openHeroTaglineEdit(){
+    if(!isAdminUser()) return;
+    const wrap = document.getElementById('heroTaglineEditWrap');
+    if(!wrap) return;
+    wrap.style.display = 'block';
+    const text = state.heroTaglineText || DEFAULT_HERO_TAGLINE;
+    wrap.innerHTML = `
+      <div class="rte-toolbar" style="border-radius:2px 2px 0 0;">
+        <button type="button" title="굵게" onmousedown="event.preventDefault()" onclick="app.rteExec('heroTaglineEditor','bold')"><b>B</b></button>
+      </div>
+      <div class="rte-editor" id="heroTaglineEditor" contenteditable="true"
+        style="min-height:calc(3 * 1.7 * 16.5px); max-height:calc(3 * 1.7 * 16.5px); overflow:hidden; border-radius:0 0 2px 2px; font-size:16.5px; line-height:1.7;"
+        data-placeholder="정확히 3줄까지 작성할 수 있어요">${sanitizeRichHtml(text)}</div>
+      <div class="field-hint" style="margin-top:4px;">딱 3줄까지만 입력할 수 있어요 (4번째 줄부터는 자동으로 막혀요)</div>
+      <div class="form-actions" style="margin-top:8px; margin-bottom:0;">
+        <button class="btn small" onclick="app.saveHeroTaglineEdit()">저장</button>
+        <button class="btn ghost small" onclick="document.getElementById('heroTaglineEditWrap').style.display='none';">취소</button>
+      </div>`;
+    // 정확히 3줄(=줄바꿈 2번)까지만 입력을 허용한다
+    const editorEl = document.getElementById('heroTaglineEditor');
+    editorEl.addEventListener('keydown', (e) => {
+      if(e.key !== 'Enter') return;
+      const brCount = (editorEl.innerHTML.match(/<br\s*\/?>/gi) || []).length;
+      if(brCount >= 2){ e.preventDefault(); showToast('3줄까지만 작성할 수 있어요'); }
+    });
+  },
+  async saveHeroTaglineEdit(){
+    if(!isAdminUser()) return;
+    const editorEl = document.getElementById('heroTaglineEditor');
+    const text = sanitizeRichHtml(editorEl ? editorEl.innerHTML : '');
+    const brCount = (text.match(/<br\s*\/?>/gi) || []).length;
+    if(brCount > 2){ showToast('3줄까지만 작성할 수 있어요'); return; }
+    const ok = await saveHeroTagline(text);
+    if(ok){
+      state.heroTaglineText = text;
+      showToast('문구가 저장되었습니다');
+      const wrap = document.getElementById('heroTaglineEditWrap');
+      if(wrap) wrap.style.display = 'none';
+      this.renderHeroTagline();
+    }else{
+      showToast('저장에 실패했습니다');
+    }
   },
 
   renderBoard(name){

@@ -2313,34 +2313,9 @@ const app = {
     const el = document.getElementById('heroTagline');
     if(!el || !HERO_TAGLINES.length) return;
 
-    const SEEN_KEY = 'tarodang_hero_seen_first';
-    const LAST_KEY = 'tarodang_hero_last_idx';
-    let hasSeenFirst = false;
-    let lastIdx = -1;
-    try{
-      hasSeenFirst = sessionStorage.getItem(SEEN_KEY) === '1';
-      const stored = sessionStorage.getItem(LAST_KEY);
-      lastIdx = stored !== null ? parseInt(stored, 10) : -1;
-    }catch(e){ /* 세션 저장소 접근 불가 시 항상 첫 문구로 처리 */ }
-
-    let idx;
-    if(!hasSeenFirst){
-      // 이번 접속(세션)에서 처음 홈에 도달했을 때는 무조건 첫 번째 문구
-      idx = 0;
-    }else{
-      // 그 이후로는 새로고침하거나 다른 게시판에 갔다가 돌아올 때마다
-      // 나머지 문구 중, 직전에 보여준 문구를 제외하고 무작위로 선택 (2회 연속 반복 방지)
-      const pool = [];
-      for(let i = 1; i < HERO_TAGLINES.length; i++){
-        if(i !== lastIdx) pool.push(i);
-      }
-      idx = pool.length ? pool[Math.floor(Math.random() * pool.length)] : 1;
-    }
+    // 첫 접속이든 그 이후 재접속/새로고침이든 상관없이, 매번 5개 문구 중 완전히 동일한 확률(1/5씩)로 뽑는다.
+    const idx = Math.floor(Math.random() * HERO_TAGLINES.length);
     el.innerHTML = HERO_TAGLINES[idx];
-    try{
-      sessionStorage.setItem(SEEN_KEY, '1');
-      sessionStorage.setItem(LAST_KEY, String(idx));
-    }catch(e){}
   },
 
   /* ---------- 고쟁 줄 사용법 패널 (모달 아님 — 열려 있어도 뒤의 줄을 계속 클릭할 수 있다) ---------- */

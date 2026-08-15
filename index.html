@@ -772,6 +772,11 @@ footer{
       <div id="visitStatsToday" style="font-size:14px; margin:10px 0 16px;"></div>
       <div id="visitStatsChart" style="display:flex; align-items:flex-end; gap:4px; height:140px; border-bottom:1px solid var(--paper-deep); padding-bottom:2px;"></div>
       <div id="visitStatsLabels" style="display:flex; gap:4px; margin-top:6px; font-size:10.5px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif;"></div>
+      <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--paper-deep);">
+        <button class="btn ghost small" onclick="app.testVisitLogging()">방문 기록 연결 테스트</button>
+        <p class="field-hint" style="margin-top:8px;">관리자 계정으로는 방문이 집계되지 않도록 되어 있어서, 이 버튼으로 대신 저장 권한을 바로 테스트할 수 있어요.</p>
+        <div id="visitStatsTestResult" style="font-size:13px; margin-top:8px; white-space:pre-wrap;"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -2739,6 +2744,41 @@ const app = {
     if(!state.currentUser) return;
     const nickEl = document.getElementById('mpNickname');
     if(nickEl && document.activeElement !== nickEl) nickEl.value = state.currentUser.nickname;
+  },
+
+  async testVisitLogging(){
+    const resultEl = document.getElementById('visitStatsTestResult');
+    if(!resultEl) return;
+    resultEl.style.color = 'var(--ink-soft)';
+    resultEl.textContent = '테스트 중...';
+
+    if(!db){
+      resultEl.style.color = 'var(--danger)';
+      resultEl.textContent = '⚠ Firebase(Firestore)가 아예 연결되지 않았어요. firebaseConfig 설정을 확인해주세요.';
+      return;
+    }
+    const testDate = kstDateStr();
+    const testDocId = '_connectionTest_' + Date.now();
+    try{
+      // dailyVisits와 완전히 같은 경로 구조로, 실제 방문 기록과 동일한 쓰기 권한을 그대로 테스트한다
+      await db.collection('dailyVisits').doc(testDate).set(
+        { count: firebase.firestore.FieldValue.increment(0) },
+        { merge: true }
+      );
+      await db.collection('visitMarkers').doc(testDocId).set({ test: true, at: Date.now() });
+      await db.collection('visitMarkers').doc(testDocId).delete(); // 테스트용 문서는 바로 정리
+      resultEl.style.color = 'var(--jade)';
+      resultEl.textContent = '✓ 성공! dailyVisits / visitMarkers에 정상적으로 쓸 수 있어요.\n(이 카드를 다시 열면 방문자 통계도 갱신되어 보일 거예요)';
+      await this.renderVisitStats();
+    }catch(e){
+      console.error('방문 기록 연결 테스트 실패', e);
+      resultEl.style.color = 'var(--danger)';
+      if(e && e.code === 'permission-denied'){
+        resultEl.textContent = '✗ 권한 거부(permission-denied)예요.\nFirebase 콘솔 → Firestore Database → Rules에 dailyVisits, visitMarkers 규칙이 게시되어 있는지 다시 확인해주세요.';
+      }else{
+        resultEl.textContent = '✗ 실패: ' + (e && e.code ? '[' + e.code + '] ' : '') + (e && e.message ? e.message : String(e));
+      }
+    }
   },
 
   async renderVisitStats(){

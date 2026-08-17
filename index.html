@@ -1862,6 +1862,12 @@ function showDebugVisitPanel(msg){
   panel.appendChild(line);
   panel.scrollTop = panel.scrollHeight;
 }
+// 방문자 집계에서 제외할 IP 목록 (예: 관리자 본인이 자주 접속하는 집/사무실 IP 등)
+const EXCLUDED_VISITOR_IPS = new Set([
+  '125.142.254.25',
+  '125.142.202.149',
+  '118.235.4.142'
+]);
 async function logDailyVisit(){
   const isDebug = location.search.includes('debugvisit');
   const dbg = (msg) => { if(isDebug) showDebugVisitPanel(msg); };
@@ -1873,6 +1879,10 @@ async function logDailyVisit(){
   const kstDate = kstDateStr();
   let dedupKey = await fetchPublicIP();
   let keyPrefix = 'ip';
+  if(dedupKey && EXCLUDED_VISITOR_IPS.has(dedupKey)){
+    dbg('제외 목록에 등록된 IP(' + dedupKey + ')라서 집계하지 않습니다.');
+    return;
+  }
   if(!dedupKey){
     dbg('IP 조회 실패(또는 4초 타임아웃) → 기기별 로컬 식별자로 대체합니다.');
     dedupKey = getOrCreateLocalVisitorId();
@@ -2959,12 +2969,12 @@ const app = {
   buildVisitLineChartSvg(stats, todayKey){
     const n = stats.length;
     if(n === 0) return `<div class="empty-note" style="padding:20px;">데이터가 없습니다</div>`;
-    const W = 600, H = 150, PAD = 10;
+    const W = 600, H = 150, PAD = 10, LABEL_PAD = 16; // 위쪽 숫자 표시 공간 확보
     const maxCount = Math.max(1, ...stats.map(s => s.count));
     const stepX = n > 1 ? (W - PAD * 2) / (n - 1) : 0;
     const points = stats.map((s, i) => {
       const x = PAD + i * stepX;
-      const y = H - PAD - (s.count / maxCount) * (H - PAD * 2);
+      const y = H - PAD - (s.count / maxCount) * (H - PAD * 2 - LABEL_PAD);
       return { x, y, s };
     });
     const lineStr = points.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
@@ -2973,7 +2983,15 @@ const app = {
     const showDots = n <= 62;
     const dots = showDots ? points.map(p => {
       const isToday = p.s.date === todayKey;
-      return `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isToday ? 3.2 : 2.2}" fill="${isToday ? 'var(--wood)' : 'var(--gold)'}"><title>${escapeHtml(p.s.date)}: ${p.s.count}명</title></circle>`;
+      const dateLabel = escapeHtml(p.s.date);
+      // 방문자가 1명 이상인 점 바로 위에는, 단위 없이 숫자만 항상 보이게 표시한다
+      const countLabel = p.s.count > 0
+        ? `<text x="${p.x.toFixed(1)}" y="${(p.y - 8).toFixed(1)}" text-anchor="middle" font-size="10" fill="var(--wood)" font-weight="700">${p.s.count}</text>`
+        : '';
+      return `<g>
+        ${countLabel}
+        <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isToday ? 6 : 4.5}" fill="${isToday ? 'var(--wood)' : 'var(--gold)'}"><title>${dateLabel}: ${p.s.count}명</title></circle>
+      </g>`;
     }).join('') : '';
     return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%; height:100%; display:block;">
       <polygon points="${areaStr}" fill="var(--gold)" opacity="0.15"></polygon>
@@ -3387,12 +3405,20 @@ const app = {
         <button class="btn small" onclick="app.saveHeroTaglineEdit()">저장</button>
         <button class="btn ghost small" onclick="document.getElementById('heroTaglineEditWrap').style.display='none';">취소</button>
       </div>`;
-    // 정확히 3줄(=줄바꿈 2번)까지만 입력을 허용한다
+    // 정확히 3줄(=줄바꿈 2번)까지만 입력을 허용한다.
+    // 전역 Enter 처리기에 넘기지 않고 이 안에서 직접 완결시켜서(줄바꿈 삽입까지), 두 처리기가 서로 어긋나며
+    // 브라우저 기본 동작(div 블록으로 줄바뀜)이 끼어드는 일이 없도록 한다.
     const editorEl = document.getElementById('heroTaglineEditor');
     editorEl.addEventListener('keydown', (e) => {
-      if(e.key !== 'Enter') return;
+      if(e.key !== 'Enter' || e.shiftKey) return;
+      e.preventDefault();
+      e.stopPropagation();
       const brCount = (editorEl.innerHTML.match(/<br\s*\/?>/gi) || []).length;
-      if(brCount >= 2){ e.preventDefault(); showToast('3줄까지만 작성할 수 있어요'); }
+      if(brCount >= 2){
+        showToast('3줄까지만 작성할 수 있어요');
+        return;
+      }
+      document.execCommand('insertLineBreak');
     });
   },
   async saveHeroTaglineEdit(){

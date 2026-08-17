@@ -349,6 +349,16 @@ main.no-hero{padding-top:44px;}
 }
 .rte-swatch.active{box-shadow:0 0 0 2px var(--wood);}
 
+/* 라이트모드에서는 검정, 다크모드(시스템 설정)에서는 흰색으로 자동 전환되는 기본 텍스트 색상 */
+.rte-color-auto{ color:#000000; }
+@media (prefers-color-scheme: dark){
+  .rte-color-auto{ color:#ffffff; }
+}
+.rte-swatch-auto{
+  background:linear-gradient(135deg, #000000 50%, #ffffff 50%);
+  border:1px solid rgba(0,0,0,0.3);
+}
+
 /* ---------- faq ---------- */
 .faq-item{border-bottom:1px solid var(--paper-deep);}
 .faq-item:last-child{border-bottom:none;}
@@ -1187,6 +1197,9 @@ function sanitizeRichHtml(html){
             if(colorMatch) cleaned += 'color:' + colorMatch[1] + ';';
             if(sizeMatch) cleaned += 'font-size:' + sizeMatch[1] + ';';
             if(cleaned) child.setAttribute('style', cleaned); else child.removeAttribute('style');
+          } else if(child.tagName === 'SPAN' && attr.name === 'class' && attr.value === 'rte-color-auto'){
+            // 다크모드에서는 흰색, 라이트모드에서는 검정으로 자동 전환되는 기본 색상 전용 클래스만 허용한다
+            child.setAttribute('class', 'rte-color-auto');
           } else {
             child.removeAttribute(attr.name);
           }
@@ -1320,13 +1333,28 @@ const RTE_SIZES = [
   {label:'아주 크게', px:'24px'}
 ];
 
+// 브라우저 내장 줄바꿈 명령은 브라우저에 따라 안 먹히거나 별도 블록 요소로 처리되는 등 불안정해서,
+// 직접 DOM에 <br> 노드를 만들어 커서 위치에 삽입하는 방식으로 대체한다 (모든 브라우저에서 동일하게 동작)
+function insertLineBreakAtCursor(){
+  const sel = window.getSelection();
+  if(!sel || !sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const br = document.createElement('br');
+  range.insertNode(br);
+  range.setStartAfter(br);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
+
 // Enter 키를 직접 처리해 빈 줄이 사라지지 않고 항상 한 줄씩 정확히 내려가게 한다
 document.addEventListener('keydown', (e)=>{
   if(e.key !== 'Enter' || e.shiftKey) return;
   const editor = e.target.closest && e.target.closest('.rte-editor');
   if(!editor) return;
   e.preventDefault();
-  document.execCommand('insertLineBreak');
+  insertLineBreakAtCursor();
 });
 
 function buildRteHtml(editorId, placeholder){
@@ -2512,6 +2540,7 @@ const app = {
           <button type="button" title="굵게" onmousedown="event.preventDefault()" onclick="app.rteExec('guzhengGuideEditor','bold')"><b>B</b></button>
           <button type="button" class="u-btn" title="밑줄" onmousedown="event.preventDefault()" onclick="app.rteExec('guzhengGuideEditor','underline')">U</button>
           <span class="rte-sep"></span>
+          <button type="button" class="rte-swatch rte-swatch-auto" title="기본 색상 (라이트모드: 검정 / 다크모드: 흰색)" onmousedown="event.preventDefault()" onclick="app.rteApplyAutoColor('guzhengGuideEditor')"></button>
           <button type="button" class="rte-swatch" title="빨강" style="background:#E53935;" onmousedown="event.preventDefault()" onclick="app.rteApplyColor('guzhengGuideEditor','#E53935')"></button>
           <button type="button" class="rte-swatch" title="파랑" style="background:#1E88E5;" onmousedown="event.preventDefault()" onclick="app.rteApplyColor('guzhengGuideEditor','#1E88E5')"></button>
           <button type="button" class="rte-swatch" title="초록" style="background:#43A047;" onmousedown="event.preventDefault()" onclick="app.rteApplyColor('guzhengGuideEditor','#43A047')"></button>
@@ -2813,6 +2842,12 @@ const app = {
     el.focus();
     this.wrapSelectionInEditor(editorId, span => { span.style.color = hex; });
   },
+  rteApplyAutoColor(editorId){
+    const el = document.getElementById(editorId);
+    if(!el) return;
+    el.focus();
+    this.wrapSelectionInEditor(editorId, span => { span.className = 'rte-color-auto'; });
+  },
   rteApplyFontSize(editorId, px){
     const el = document.getElementById(editorId);
     if(!el) return;
@@ -2990,7 +3025,8 @@ const app = {
         : '';
       return `<g>
         ${countLabel}
-        <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isToday ? 6 : 4.5}" fill="${isToday ? 'var(--wood)' : 'var(--gold)'}"><title>${dateLabel}: ${p.s.count}명</title></circle>
+        <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isToday ? 3.2 : 2.2}" fill="${isToday ? 'var(--wood)' : 'var(--gold)'}"></circle>
+        <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="6" fill="transparent" style="cursor:pointer;" onclick="app.showVisitDotInfo(event, '${dateLabel}', ${p.s.count})"></circle>
       </g>`;
     }).join('') : '';
     return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="width:100%; height:100%; display:block;">
@@ -2998,6 +3034,25 @@ const app = {
       <polyline points="${lineStr}" fill="none" stroke="var(--wood)" stroke-width="2"></polyline>
       ${dots}
     </svg>`;
+  },
+  showVisitDotInfo(evt, dateStr, count){
+    evt.stopPropagation();
+    let tip = document.getElementById('visitDotTooltip');
+    if(!tip){
+      tip = document.createElement('div');
+      tip.id = 'visitDotTooltip';
+      tip.style.cssText = 'position:fixed; z-index:300; background:var(--ink); color:var(--paper); font-size:12.5px; padding:6px 10px; border-radius:4px; box-shadow:var(--shadow); pointer-events:none; white-space:nowrap;';
+      document.body.appendChild(tip);
+    }
+    tip.textContent = dateStr + ': ' + count + '명';
+    tip.style.display = 'block';
+    const left = Math.min(evt.clientX + 10, window.innerWidth - tip.offsetWidth - 60);
+    const top = Math.max(8, evt.clientY - 36);
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+    // 다른 곳을 클릭하거나 잠시 후 자동으로 닫힌다
+    clearTimeout(this._visitDotTooltipTimer);
+    this._visitDotTooltipTimer = setTimeout(() => { tip.style.display = 'none'; }, 3000);
   },
 
   async saveNickname(){
@@ -3398,7 +3453,7 @@ const app = {
         <button type="button" title="굵게" onmousedown="event.preventDefault()" onclick="app.rteExec('heroTaglineEditor','bold')"><b>B</b></button>
       </div>
       <div class="rte-editor" id="heroTaglineEditor" contenteditable="true"
-        style="min-height:calc(3 * 1.7 * 16.5px); max-height:calc(3 * 1.7 * 16.5px); overflow:hidden; border-radius:0 0 2px 2px; font-size:16.5px; line-height:1.7;"
+        style="min-height:calc(3 * 1.7 * 16.5px + 24px); max-height:calc(3 * 1.7 * 16.5px + 24px); overflow:hidden; border-radius:0 0 2px 2px; font-size:16.5px; line-height:1.7;"
         data-placeholder="정확히 3줄까지 작성할 수 있어요">${sanitizeRichHtml(text)}</div>
       <div class="field-hint" style="margin-top:4px;">딱 3줄까지만 입력할 수 있어요 (4번째 줄부터는 자동으로 막혀요)</div>
       <div class="form-actions" style="margin-top:8px; margin-bottom:0;">
@@ -3418,7 +3473,7 @@ const app = {
         showToast('3줄까지만 작성할 수 있어요');
         return;
       }
-      document.execCommand('insertLineBreak');
+      insertLineBreakAtCursor();
     });
   },
   async saveHeroTaglineEdit(){
@@ -4760,6 +4815,10 @@ window.addEventListener('resize', () => {
 
 // 고쟁 줄 위가 아닌 곳에서 마우스를 떼거나, 창 밖으로 나가도 드래그(스트럼) 상태를 확실히 해제한다
 window.addEventListener('mouseup', () => { stringsDragActive = false; stopStringTremolo(); currentHeldNote = null; });
+document.addEventListener('click', () => {
+  const tip = document.getElementById('visitDotTooltip');
+  if(tip) tip.style.display = 'none';
+});
 window.addEventListener('blur', () => { stringsDragActive = false; stopStringTremolo(); currentHeldNote = null; });
 
 app.init();

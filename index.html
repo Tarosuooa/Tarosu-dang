@@ -599,7 +599,6 @@ footer{
       <button class="subtab-btn" id="noticesubtab-notice" onclick="app.setNoticeTab('notice')">공지사항</button>
       <button class="subtab-btn" id="noticesubtab-noticeUpdate" onclick="app.setNoticeTab('noticeUpdate')">업데이트</button>
       <button class="subtab-btn" id="noticesubtab-profile" onclick="app.setNoticeTab('profile')">프로필</button>
-      <button class="subtab-btn" id="noticesubtab-inquiry" onclick="app.setNoticeTab('inquiry')">문의</button>
     </div>
 
     <!-- 공지사항 -->
@@ -625,13 +624,6 @@ footer{
       <div class="toolbar" id="profile-toolbar"></div>
       <div class="card" id="profile-display" style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;"></div>
       <div id="profile-edit-wrap" style="display:none; margin-top:14px;"></div>
-    </div>
-
-    <!-- 문의: 프로필처럼 관리자가 소개글(연락처 등)을 직접 작성 -->
-    <div id="notice-tab-inquiry" style="display:none;">
-      <div class="toolbar" id="inquiryIntro-toolbar"></div>
-      <div class="card" id="inquiryIntro-display"></div>
-      <div id="inquiryIntro-edit-wrap" style="display:none; margin-top:14px;"></div>
     </div>
   </div>
 
@@ -1008,7 +1000,6 @@ const BOARD_CONFIG = {
   notice:       {label:'공지', hasLink:false, hasMedia:true, hasComments:true},
   noticeUpdate: {label:'업데이트', hasLink:false, hasMedia:true, hasComments:true},
   download:     {label:'자료', hasLink:true, hasMedia:true, hasComments:true},
-  inquiry:      {label:'문의', hasLink:false, hasMedia:false, hasComments:false},
 };
 
 const FAQ_CATEGORIES = ['악보 제작', '악보 업로드&다운로드', '음정 체크&조율', '미디어', '악기', '홈페이지', '관리자', '그 외'];
@@ -1056,12 +1047,11 @@ const state = {
   tuningNoticeText: '',
   tipText: { scoreMaker: '', tuning: '' },
   profile: { photoUrl: '', title: '', content: '' },
-  inquiryIntro: { title: '', content: '' },
   homeCardOrder: null, // null이면 기본 순서 사용, 배열이면 그 순서대로 표시
   heroTaglineText: null, // null이면 기본 3줄 문구 사용
   visitStatsRange: null, // { fromDate, toDate, presetDays }
-  data: { notice: [], noticeUpdate: [], download: [], faq: [], inquiry: [], guestbook: [], sheets: [], updateLog: [], tuningUpdateLog: [] },
-  detail: { notice: null, noticeUpdate: null, download: null, inquiry: null, sheets: null },
+  data: { notice: [], noticeUpdate: [], download: [], faq: [], guestbook: [], sheets: [], updateLog: [], tuningUpdateLog: [] },
+  detail: { notice: null, noticeUpdate: null, download: null, sheets: null },
   pendingSignup: null,
   pendingWithdraw: null,
 };
@@ -1179,6 +1169,22 @@ function sanitizeRichHtml(html){
     });
   })(wrapper);
   return wrapper.innerHTML;
+}
+
+// 관리자가 적은 글 안에 "instagram @아이디"나 "E-Mail 이메일주소" 형태의 문구가 있으면,
+// 표시할 때만 자동으로 클릭 가능하게 바꿔준다 (저장된 원본 텍스트 자체는 그대로 둔다).
+// - instagram @아이디 → 클릭하면 새 탭에서 해당 인스타그램 프로필로 이동
+// - E-Mail 이메일주소 → 클릭하면 그 이메일 주소가 클립보드에 복사됨
+function linkifyContactPatterns(html){
+  if(!html) return html;
+  html = html.replace(/(instagram)(\s*)(@[A-Za-z0-9_.]+)/gi, (m, label, sp, handle) => {
+    const username = handle.slice(1);
+    return `<a href="https://www.instagram.com/${username}/" target="_blank" rel="noopener" style="color:inherit; text-decoration:underline;">${label}${sp}${handle}</a>`;
+  });
+  html = html.replace(/(E-Mail)(\s*:?\s*)([\w.+-]+@[\w-]+\.[\w.-]+)/gi, (m, label, sp, email) => {
+    return `<span onclick="app.copyEmailToClipboard('${email}')" style="cursor:pointer; text-decoration:underline;" title="클릭하면 이메일 주소가 복사돼요">${label}${sp}${email}</span>`;
+  });
+  return html;
 }
 function richTextHasContent(html){
   const wrapper = document.createElement('div');
@@ -1724,21 +1730,6 @@ async function loadProfile(){
   }
 }
 
-/* ---------- 소식 > 문의 상단 소개글 (프로필과 동일한 방식, 관리자만 수정) ---------- */
-async function loadInquiryIntro(){
-  if(!db){ state.inquiryIntro = {title:'', content:''}; return; }
-  try{
-    const doc = await db.collection('content').doc('inquiryIntro').get();
-    state.inquiryIntro = doc.exists ? {
-      title: doc.data().title || '',
-      content: doc.data().content || ''
-    } : {title:'', content:''};
-  }catch(e){
-    console.error('문의 소개글 로드 실패', e);
-    state.inquiryIntro = {title:'', content:''};
-  }
-}
-
 /* ---------- 홈 화면 카드: 관리자가 순서를 자유롭게 바꿀 수 있다 ---------- */
 const HOME_CARD_IDS = ['notice', 'sheetsDl', 'sheetsMake', 'download', 'faq', 'guestbook'];
 const HOME_CARD_HTML = {
@@ -1747,7 +1738,6 @@ const HOME_CARD_HTML = {
       <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('notice')">공지사항</button>
       <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('noticeUpdate')">업데이트</button>
       <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('profile')">프로필</button>
-      <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('inquiry')">문의</button>
     </div>`,
   sheetsDl: () => `<h3 style="font-size:16px;">악보 다운로드 <span id="homeSheetsNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로수와 회원님들이 공유한 악보를 받아 보세요.</p>`,
   sheetsMake: () => `<h3 style="font-size:16px;">악보 제작 및 조율</h3>
@@ -2079,7 +2069,6 @@ function captureNavState(){
     detailNotice: state.detail.notice,
     detailNoticeUpdate: state.detail.noticeUpdate,
     detailDownload: state.detail.download,
-    detailInquiry: state.detail.inquiry,
     detailSheets: state.detail.sheets
   };
 }
@@ -2098,7 +2087,6 @@ function applyNavState(s){
   state.detail.notice = s.detailNotice || null;
   state.detail.noticeUpdate = s.detailNoticeUpdate || null;
   state.detail.download = s.detailDownload || null;
-  state.detail.inquiry = s.detailInquiry || null;
   state.detail.sheets = s.detailSheets || null;
 
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
@@ -2190,7 +2178,7 @@ const app = {
     }else{
       logDailyVisit(); // Firebase Auth를 못 쓰는 경우에도(설정 미완료 등) 최소한 시도는 한다
     }
-    await Promise.all(['notice','noticeUpdate','download','faq','inquiry','guestbook','updateLog','tuningUpdateLog'].map(loadBoard));
+    await Promise.all(['notice','noticeUpdate','download','faq','guestbook','updateLog','tuningUpdateLog'].map(loadBoard));
     await loadSheets();
     await loadGuzhengGuide();
     await loadScoreMakerNotice();
@@ -2198,7 +2186,6 @@ const app = {
     await loadTipText('scoreMaker');
     await loadTipText('tuning');
     await loadProfile();
-    await loadInquiryIntro();
     await loadHomeCardOrder();
     await loadHeroTagline();
     updateStorageWarning();
@@ -2246,7 +2233,6 @@ const app = {
             <button onclick="app.goNoticeTab('notice')">공지사항</button>
             <button onclick="app.goNoticeTab('noticeUpdate')">업데이트</button>
             <button onclick="app.goNoticeTab('profile')">프로필</button>
-            <button onclick="app.goNoticeTab('inquiry')">문의</button>
           </div>
         </div>`;
       }
@@ -2661,7 +2647,7 @@ const app = {
     document.getElementById('heroSection').style.display = page==='home' ? '' : 'none';
     document.querySelector('main').classList.toggle('no-hero', page!=='home');
     if(page==='home' && !skipPush) this.pickRandomHeroTagline();
-    state.detail.notice = null; state.detail.noticeUpdate = null; state.detail.download = null; state.detail.inquiry = null;
+    state.detail.notice = null; state.detail.noticeUpdate = null; state.detail.download = null;
     state.detail.sheets = null;
     this.renderAll();
     if(page==='mypage') this.renderVisitStats();
@@ -2685,27 +2671,22 @@ const app = {
     document.getElementById('noticesubtab-notice').classList.toggle('active', tab==='notice');
     document.getElementById('noticesubtab-noticeUpdate').classList.toggle('active', tab==='noticeUpdate');
     document.getElementById('noticesubtab-profile').classList.toggle('active', tab==='profile');
-    document.getElementById('noticesubtab-inquiry').classList.toggle('active', tab==='inquiry');
     document.getElementById('notice-tab-notice').style.display = tab==='notice' ? '' : 'none';
     document.getElementById('notice-tab-noticeUpdate').style.display = tab==='noticeUpdate' ? '' : 'none';
     document.getElementById('notice-tab-profile').style.display = tab==='profile' ? '' : 'none';
-    document.getElementById('notice-tab-inquiry').style.display = tab==='inquiry' ? '' : 'none';
     this.renderNoticeTabs();
     if(tab==='notice') this.renderBoard('notice');
     else if(tab==='noticeUpdate') this.renderBoard('noticeUpdate');
     else if(tab==='profile') this.renderProfile();
-    else if(tab==='inquiry'){ this.renderInquiryIntro(); }
     pushNavState();
   },
   renderNoticeTabs(){
     document.getElementById('noticesubtab-notice').classList.toggle('active', state.noticeTab==='notice');
     document.getElementById('noticesubtab-noticeUpdate').classList.toggle('active', state.noticeTab==='noticeUpdate');
     document.getElementById('noticesubtab-profile').classList.toggle('active', state.noticeTab==='profile');
-    document.getElementById('noticesubtab-inquiry').classList.toggle('active', state.noticeTab==='inquiry');
     document.getElementById('notice-tab-notice').style.display = state.noticeTab==='notice' ? '' : 'none';
     document.getElementById('notice-tab-noticeUpdate').style.display = state.noticeTab==='noticeUpdate' ? '' : 'none';
     document.getElementById('notice-tab-profile').style.display = state.noticeTab==='profile' ? '' : 'none';
-    document.getElementById('notice-tab-inquiry').style.display = state.noticeTab==='inquiry' ? '' : 'none';
   },
 
   /* ---------- 프로필 (게시물 목록이 아니라 왼쪽 사진 + 오른쪽 제목/내용, 관리자만 수정) ---------- */
@@ -2722,7 +2703,7 @@ const app = {
       ${photoHtml}
       <div style="flex:1; min-width:200px;">
         <h3 style="font-size:18px; margin-bottom:10px;">${p.title ? escapeHtml(p.title) : '<span style="color:var(--ink-soft);">등록된 프로필이 없습니다</span>'}</h3>
-        <div style="font-size:14.5px; white-space:pre-wrap; word-break:break-word;">${p.content ? sanitizeRichHtml(p.content) : ''}</div>
+        <div style="font-size:14.5px; white-space:pre-wrap; word-break:break-word;">${p.content ? linkifyContactPatterns(sanitizeRichHtml(p.content)) : ''}</div>
       </div>`;
   },
   openProfileEdit(){
@@ -2766,54 +2747,26 @@ const app = {
       showToast('저장에 실패했습니다');
     }
   },
-
-  /* ---------- 소식 > 문의 상단 소개글 (프로필과 동일한 방식, 관리자만 수정) ---------- */
-  renderInquiryIntro(){
-    const toolbarEl = document.getElementById('inquiryIntro-toolbar');
-    const displayEl = document.getElementById('inquiryIntro-display');
-    if(!toolbarEl || !displayEl) return;
-    toolbarEl.innerHTML = isAdminUser() ? `<button class="btn small" onclick="app.openInquiryIntroEdit()">소개글 수정</button>` : '';
-    const iv = state.inquiryIntro || {title:'', content:''};
-    displayEl.innerHTML = `
-      <h3 style="font-size:18px; margin-bottom:10px;">${iv.title ? escapeHtml(iv.title) : '<span style="color:var(--ink-soft);">등록된 소개글이 없습니다</span>'}</h3>
-      <div style="font-size:14.5px; white-space:pre-wrap; word-break:break-word;">${iv.content ? sanitizeRichHtml(iv.content) : ''}</div>`;
-  },
-  openInquiryIntroEdit(){
-    if(!isAdminUser()) return;
-    const wrap = document.getElementById('inquiryIntro-edit-wrap');
-    if(!wrap) return;
-    const iv = state.inquiryIntro || {title:'', content:''};
-    wrap.style.display = 'block';
-    wrap.innerHTML = `
-      <div class="form-box">
-        <label>제목</label>
-        <input type="text" id="inquiryIntro-f-title" maxlength="60" value="${escapeHtml(iv.title || '')}">
-        <label>내용</label>
-        <div id="inquiryIntro-f-content-wrap"></div>
-        <div class="form-actions">
-          <button class="btn small" onclick="app.saveInquiryIntroEdit()">저장</button>
-          <button class="btn ghost small" onclick="document.getElementById('inquiryIntro-edit-wrap').style.display='none';">취소</button>
-        </div>
-      </div>`;
-    document.getElementById('inquiryIntro-f-content-wrap').innerHTML = buildRteHtml('inquiryIntro-f-content', '소개 내용을 입력하세요');
-    if(iv.content) document.getElementById('inquiryIntro-f-content').innerHTML = sanitizeRichHtml(iv.content);
-  },
-  async saveInquiryIntroEdit(){
-    if(!isAdminUser()) return;
-    const title = document.getElementById('inquiryIntro-f-title').value.trim();
-    const contentEl = document.getElementById('inquiryIntro-f-content');
-    const content = sanitizeRichHtml(contentEl ? contentEl.innerHTML : '');
-    if(!db){ showToast('Firebase가 설정되지 않았습니다'); return; }
-    try{
-      await db.collection('content').doc('inquiryIntro').set({ title, content });
-      state.inquiryIntro = { title, content };
-      const wrap = document.getElementById('inquiryIntro-edit-wrap');
-      if(wrap) wrap.style.display = 'none';
-      showToast('소개글이 저장되었습니다');
-      this.renderInquiryIntro();
-    }catch(e){
-      console.error(e);
-      showToast('저장에 실패했습니다');
+  copyEmailToClipboard(email){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(email)
+        .then(() => showToast('이메일 주소가 복사되었습니다'))
+        .catch(() => showToast('복사에 실패했어요. 직접 선택해서 복사해주세요'));
+    }else{
+      // 클립보드 API를 못 쓰는 구형 환경을 위한 대체 방식
+      try{
+        const temp = document.createElement('textarea');
+        temp.value = email;
+        temp.style.position = 'fixed';
+        temp.style.opacity = '0';
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand('copy');
+        document.body.removeChild(temp);
+        showToast('이메일 주소가 복사되었습니다');
+      }catch(e){
+        showToast('복사에 실패했어요. 직접 선택해서 복사해주세요');
+      }
     }
   },
 
@@ -2825,7 +2778,6 @@ const app = {
     this.renderBoard('notice');
     this.renderBoard('noticeUpdate');
     this.renderProfile();
-    this.renderInquiryIntro();
     this.renderBoard('download');
     this.renderFaq();
     this.renderGuestbook();

@@ -126,6 +126,7 @@ main.no-hero{padding-top:44px;}
 .hero-inner{position:relative; z-index:2; max-width:640px; pointer-events:none;}
 .hero-inner a, .hero-inner button{ pointer-events:auto; }
 #heroTaglineEditWrap{ pointer-events:auto; }
+#heroContactEditWrap{ pointer-events:auto; }
 .hero .eyebrow{
   font-family:'Noto Sans KR',sans-serif; font-size:12.5px; letter-spacing:4px;
   color:var(--wood); text-transform:uppercase; margin-bottom:14px; display:block;
@@ -558,8 +559,11 @@ footer{
         <button type="button" id="heroTaglineEditBtn" class="btn ghost small" style="display:none; position:absolute; top:0; right:0; padding:3px 9px; font-size:11px;" onclick="app.openHeroTaglineEdit()">수정</button>
       </div>
       <div id="heroTaglineEditWrap" style="display:none; max-width:480px; margin-bottom:8px;"></div>
-      <p style="margin-top:14px; font-size:16.5px; color:var(--ink-soft);"><a href="https://www.instagram.com/tarosu_gzh/" target="_blank" rel="noopener" style="color:inherit; text-decoration:none;">instagram @tarosu_gzh</a></p>
-      <p style="margin-top:2px; font-size:16.5px; color:var(--ink-soft);">E-Mail: tarosu.ooa@gmail.com</p>
+      <div style="position:relative; max-width:480px; margin-top:14px;">
+        <div id="heroContactDisplay" style="font-size:16.5px; color:var(--ink-soft);"></div>
+        <button type="button" id="heroContactEditBtn" class="btn ghost small" style="display:none; position:absolute; top:0; right:0; padding:3px 9px; font-size:11px;" onclick="app.openHeroContactEdit()">수정</button>
+      </div>
+      <div id="heroContactEditWrap" style="display:none; max-width:480px; margin-bottom:8px;"></div>
       <button type="button" class="mobile-guzheng-toggle-btn" onclick="app.toggleMobileGuzheng()">타로당 13현 고쟁</button>
     </div>
     <div class="strings-wrap" id="stringsWrap">
@@ -1049,6 +1053,7 @@ const state = {
   profile: { photoUrl: '', title: '', content: '' },
   homeCardOrder: null, // null이면 기본 순서 사용, 배열이면 그 순서대로 표시
   heroTaglineText: null, // null이면 기본 3줄 문구 사용
+  heroContactText: null, // null이면 기본 인스타그램/이메일 문구 사용
   visitStatsRange: null, // { fromDate, toDate, presetDays }
   data: { notice: [], noticeUpdate: [], download: [], faq: [], guestbook: [], sheets: [], updateLog: [], tuningUpdateLog: [] },
   detail: { notice: null, noticeUpdate: null, download: null, sheets: null },
@@ -1808,6 +1813,29 @@ async function saveHeroTagline(text){
   }
 }
 
+/* ---------- 홈 화면 인스타그램/이메일 연락처 (관리자만 작성/수정 가능) ---------- */
+const DEFAULT_HERO_CONTACT = "instagram @tarosu_gzh<br>E-Mail: tarosu.ooa@gmail.com";
+async function loadHeroContact(){
+  if(!db){ state.heroContactText = null; return; }
+  try{
+    const doc = await db.collection('content').doc('heroContact').get();
+    state.heroContactText = (doc.exists && doc.data().text) ? doc.data().text : null;
+  }catch(e){
+    console.error('홈 연락처 문구 로드 실패', e);
+    state.heroContactText = null;
+  }
+}
+async function saveHeroContact(text){
+  if(!db) return false;
+  try{
+    await db.collection('content').doc('heroContact').set({ text });
+    return true;
+  }catch(e){
+    console.error('홈 연락처 문구 저장 실패', e);
+    return false;
+  }
+}
+
 /* ---------- 악보 제작 / 음정 체크&조율 툴 '사용 Tip' (관리자만 작성/수정 가능) ---------- */
 const TIP_CONFIGS = {
   scoreMaker: { docId: 'scoreMakerTip', panelId: 'scoreMakerTipPanel', btnId: 'scoreMakerTipBtn', bodyId: 'scoreMakerTipBody' },
@@ -2188,6 +2216,7 @@ const app = {
     await loadProfile();
     await loadHomeCardOrder();
     await loadHeroTagline();
+    await loadHeroContact();
     updateStorageWarning();
     this.renderAll();
     initGuestbookCharLimit();
@@ -2774,6 +2803,7 @@ const app = {
     if(state.page==='mypage' && !state.currentUser){ this.go('home'); return; }
     this.renderHome();
     this.renderHeroTagline();
+    this.renderHeroContact();
     this.renderNoticeTabs();
     this.renderBoard('notice');
     this.renderBoard('noticeUpdate');
@@ -3482,6 +3512,50 @@ const app = {
       const wrap = document.getElementById('heroTaglineEditWrap');
       if(wrap) wrap.style.display = 'none';
       this.renderHeroTagline();
+    }else{
+      showToast('저장에 실패했습니다');
+    }
+  },
+
+  /* ---------- 홈 화면 인스타그램/이메일 연락처 (관리자만 수정, instagram/E-Mail 자동 링크화) ---------- */
+  renderHeroContact(){
+    const displayEl = document.getElementById('heroContactDisplay');
+    const editBtn = document.getElementById('heroContactEditBtn');
+    if(!displayEl) return;
+    const text = state.heroContactText || DEFAULT_HERO_CONTACT;
+    displayEl.innerHTML = linkifyContactPatterns(sanitizeRichHtml(text));
+    if(editBtn) editBtn.style.display = isAdminUser() ? '' : 'none';
+  },
+  openHeroContactEdit(){
+    if(!isAdminUser()) return;
+    const wrap = document.getElementById('heroContactEditWrap');
+    if(!wrap) return;
+    wrap.style.display = 'block';
+    const text = state.heroContactText || DEFAULT_HERO_CONTACT;
+    wrap.innerHTML = `
+      <div class="rte-toolbar" style="border-radius:2px 2px 0 0;">
+        <button type="button" title="굵게" onmousedown="event.preventDefault()" onclick="app.rteExec('heroContactEditor','bold')"><b>B</b></button>
+      </div>
+      <div class="rte-editor" id="heroContactEditor" contenteditable="true"
+        style="min-height:calc(2 * 1.7 * 16.5px + 24px); border-radius:0 0 2px 2px; font-size:16.5px; line-height:1.7;"
+        data-placeholder="instagram @아이디 / E-Mail 이메일주소 형태로 적으면 자동으로 클릭 가능해져요">${sanitizeRichHtml(text)}</div>
+      <div class="field-hint" style="margin-top:4px;">'instagram @아이디'라고 적으면 클릭 시 그 프로필로 이동하고, 'E-Mail 이메일주소'라고 적으면 클릭 시 이메일이 복사돼요.</div>
+      <div class="form-actions" style="margin-top:8px; margin-bottom:0;">
+        <button class="btn small" onclick="app.saveHeroContactEdit()">저장</button>
+        <button class="btn ghost small" onclick="document.getElementById('heroContactEditWrap').style.display='none';">취소</button>
+      </div>`;
+  },
+  async saveHeroContactEdit(){
+    if(!isAdminUser()) return;
+    const editorEl = document.getElementById('heroContactEditor');
+    const text = sanitizeRichHtml(editorEl ? editorEl.innerHTML : '');
+    const ok = await saveHeroContact(text);
+    if(ok){
+      state.heroContactText = text;
+      showToast('문구가 저장되었습니다');
+      const wrap = document.getElementById('heroContactEditWrap');
+      if(wrap) wrap.style.display = 'none';
+      this.renderHeroContact();
     }else{
       showToast('저장에 실패했습니다');
     }

@@ -133,7 +133,7 @@ main.no-hero{padding-top:44px;}
 }
 .hero h1{font-size:44px; line-height:1.35; font-weight:800;}
 .hero h1 em{font-style:normal; color:var(--wood); border-bottom:2px solid var(--gold);}
-.hero p.tagline{margin-top:18px; font-size:16.5px; color:var(--ink-soft); max-width:480px;}
+.hero p.tagline{margin-top:18px; font-size:16.5px; color:var(--ink-soft); max-width:480px; white-space:pre-wrap;}
 
 .strings-wrap{
   position:absolute; right:-40px; top:0; height:380px; width:56%;
@@ -560,7 +560,7 @@ footer{
       </div>
       <div id="heroTaglineEditWrap" style="display:none; max-width:480px; margin-bottom:8px;"></div>
       <div style="position:relative; max-width:480px; margin-top:14px;">
-        <div id="heroContactDisplay" style="font-size:16.5px; color:var(--ink-soft);"></div>
+        <div id="heroContactDisplay" style="font-size:16.5px; color:var(--ink-soft); white-space:pre-wrap;"></div>
         <button type="button" id="heroContactEditBtn" class="btn ghost small" style="display:none; position:absolute; top:0; right:0; padding:3px 9px; font-size:11px;" onclick="app.openHeroContactEdit()">수정</button>
       </div>
       <div id="heroContactEditWrap" style="display:none; max-width:480px; margin-bottom:8px;"></div>
@@ -2512,7 +2512,7 @@ const app = {
         </div>`;
     }else{
       bodyEl.innerHTML = state.tipText[key]
-        ? sanitizeRichHtml(state.tipText[key])
+        ? `<div style="white-space:pre-wrap;">${sanitizeRichHtml(state.tipText[key])}</div>`
         : `<span style="color:var(--ink-soft);">아직 등록된 사용 Tip이 없습니다.</span>`;
     }
   },
@@ -2590,7 +2590,7 @@ const app = {
     const displayEl = document.getElementById('scoreMakerNoticeDisplay');
     const editBtn = document.getElementById('scoreMakerNoticeEditBtn');
     if(!displayEl) return;
-    displayEl.innerHTML = `<div style="font-size:13.5px; color:var(--ink-soft);">${sanitizeRichHtml(state.scoreMakerNoticeText)}</div>`;
+    displayEl.innerHTML = `<div style="font-size:13.5px; color:var(--ink-soft); white-space:pre-wrap;">${sanitizeRichHtml(state.scoreMakerNoticeText)}</div>`;
     if(editBtn) editBtn.style.display = isAdminUser() ? '' : 'none';
   },
   openScoreMakerNoticeEdit(){
@@ -2626,7 +2626,7 @@ const app = {
     const displayEl = document.getElementById('tuningNoticeDisplay');
     const editBtn = document.getElementById('tuningNoticeEditBtn');
     if(!displayEl) return;
-    displayEl.innerHTML = `<div style="font-size:13.5px; color:var(--ink-soft);">${sanitizeRichHtml(state.tuningNoticeText)}</div>`;
+    displayEl.innerHTML = `<div style="font-size:13.5px; color:var(--ink-soft); white-space:pre-wrap;">${sanitizeRichHtml(state.tuningNoticeText)}</div>`;
     if(editBtn) editBtn.style.display = isAdminUser() ? '' : 'none';
   },
   openTuningNoticeEdit(){

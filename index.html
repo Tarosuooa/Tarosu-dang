@@ -642,6 +642,24 @@ footer{
     <div id="download-detail-view" style="display:none;"></div>
   </div>
 
+  <!-- GAME -->
+  <div class="page" id="page-game">
+    <div class="section-title"><h2>게임</h2><span class="hanja-sub">遊戲</span></div>
+    <div class="divider"></div>
+    <div id="gameStatus" class="field-hint" style="margin-bottom:10px; font-size:13px;"></div>
+    <div id="gameBlocked" class="card" style="display:none; text-align:center; padding:44px 24px;">
+      <h3 style="font-size:17px; margin-bottom:10px;">오늘의 이용 가능 시간을 모두 사용했어요</h3>
+      <p id="gameBlockedMsg" style="font-size:13.5px; color:var(--ink-soft); margin-bottom:18px;"></p>
+      <button class="btn" onclick="app.openLoginModal()">로그인하고 제한 없이 이용하기</button>
+    </div>
+    <div id="gameFrameWrap" style="position:relative; display:none;">
+      <iframe id="gameFrame" src="" title="타로당 고쟁 게임" scrolling="no" style="width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
+      <div id="gamePreparingOverlay" style="position:absolute; inset:0; background:rgba(35,29,23,0.72); border-radius:4px; display:flex; align-items:center; justify-content:center; pointer-events:auto;">
+        <span style="font-family:'Nanum Myeongjo',serif; font-size:26px; color:#fff; letter-spacing:2px;">(준비 중)</span>
+      </div>
+    </div>
+  </div>
+
   <!-- FAQ -->
   <div class="page" id="page-faq">
     <div class="section-title"><h2>FAQ</h2><span class="hanja-sub">問答</span></div>
@@ -996,6 +1014,7 @@ const NAV_ITEMS = [
   {id:'notice', label:'소식'},
   {id:'download', label:'미디어'},
   {id:'sheets', label:'악보'},
+  {id:'game', label:'게임'},
   {id:'faq', label:'FAQ'},
   {id:'guestbook', label:'방명록'},
 ];
@@ -1390,6 +1409,25 @@ function ensureScoreMakerFrameLoaded(iframeEl, loggedIn){
   scoreMakerState.frameSrcSet = true;
   const base = 'https://tarosuooa.github.io/Guzheng-sheet-Tarosu/';
   iframeEl.src = base + (loggedIn ? '?loggedin=1' : '');
+}
+
+// 게임 게시판 전용 시간제한 상태 (악보 제작/음정 체크 툴의 시간과는 완전히 별개로 관리)
+const gameState = {
+  active: false,
+  timerHandle: null,
+  ip: null,
+  windowStart: null,
+  usedSecondsAtStart: 0,
+  sessionStartTime: null,
+  remainingSeconds: 0,
+  blocked: false,
+  resetAt: null,
+  frameSrcLoaded: false
+};
+function ensureGameFrameSrc(iframeEl){
+  if(gameState.frameSrcLoaded) return;
+  gameState.frameSrcLoaded = true;
+  iframeEl.src = 'https://tarosuooa.github.io/Tarosuooa-Guzheng-game-Tarosu/';
 }
 
 // 음정 체크 툴 전용 시간제한 상태 (악보 제작 툴의 시간과는 완전히 별개로 관리)
@@ -2144,6 +2182,8 @@ function applyNavState(s){
   else app.stopScoreMakerSession(false);
   if(state.page==='sheets' && state.sheetTab==='tuning') app.startTuningSession();
   else app.stopTuningSession(false);
+  if(state.page==='game') app.startGameSession();
+  else app.stopGameSession(false);
 
   window.scrollTo({top:0, behavior:'smooth'});
   isRestoringHistory = false;
@@ -2203,6 +2243,10 @@ const app = {
         if(state.page==='sheets' && state.sheetTab==='tuning'){
           this.stopTuningSession(false);
           this.startTuningSession();
+        }
+        if(state.page==='game'){
+          this.stopGameSession(false);
+          this.startGameSession();
         }
       });
     }else{
@@ -2666,6 +2710,8 @@ const app = {
     if(leavingScoreMaker) this.stopScoreMakerSession(false);
     const leavingTuning = (state.page==='sheets' && state.sheetTab==='tuning' && page!=='sheets');
     if(leavingTuning) this.stopTuningSession(false);
+    const leavingGame = (state.page==='game' && page!=='game');
+    if(leavingGame) this.stopGameSession(false);
     if(page==='sheets') state.sheetTab = 'dl';
     if(page==='notice') state.noticeTab = 'notice';
     if(page==='faq') state.faqCategory = '전체';
@@ -2682,6 +2728,7 @@ const app = {
     state.detail.sheets = null;
     this.renderAll();
     if(page==='mypage') this.renderVisitStats();
+    if(page==='game') this.startGameSession();
     window.scrollTo({top:0, behavior:'smooth'});
     if(!skipPush) pushNavState();
   },
@@ -4782,6 +4829,158 @@ const app = {
       tuningState.resetAt = tuningState.windowStart + 24*60*60*1000;
       if(blockedEl) blockedEl.style.display = '';
       this.updateTuningBlockedCountdown();
+    }
+  },
+
+  /* ---------- 게임 게시판 시간제한 (비회원 5분/일, 로그인 시 무제한) ---------- */
+  async startGameSession(){
+    const statusEl = document.getElementById('gameStatus');
+    const blockedEl = document.getElementById('gameBlocked');
+    const wrapEl = document.getElementById('gameFrameWrap');
+    const iframeEl = document.getElementById('gameFrame');
+    if(!statusEl || !blockedEl || !wrapEl || !iframeEl){
+      console.error('게임: 필요한 화면 요소를 찾지 못했습니다', {statusEl, blockedEl, wrapEl, iframeEl});
+      return;
+    }
+    try{
+      await this._startGameSessionInner(statusEl, blockedEl, wrapEl, iframeEl);
+    }catch(e){
+      console.error('게임 오류', e);
+      statusEl.style.display = '';
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '⚠ 오류가 발생했습니다: ' + (e && e.message ? e.message : String(e));
+      wrapEl.style.display = '';
+      ensureGameFrameSrc(iframeEl);
+    }
+  },
+
+  async _startGameSessionInner(statusEl, blockedEl, wrapEl, iframeEl){
+    if(state.currentUser){
+      if(gameState.timerHandle){ clearInterval(gameState.timerHandle); gameState.timerHandle = null; }
+      gameState.active = false;
+      statusEl.style.display = 'none';
+      blockedEl.style.display = 'none';
+      wrapEl.style.display = '';
+      ensureGameFrameSrc(iframeEl);
+      return;
+    }
+
+    statusEl.style.display = '';
+    statusEl.textContent = '이용 가능 시간을 확인하는 중...';
+    blockedEl.style.display = 'none';
+    wrapEl.style.display = 'none';
+
+    if(!db){
+      statusEl.textContent = '⚠ 이용 시간 확인 기능을 사용할 수 없습니다 (Firebase 설정 필요). 제한 없이 이용됩니다.';
+      wrapEl.style.display = '';
+      ensureGameFrameSrc(iframeEl);
+      return;
+    }
+
+    const ip = await fetchPublicIP();
+    gameState.ip = ip;
+
+    if(!ip){
+      statusEl.textContent = '⚠ 접속 정보를 확인할 수 없어 이용 시간 제한을 적용할 수 없습니다. 로그인하면 언제든 제한 없이 이용할 수 있어요.';
+      wrapEl.style.display = '';
+      ensureGameFrameSrc(iframeEl);
+      return;
+    }
+
+    const docId = ip.replace(/[^a-zA-Z0-9._-]/g, '_');
+    let usedSeconds = 0;
+    let windowStart = Date.now();
+    try{
+      const snap = await db.collection('gameIpUsage').doc(docId).get();
+      if(snap.exists){
+        const d = snap.data();
+        const elapsed = Date.now() - (d.windowStart || 0);
+        if(elapsed < 24*60*60*1000){
+          usedSeconds = d.usedSeconds || 0;
+          windowStart = d.windowStart;
+        }
+      }
+    }catch(e){ console.error('이용 기록 조회 실패', e); }
+
+    gameState.windowStart = windowStart;
+    const remaining = Math.max(0, 300 - usedSeconds);
+
+    if(remaining <= 0){
+      gameState.blocked = true;
+      gameState.resetAt = windowStart + 24*60*60*1000;
+      statusEl.style.display = 'none';
+      blockedEl.style.display = '';
+      this.updateGameBlockedCountdown();
+      return;
+    }
+
+    gameState.blocked = false;
+    gameState.remainingSeconds = remaining;
+    gameState.sessionStartTime = Date.now();
+    gameState.usedSecondsAtStart = usedSeconds;
+    gameState.active = true;
+
+    wrapEl.style.display = '';
+    ensureGameFrameSrc(iframeEl);
+    statusEl.style.display = '';
+    this.updateGameCountdown();
+
+    if(gameState.timerHandle) clearInterval(gameState.timerHandle);
+    gameState.timerHandle = setInterval(()=>{
+      gameState.remainingSeconds--;
+      this.updateGameCountdown();
+      if(gameState.remainingSeconds % 10 === 0) this.persistGameUsage();
+      if(gameState.remainingSeconds <= 0) this.stopGameSession(true);
+    }, 1000);
+  },
+
+  updateGameCountdown(){
+    const statusEl = document.getElementById('gameStatus');
+    if(!statusEl) return;
+    const s = Math.max(0, gameState.remainingSeconds);
+    const mm = String(Math.floor(s/60)).padStart(2,'0');
+    const ss = String(s%60).padStart(2,'0');
+    statusEl.textContent = `비회원 이용 가능 시간: ${mm}:${ss} 남음 · 로그인하면 시간 제한 없이 이용할 수 있어요`;
+  },
+
+  updateGameBlockedCountdown(){
+    const blockedMsgEl = document.getElementById('gameBlockedMsg');
+    if(!blockedMsgEl) return;
+    const remainMs = Math.max(0, gameState.resetAt - Date.now());
+    const remainH = Math.floor(remainMs / 3600000);
+    const remainM = Math.floor((remainMs % 3600000) / 60000);
+    blockedMsgEl.textContent = `오늘 사용 가능한 5분을 모두 사용했어요. 약 ${remainH}시간 ${remainM}분 후 다시 이용할 수 있어요.`;
+  },
+
+  persistGameUsage(){
+    if(!gameState.ip || !db) return;
+    const elapsedSinceStart = Math.floor((Date.now() - gameState.sessionStartTime) / 1000);
+    const totalUsed = Math.min(300, gameState.usedSecondsAtStart + Math.max(0, elapsedSinceStart));
+    const docId = gameState.ip.replace(/[^a-zA-Z0-9._-]/g, '_');
+    db.collection('gameIpUsage').doc(docId).set({
+      windowStart: gameState.windowStart,
+      usedSeconds: totalUsed,
+      lastSeen: Date.now()
+    }, { merge: true }).catch(e => console.error('이용 기록 저장 실패', e));
+  },
+
+  stopGameSession(expired){
+    if(gameState.timerHandle){ clearInterval(gameState.timerHandle); gameState.timerHandle = null; }
+    if(gameState.active && !state.currentUser){ this.persistGameUsage(); }
+    gameState.active = false;
+    if(expired){
+      const wrapEl = document.getElementById('gameFrameWrap');
+      const iframeEl = document.getElementById('gameFrame');
+      const statusEl = document.getElementById('gameStatus');
+      const blockedEl = document.getElementById('gameBlocked');
+      if(wrapEl) wrapEl.style.display = 'none';
+      if(iframeEl) iframeEl.src = '';
+      gameState.frameSrcLoaded = false;
+      if(statusEl) statusEl.style.display = 'none';
+      gameState.blocked = true;
+      gameState.resetAt = gameState.windowStart + 24*60*60*1000;
+      if(blockedEl) blockedEl.style.display = '';
+      this.updateGameBlockedCountdown();
     }
   }
 };

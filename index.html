@@ -599,6 +599,7 @@ footer{
       <button class="subtab-btn" id="noticesubtab-notice" onclick="app.setNoticeTab('notice')">공지사항</button>
       <button class="subtab-btn" id="noticesubtab-noticeUpdate" onclick="app.setNoticeTab('noticeUpdate')">업데이트</button>
       <button class="subtab-btn" id="noticesubtab-profile" onclick="app.setNoticeTab('profile')">프로필</button>
+      <button class="subtab-btn" id="noticesubtab-inquiry" onclick="app.setNoticeTab('inquiry')">문의</button>
     </div>
 
     <!-- 공지사항 -->
@@ -625,6 +626,13 @@ footer{
       <div class="card" id="profile-display" style="display:flex; gap:20px; align-items:flex-start; flex-wrap:wrap;"></div>
       <div id="profile-edit-wrap" style="display:none; margin-top:14px;"></div>
     </div>
+
+    <!-- 문의: 프로필처럼 관리자가 소개글(연락처 등)을 직접 작성 -->
+    <div id="notice-tab-inquiry" style="display:none;">
+      <div class="toolbar" id="inquiryIntro-toolbar"></div>
+      <div class="card" id="inquiryIntro-display"></div>
+      <div id="inquiryIntro-edit-wrap" style="display:none; margin-top:14px;"></div>
+    </div>
   </div>
 
   <!-- DOWNLOAD -->
@@ -645,44 +653,6 @@ footer{
     <div class="category-filter" id="faqCategoryFilter"></div>
     <div class="toolbar" id="faq-toolbar"></div>
     <div class="list-box" id="faq-list"></div>
-  </div>
-
-  <!-- INQUIRY -->
-  <div class="page" id="page-inquiry">
-    <div class="section-title"><h2>문의</h2><span class="hanja-sub">問議</span></div>
-    <div class="divider"></div>
-
-    <div class="form-box">
-      <h3 style="font-size:16px; margin-bottom:4px;">문의 보내기</h3>
-      <p class="field-hint" style="margin:0 0 12px;">문의를 보내면 관리자의 이메일로 바로 전달돼요. 로그인한 회원만 이용할 수 있어요.</p>
-      <div id="iqLoginNotice" class="field-hint" style="display:none; margin-bottom:12px;">로그인 후 이용해주세요</div>
-      <div id="iqFormFields">
-        <label>내 이메일 (답변받으실 주소)</label>
-        <input type="text" id="iqEmail" placeholder="you@example.com">
-        <label>유형 (중복 선택 가능)</label>
-        <div style="display:flex; gap:16px; flex-wrap:wrap; margin-top:-2px; padding-bottom:4px;">
-          <label style="display:flex; align-items:center; gap:6px; font-size:14px; font-family:'Noto Sans KR',sans-serif; cursor:pointer;">
-            <input type="checkbox" id="iqType-inquiry"> 문의
-          </label>
-          <label style="display:flex; align-items:center; gap:6px; font-size:14px; font-family:'Noto Sans KR',sans-serif; cursor:pointer;">
-            <input type="checkbox" id="iqType-bug"> 오류 제보
-          </label>
-          <label style="display:flex; align-items:center; gap:6px; font-size:14px; font-family:'Noto Sans KR',sans-serif; cursor:pointer;">
-            <input type="checkbox" id="iqType-suggestion"> 건의 사항
-          </label>
-          <label style="display:flex; align-items:center; gap:6px; font-size:14px; font-family:'Noto Sans KR',sans-serif; cursor:pointer;">
-            <input type="checkbox" id="iqType-etc"> 그 외
-          </label>
-        </div>
-        <label>제목</label>
-        <input type="text" id="iqTitle" maxlength="100" placeholder="문의 제목을 입력하세요">
-        <label>내용</label>
-        <textarea id="iqContent" maxlength="2000" placeholder="문의하실 내용을 입력하세요"></textarea>
-        <label>이미지 / 영상 링크</label>
-        <textarea id="iqMedia" placeholder="참고할 이미지·영상 링크를 한 줄에 하나씩 붙여넣으세요 (선택 입력)"></textarea>
-        <div class="form-actions"><button class="btn" id="iqSendBtn" onclick="app.sendInquiryEmail()">전송</button></div>
-      </div>
-    </div>
   </div>
 
   <!-- GUESTBOOK -->
@@ -997,8 +967,6 @@ const firebaseConfig = {
   measurementId: "G-P3CPQM1G77"
 };
 
-// '문의' 게시판에서 회원이 보낸 문의 이메일을 받을 주소입니다. 실제 관리자 이메일로 바꿔주세요.
-const ADMIN_CONTACT_EMAIL = "tarosu.ooa@gmail.com";
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxYLSCw35u6GenUb85TBx2sLzoOLzdnXB_fl0f1IU41aNP6H7BFthzLseHd8RE988qo/exec";
 const GAS_CONFIGURED = GAS_WEB_APP_URL !== "YOUR_APPS_SCRIPT_WEB_APP_URL";
 
@@ -1033,7 +1001,6 @@ const NAV_ITEMS = [
   {id:'download', label:'미디어'},
   {id:'sheets', label:'악보'},
   {id:'faq', label:'FAQ'},
-  {id:'inquiry', label:'문의'},
   {id:'guestbook', label:'방명록'},
 ];
 
@@ -1089,6 +1056,7 @@ const state = {
   tuningNoticeText: '',
   tipText: { scoreMaker: '', tuning: '' },
   profile: { photoUrl: '', title: '', content: '' },
+  inquiryIntro: { title: '', content: '' },
   homeCardOrder: null, // null이면 기본 순서 사용, 배열이면 그 순서대로 표시
   heroTaglineText: null, // null이면 기본 3줄 문구 사용
   visitStatsRange: null, // { fromDate, toDate, presetDays }
@@ -1756,6 +1724,21 @@ async function loadProfile(){
   }
 }
 
+/* ---------- 소식 > 문의 상단 소개글 (프로필과 동일한 방식, 관리자만 수정) ---------- */
+async function loadInquiryIntro(){
+  if(!db){ state.inquiryIntro = {title:'', content:''}; return; }
+  try{
+    const doc = await db.collection('content').doc('inquiryIntro').get();
+    state.inquiryIntro = doc.exists ? {
+      title: doc.data().title || '',
+      content: doc.data().content || ''
+    } : {title:'', content:''};
+  }catch(e){
+    console.error('문의 소개글 로드 실패', e);
+    state.inquiryIntro = {title:'', content:''};
+  }
+}
+
 /* ---------- 홈 화면 카드: 관리자가 순서를 자유롭게 바꿀 수 있다 ---------- */
 const HOME_CARD_IDS = ['notice', 'sheetsDl', 'sheetsMake', 'download', 'faq', 'guestbook'];
 const HOME_CARD_HTML = {
@@ -1764,6 +1747,7 @@ const HOME_CARD_HTML = {
       <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('notice')">공지사항</button>
       <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('noticeUpdate')">업데이트</button>
       <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('profile')">프로필</button>
+      <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('inquiry')">문의</button>
     </div>`,
   sheetsDl: () => `<h3 style="font-size:16px;">악보 다운로드 <span id="homeSheetsNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로수와 회원님들이 공유한 악보를 받아 보세요.</p>`,
   sheetsMake: () => `<h3 style="font-size:16px;">악보 제작 및 조율</h3>
@@ -2214,6 +2198,7 @@ const app = {
     await loadTipText('scoreMaker');
     await loadTipText('tuning');
     await loadProfile();
+    await loadInquiryIntro();
     await loadHomeCardOrder();
     await loadHeroTagline();
     updateStorageWarning();
@@ -2261,6 +2246,7 @@ const app = {
             <button onclick="app.goNoticeTab('notice')">공지사항</button>
             <button onclick="app.goNoticeTab('noticeUpdate')">업데이트</button>
             <button onclick="app.goNoticeTab('profile')">프로필</button>
+            <button onclick="app.goNoticeTab('inquiry')">문의</button>
           </div>
         </div>`;
       }
@@ -2699,22 +2685,27 @@ const app = {
     document.getElementById('noticesubtab-notice').classList.toggle('active', tab==='notice');
     document.getElementById('noticesubtab-noticeUpdate').classList.toggle('active', tab==='noticeUpdate');
     document.getElementById('noticesubtab-profile').classList.toggle('active', tab==='profile');
+    document.getElementById('noticesubtab-inquiry').classList.toggle('active', tab==='inquiry');
     document.getElementById('notice-tab-notice').style.display = tab==='notice' ? '' : 'none';
     document.getElementById('notice-tab-noticeUpdate').style.display = tab==='noticeUpdate' ? '' : 'none';
     document.getElementById('notice-tab-profile').style.display = tab==='profile' ? '' : 'none';
+    document.getElementById('notice-tab-inquiry').style.display = tab==='inquiry' ? '' : 'none';
     this.renderNoticeTabs();
     if(tab==='notice') this.renderBoard('notice');
     else if(tab==='noticeUpdate') this.renderBoard('noticeUpdate');
     else if(tab==='profile') this.renderProfile();
+    else if(tab==='inquiry'){ this.renderInquiryIntro(); }
     pushNavState();
   },
   renderNoticeTabs(){
     document.getElementById('noticesubtab-notice').classList.toggle('active', state.noticeTab==='notice');
     document.getElementById('noticesubtab-noticeUpdate').classList.toggle('active', state.noticeTab==='noticeUpdate');
     document.getElementById('noticesubtab-profile').classList.toggle('active', state.noticeTab==='profile');
+    document.getElementById('noticesubtab-inquiry').classList.toggle('active', state.noticeTab==='inquiry');
     document.getElementById('notice-tab-notice').style.display = state.noticeTab==='notice' ? '' : 'none';
     document.getElementById('notice-tab-noticeUpdate').style.display = state.noticeTab==='noticeUpdate' ? '' : 'none';
     document.getElementById('notice-tab-profile').style.display = state.noticeTab==='profile' ? '' : 'none';
+    document.getElementById('notice-tab-inquiry').style.display = state.noticeTab==='inquiry' ? '' : 'none';
   },
 
   /* ---------- 프로필 (게시물 목록이 아니라 왼쪽 사진 + 오른쪽 제목/내용, 관리자만 수정) ---------- */
@@ -2776,6 +2767,56 @@ const app = {
     }
   },
 
+  /* ---------- 소식 > 문의 상단 소개글 (프로필과 동일한 방식, 관리자만 수정) ---------- */
+  renderInquiryIntro(){
+    const toolbarEl = document.getElementById('inquiryIntro-toolbar');
+    const displayEl = document.getElementById('inquiryIntro-display');
+    if(!toolbarEl || !displayEl) return;
+    toolbarEl.innerHTML = isAdminUser() ? `<button class="btn small" onclick="app.openInquiryIntroEdit()">소개글 수정</button>` : '';
+    const iv = state.inquiryIntro || {title:'', content:''};
+    displayEl.innerHTML = `
+      <h3 style="font-size:18px; margin-bottom:10px;">${iv.title ? escapeHtml(iv.title) : '<span style="color:var(--ink-soft);">등록된 소개글이 없습니다</span>'}</h3>
+      <div style="font-size:14.5px; white-space:pre-wrap; word-break:break-word;">${iv.content ? sanitizeRichHtml(iv.content) : ''}</div>`;
+  },
+  openInquiryIntroEdit(){
+    if(!isAdminUser()) return;
+    const wrap = document.getElementById('inquiryIntro-edit-wrap');
+    if(!wrap) return;
+    const iv = state.inquiryIntro || {title:'', content:''};
+    wrap.style.display = 'block';
+    wrap.innerHTML = `
+      <div class="form-box">
+        <label>제목</label>
+        <input type="text" id="inquiryIntro-f-title" maxlength="60" value="${escapeHtml(iv.title || '')}">
+        <label>내용</label>
+        <div id="inquiryIntro-f-content-wrap"></div>
+        <div class="form-actions">
+          <button class="btn small" onclick="app.saveInquiryIntroEdit()">저장</button>
+          <button class="btn ghost small" onclick="document.getElementById('inquiryIntro-edit-wrap').style.display='none';">취소</button>
+        </div>
+      </div>`;
+    document.getElementById('inquiryIntro-f-content-wrap').innerHTML = buildRteHtml('inquiryIntro-f-content', '소개 내용을 입력하세요');
+    if(iv.content) document.getElementById('inquiryIntro-f-content').innerHTML = sanitizeRichHtml(iv.content);
+  },
+  async saveInquiryIntroEdit(){
+    if(!isAdminUser()) return;
+    const title = document.getElementById('inquiryIntro-f-title').value.trim();
+    const contentEl = document.getElementById('inquiryIntro-f-content');
+    const content = sanitizeRichHtml(contentEl ? contentEl.innerHTML : '');
+    if(!db){ showToast('Firebase가 설정되지 않았습니다'); return; }
+    try{
+      await db.collection('content').doc('inquiryIntro').set({ title, content });
+      state.inquiryIntro = { title, content };
+      const wrap = document.getElementById('inquiryIntro-edit-wrap');
+      if(wrap) wrap.style.display = 'none';
+      showToast('소개글이 저장되었습니다');
+      this.renderInquiryIntro();
+    }catch(e){
+      console.error(e);
+      showToast('저장에 실패했습니다');
+    }
+  },
+
   renderAll(){
     if(state.page==='mypage' && !state.currentUser){ this.go('home'); return; }
     this.renderHome();
@@ -2784,6 +2825,7 @@ const app = {
     this.renderBoard('notice');
     this.renderBoard('noticeUpdate');
     this.renderProfile();
+    this.renderInquiryIntro();
     this.renderBoard('download');
     this.renderFaq();
     this.renderGuestbook();
@@ -2792,7 +2834,6 @@ const app = {
     this.renderScoreMakerNotice();
     this.renderTuningNotice();
     this.renderMyPage();
-    this.renderInquiryForm();
     this.updateAuthArea();
     const guidePanel = document.getElementById('guzhengGuidePanel');
     if(guidePanel && guidePanel.style.display !== 'none') this.renderGuzhengGuide();
@@ -3679,85 +3720,6 @@ const app = {
     showToast('삭제되었습니다');
     this.renderBoard(name);
     if(name==='notice') this.renderHome();
-  },
-
-  /* ---------- inquiry: 회원이 관리자 이메일로 문의 보내기 ---------- */
-  renderInquiryForm(){
-    const noticeEl = document.getElementById('iqLoginNotice');
-    const fieldsEl = document.getElementById('iqFormFields');
-    if(!noticeEl || !fieldsEl) return;
-    if(state.currentUser){
-      noticeEl.style.display = 'none';
-      fieldsEl.style.display = '';
-      const emailEl = document.getElementById('iqEmail');
-      if(emailEl && !emailEl.value) emailEl.value = state.currentUser.email;
-    }else{
-      noticeEl.style.display = '';
-      fieldsEl.style.display = 'none';
-    }
-  },
-  async sendInquiryEmail(){
-    if(!state.currentUser){ showToast('로그인 후 이용해주세요'); return; }
-    if(!GAS_CONFIGURED){ showToast('이메일 발송 기능이 아직 설정되지 않았습니다'); return; }
-    const email = document.getElementById('iqEmail').value.trim();
-    const title = document.getElementById('iqTitle').value.trim();
-    const content = document.getElementById('iqContent').value.trim();
-    const media = parseMediaUrls(document.getElementById('iqMedia').value);
-
-    const typeMap = [
-      { id: 'iqType-inquiry', label: '문의' },
-      { id: 'iqType-bug', label: '오류 제보' },
-      { id: 'iqType-suggestion', label: '건의 사항' },
-      { id: 'iqType-etc', label: '그 외' }
-    ];
-    const checkedTypes = typeMap.filter(t => document.getElementById(t.id) && document.getElementById(t.id).checked).map(t => t.label);
-
-    if(!validEmail(email)){ showToast('올바른 이메일 주소를 입력해주세요'); return; }
-    if(!title || !content){ showToast('제목과 내용을 입력해주세요'); return; }
-
-    // 체크된 유형을 메일 본문 맨 앞에 함께 적어 보낸다 (화면의 내용 입력창 자체는 건드리지 않는다)
-    const typesLine = checkedTypes.length ? `[선택한 유형: ${checkedTypes.join(', ')}]\n\n` : '';
-    const contentWithTypes = typesLine + content;
-
-    const btn = document.getElementById('iqSendBtn');
-    btn.disabled = true; btn.textContent = '전송 중...';
-    try{
-      const res = await fetch(GAS_WEB_APP_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({
-          type: 'inquiry',
-          to: ADMIN_CONTACT_EMAIL,
-          replyTo: email,
-          title, content: contentWithTypes, media,
-          types: checkedTypes,
-          nickname: state.currentUser.nickname
-        })
-      });
-      const rawText = await res.text();
-      let result = null;
-      try{ result = JSON.parse(rawText); }catch(parseErr){ /* JSON이 아닌 응답 */ }
-
-      if(!res.ok){
-        throw new Error('서버 응답 오류 (HTTP ' + res.status + '): ' + rawText.slice(0, 200));
-      }
-      if(!result){
-        throw new Error('응답을 해석할 수 없어요: ' + rawText.slice(0, 200));
-      }
-      if(result.status !== 'ok'){
-        throw new Error(result.message || '발송 실패');
-      }
-
-      showToast('문의가 전송되었습니다');
-      document.getElementById('iqTitle').value = '';
-      document.getElementById('iqContent').value = '';
-      document.getElementById('iqMedia').value = '';
-      typeMap.forEach(t => { const el = document.getElementById(t.id); if(el) el.checked = false; });
-    }catch(e){
-      console.error(e);
-      showToast('문의 전송에 실패했습니다: ' + (e && e.message ? e.message : '알 수 없는 오류'));
-    }
-    btn.disabled = false; btn.textContent = '전송';
   },
 
   renderFaq(){

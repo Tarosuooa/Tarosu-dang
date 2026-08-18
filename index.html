@@ -1179,10 +1179,10 @@ function linkifyContactPatterns(html){
   if(!html) return html;
   html = html.replace(/(instagram)(\s*)(@[A-Za-z0-9_.]+)/gi, (m, label, sp, handle) => {
     const username = handle.slice(1);
-    return `<a href="https://www.instagram.com/${username}/" target="_blank" rel="noopener" style="color:inherit; text-decoration:underline;">${label}${sp}${handle}</a>`;
+    return `<a href="https://www.instagram.com/${username}/" target="_blank" rel="noopener" style="color:inherit; text-decoration:none;">${label}${sp}${handle}</a>`;
   });
   html = html.replace(/(E-Mail)(\s*:?\s*)([\w.+-]+@[\w-]+\.[\w.-]+)/gi, (m, label, sp, email) => {
-    return `<span onclick="app.copyEmailToClipboard('${email}')" style="cursor:pointer; text-decoration:underline;" title="클릭하면 이메일 주소가 복사돼요">${label}${sp}${email}</span>`;
+    return `<span onclick="app.copyEmailToClipboard('${email}')" style="cursor:pointer; text-decoration:none;" title="클릭하면 이메일 주소가 복사돼요">${label}${sp}${email}</span>`;
   });
   return html;
 }

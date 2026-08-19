@@ -646,6 +646,9 @@ footer{
   <div class="page" id="page-game">
     <div class="section-title"><h2>게임</h2><span class="hanja-sub">遊戲</span></div>
     <div class="divider"></div>
+    <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
+      <button class="btn ghost small" onclick="app.openGameUpdateLogModal()">업데이트 내역</button>
+    </div>
     <div id="gameStatus" class="field-hint" style="margin-bottom:10px; font-size:13px;"></div>
     <div id="gameBlocked" class="card" style="display:none; text-align:center; padding:44px 24px;">
       <h3 style="font-size:17px; margin-bottom:10px;">오늘의 이용 가능 시간을 모두 사용했어요</h3>
@@ -964,6 +967,19 @@ footer{
   </div>
 </div>
 
+<!-- 게임 게시판 업데이트 내역 모달 (악보 제작/음정 체크 툴과는 별개의 데이터) -->
+<div class="modal-overlay" id="gameUpdateLogModal">
+  <div class="modal-box wide" style="width:460px; max-height:80vh; display:flex; flex-direction:column;">
+    <h3>게임 업데이트 내역</h3>
+    <p class="sub" id="gameUpdateLogCurrentVersion">현재 버전: -</p>
+    <div class="toolbar" id="gameUpdateLog-toolbar" style="margin-bottom:12px;"></div>
+    <div class="list-box" id="gameUpdateLog-list" style="overflow-y:auto; flex:1 1 auto;"></div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn ghost" onclick="app.closeGameUpdateLogModal()" style="flex:1;">닫기</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 
@@ -1053,7 +1069,8 @@ const SEED = {
   updateLog: [
     {id:'seed-u1', version:'0.0.1', date:'2026-08-01', content:'악보 제작 도구 첫 배포'}
   ],
-  tuningUpdateLog: []
+  tuningUpdateLog: [],
+  gameUpdateLog: []
 };
 
 const state = {
@@ -1074,7 +1091,7 @@ const state = {
   heroTaglineText: null, // null이면 기본 3줄 문구 사용
   heroContactText: null, // null이면 기본 인스타그램/이메일 문구 사용
   visitStatsRange: null, // { fromDate, toDate, presetDays }
-  data: { notice: [], noticeUpdate: [], download: [], faq: [], guestbook: [], sheets: [], updateLog: [], tuningUpdateLog: [] },
+  data: { notice: [], noticeUpdate: [], download: [], faq: [], guestbook: [], sheets: [], updateLog: [], tuningUpdateLog: [], gameUpdateLog: [] },
   detail: { notice: null, noticeUpdate: null, download: null, sheets: null },
   pendingSignup: null,
   pendingWithdraw: null,
@@ -2252,7 +2269,7 @@ const app = {
     }else{
       logDailyVisit(); // Firebase Auth를 못 쓰는 경우에도(설정 미완료 등) 최소한 시도는 한다
     }
-    await Promise.all(['notice','noticeUpdate','download','faq','guestbook','updateLog','tuningUpdateLog'].map(loadBoard));
+    await Promise.all(['notice','noticeUpdate','download','faq','guestbook','updateLog','tuningUpdateLog','gameUpdateLog'].map(loadBoard));
     await loadSheets();
     await loadGuzhengGuide();
     await loadScoreMakerNotice();
@@ -4530,6 +4547,93 @@ const app = {
     this.renderTuningUpdateLog();
   },
 
+  /* ---------- 게임 게시판 업데이트 내역 (악보 제작/음정 체크 툴과는 별개의 데이터) ---------- */
+  openGameUpdateLogModal(){
+    document.getElementById('gameUpdateLogModal').classList.add('show');
+    this.renderGameUpdateLog();
+  },
+  closeGameUpdateLogModal(){
+    document.getElementById('gameUpdateLogModal').classList.remove('show');
+    const f = document.getElementById('gameUpdateLog-form');
+    if(f) f.remove();
+  },
+  renderGameUpdateLog(){
+    const toolbarEl = document.getElementById('gameUpdateLog-toolbar');
+    const listEl = document.getElementById('gameUpdateLog-list');
+    const versionEl = document.getElementById('gameUpdateLogCurrentVersion');
+    if(!toolbarEl || !listEl) return;
+
+    toolbarEl.innerHTML = isAdminUser() ? `<button class="btn small" onclick="app.openGameUpdateLogForm()">+ 새 업데이트 추가</button>` : '';
+
+    const items = state.data.gameUpdateLog.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    if(versionEl){
+      versionEl.textContent = items.length ? `현재 버전: ${items[0].version}` : '현재 버전: -';
+    }
+    listEl.innerHTML = items.length===0 ? `<div class="empty-note">등록된 업데이트 내역이 없습니다</div>` :
+      items.map(u => `
+        <div class="post-row" style="cursor:default;">
+          <div style="flex:1;">
+            <div class="post-title">v${escapeHtml(u.version)}</div>
+            <div class="post-meta" style="margin-bottom:6px;">${escapeHtml(u.date)}</div>
+            <div style="font-size:13.5px; white-space:pre-wrap; word-break:break-word;">${escapeHtml(u.content)}</div>
+          </div>
+          ${isAdminUser() ? `
+            <div class="admin-row-actions">
+              <button class="btn ghost small" onclick="app.openGameUpdateLogForm('${u.id}')">수정</button>
+              <button class="btn danger small" onclick="app.deleteGameUpdateLog('${u.id}')">삭제</button>
+            </div>` : ''}
+        </div>`).join('');
+  },
+  openGameUpdateLogForm(editId){
+    if(!isAdminUser()) return;
+    const existing = editId ? state.data.gameUpdateLog.find(u=>u.id===editId) : null;
+    const toolbarEl = document.getElementById('gameUpdateLog-toolbar');
+    let form = document.getElementById('gameUpdateLog-form');
+    if(form) form.remove();
+    form = document.createElement('div');
+    form.className = 'form-box';
+    form.id = 'gameUpdateLog-form';
+    form.innerHTML = `
+      <label>날짜</label>
+      <input type="text" id="gul-f-date" placeholder="예: 2026-08-14" value="${existing ? escapeHtml(existing.date) : todayStr()}">
+      <label>버전</label>
+      <input type="text" id="gul-f-version" placeholder="예: 0.0.1" value="${existing ? escapeHtml(existing.version) : ''}">
+      <label>내용</label>
+      <textarea id="gul-f-content" maxlength="1000" placeholder="업데이트 내용을 입력하세요">${existing ? escapeHtml(existing.content) : ''}</textarea>
+      <div class="form-actions">
+        <button class="btn small" onclick="app.saveGameUpdateLog(${existing ? `'${existing.id}'` : 'null'})">${existing ? '수정 완료' : '등록'}</button>
+        <button class="btn ghost small" onclick="document.getElementById('gameUpdateLog-form').remove()">취소</button>
+      </div>`;
+    toolbarEl.insertAdjacentElement('afterend', form);
+    document.getElementById('gul-f-version').focus();
+  },
+  async saveGameUpdateLog(editId){
+    if(!isAdminUser()) return;
+    const date = document.getElementById('gul-f-date').value.trim();
+    const version = document.getElementById('gul-f-version').value.trim();
+    const content = document.getElementById('gul-f-content').value.trim();
+    if(!date || !version || !content){ showToast('날짜, 버전, 내용을 모두 입력해주세요'); return; }
+
+    if(editId){
+      const item = state.data.gameUpdateLog.find(u=>u.id===editId);
+      item.date = date; item.version = version; item.content = content;
+    }else{
+      state.data.gameUpdateLog.push({ id: uid(), date, version, content });
+    }
+    await saveBoard('gameUpdateLog');
+    const f = document.getElementById('gameUpdateLog-form'); if(f) f.remove();
+    showToast(editId ? '수정되었습니다' : '등록되었습니다');
+    this.renderGameUpdateLog();
+  },
+  async deleteGameUpdateLog(id){
+    if(!isAdminUser()) return;
+    if(!confirm('이 업데이트 내역을 삭제하시겠습니까?')) return;
+    state.data.gameUpdateLog = state.data.gameUpdateLog.filter(u=>u.id!==id);
+    await saveBoard('gameUpdateLog');
+    showToast('삭제되었습니다');
+    this.renderGameUpdateLog();
+  },
+
   async startScoreMakerSession(){
     const statusEl = document.getElementById('scoreMakerStatus');
     const blockedEl = document.getElementById('scoreMakerBlocked');
@@ -4990,6 +5094,7 @@ document.getElementById('loginModal').addEventListener('click', (e)=>{ if(e.targ
 document.getElementById('forgotPasswordModal').addEventListener('click', (e)=>{ if(e.target.id==='forgotPasswordModal') app.closeForgotPasswordModal(); });
 document.getElementById('updateLogModal').addEventListener('click', (e)=>{ if(e.target.id==='updateLogModal') app.closeUpdateLogModal(); });
 document.getElementById('tuningUpdateLogModal').addEventListener('click', (e)=>{ if(e.target.id==='tuningUpdateLogModal') app.closeTuningUpdateLogModal(); });
+document.getElementById('gameUpdateLogModal').addEventListener('click', (e)=>{ if(e.target.id==='gameUpdateLogModal') app.closeGameUpdateLogModal(); });
 document.getElementById('liPassword')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') app.submitLogin(); });
 
 

@@ -462,6 +462,36 @@ footer{
 .user-chip{font-size:13px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif; white-space:nowrap;}
 .user-chip strong{color:var(--wood);}
 
+/* ---------- 알림(종) ---------- */
+.notif-bell-wrap{ position:relative; }
+.notif-bell-btn{
+  background:none; border:none; cursor:pointer; font-size:17px; position:relative;
+  padding:4px 2px; line-height:1;
+}
+.notif-badge{
+  position:absolute; top:-4px; right:-6px; background:var(--danger); color:#fff;
+  font-size:10px; font-weight:700; border-radius:9px; min-width:16px; height:16px;
+  display:flex; align-items:center; justify-content:center; padding:0 3px;
+  font-family:'Noto Sans KR',sans-serif;
+}
+.notif-panel{
+  display:none; position:absolute; top:calc(100% + 8px); right:0; z-index:80;
+  width:300px; max-height:400px; overflow-y:auto;
+  background:#fbf7ec; border:1px solid var(--paper-deep); border-radius:6px; box-shadow:var(--shadow);
+}
+.notif-panel.show{ display:block; }
+.notif-panel-empty{ padding:24px 16px; text-align:center; color:var(--ink-soft); font-size:13px; }
+.notif-item{
+  display:block; width:100%; text-align:left; background:none; border:none; cursor:pointer;
+  padding:11px 14px; border-bottom:1px solid var(--paper-deep); font-family:'Noto Sans KR',sans-serif;
+}
+.notif-item:last-child{ border-bottom:none; }
+.notif-item:hover{ background:var(--paper-dark); }
+.notif-item.unread{ background:rgba(184,144,63,0.08); }
+.notif-item-title{ font-size:13px; color:var(--ink); margin-bottom:2px; }
+.notif-item-title strong{ color:var(--wood); }
+.notif-item-meta{ font-size:11px; color:var(--ink-soft); }
+
 /* ---------- sheets / subtabs ---------- */
 .subtabs{display:flex; gap:6px; margin-bottom:22px; border-bottom:1px solid var(--paper-deep);}
 .subtab-btn{
@@ -487,6 +517,7 @@ footer{
 .badge.imported{background:#F7E6D2; color:#8A5A20; font-weight:700;}
 .badge.share-ok{background:#DFF2D9; color:#3D7A2C; font-weight:700;}
 .badge.new{background:#F7DAD3; color:#8C3B2E; font-weight:800; vertical-align:2px;}
+.comment-count-badge{ color:var(--jade); font-weight:700; font-size:12.5px; }
 .sheet-fields{display:grid; grid-template-columns:1fr 1fr; gap:0 16px;}
 .sheet-fields > div{min-width:0;}
 @media (max-width:600px){.sheet-fields{grid-template-columns:1fr;}}
@@ -1041,11 +1072,12 @@ const BOARD_CONFIG = {
   download:     {label:'자료', hasLink:true, hasMedia:true, hasComments:true},
 };
 
-const FAQ_CATEGORIES = ['악보 제작', '악보 업로드&다운로드', '음정 체크&조율', '미디어', '악기', '홈페이지', '관리자', '그 외'];
+const FAQ_CATEGORIES = ['악보 제작', '악보 업로드&다운로드', '음정 체크&조율', '게임', '미디어', '악기', '홈페이지', '관리자', '그 외'];
 const FAQ_CATEGORY_COLORS = {
   '악보 제작':          {bg:'#E5D9F2', text:'#5B2C82'},
   '악보 업로드&다운로드': {bg:'#D9E8F2', text:'#2C5C82'},
   '음정 체크&조율':      {bg:'#D9F2EC', text:'#2C826D'},
+  '게임':               {bg:'#F2E6D9', text:'#8A5A2C'},
   '미디어':             {bg:'#F2E0D9', text:'#82502C'},
   '악기':               {bg:'#DFF2D9', text:'#3D7A2C'},
   '홈페이지':           {bg:'#F2D9EA', text:'#822C63'},
@@ -1091,6 +1123,8 @@ const state = {
   heroTaglineText: null, // null이면 기본 3줄 문구 사용
   heroContactText: null, // null이면 기본 인스타그램/이메일 문구 사용
   visitStatsRange: null, // { fromDate, toDate, presetDays }
+  commentCounts: {}, // postId -> 댓글 개수 (목록에 [N]으로 표시하기 위한 캐시)
+  notifications: [], // 로그인한 사용자에게 온 알림 목록
   data: { notice: [], noticeUpdate: [], download: [], faq: [], guestbook: [], sheets: [], updateLog: [], tuningUpdateLog: [], gameUpdateLog: [] },
   detail: { notice: null, noticeUpdate: null, download: null, sheets: null },
   pendingSignup: null,
@@ -1169,6 +1203,10 @@ function initGuestbookCharLimit(){
 }
 
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function commentCountBadge(postId){
+  const n = state.commentCounts[postId] || 0;
+  return n > 0 ? ` <span class="comment-count-badge">[${n}]</span>` : '';
+}
 function validPassword(pw){
   const SYMBOLS = "!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?~`";
   const re = new RegExp('^(?=.*[A-Za-z])(?=.*[0-9])(?=.*[' + SYMBOLS + '])[A-Za-z0-9' + SYMBOLS + ']{4,13}$');
@@ -1793,7 +1831,7 @@ async function loadProfile(){
 }
 
 /* ---------- 홈 화면 카드: 관리자가 순서를 자유롭게 바꿀 수 있다 ---------- */
-const HOME_CARD_IDS = ['notice', 'sheetsDl', 'sheetsMake', 'download', 'faq', 'guestbook'];
+const HOME_CARD_IDS = ['notice', 'sheetsDl', 'sheetsMake', 'download', 'game', 'faq', 'guestbook'];
 const HOME_CARD_HTML = {
   notice: () => `<h3 style="font-size:16px;">소식 <span id="homeNoticeNewBadge" class="badge new" style="display:none;">NEW</span></h3>
     <div style="display:flex; gap:8px; margin-top:18px; flex-wrap:wrap;">
@@ -1808,6 +1846,7 @@ const HOME_CARD_HTML = {
       <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('tuning')">음정 체크&amp;조율</button>
     </div>`,
   download: () => `<h3 style="font-size:16px;">미디어 <span id="homeDownloadNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">관리자 '타로수'의 연주 영상, 사진 등</p>`,
+  game: () => `<h3 style="font-size:16px;">게임</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">고쟁으로 즐기는 리듬 게임</p>`,
   faq: () => `<h3 style="font-size:16px;">FAQ</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">자주 묻는 질문 모음</p>`,
   guestbook: () => `<h3 style="font-size:16px;">방명록</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">자유롭게 적어 주세요 :)</p>`
 };
@@ -1815,6 +1854,7 @@ const HOME_CARD_CLICK = {
   notice: null, sheetsMake: null, // 버튼이 있는 카드는 카드 전체 클릭 이동을 쓰지 않는다
   sheetsDl: "app.goSheetsTab('dl')",
   download: "app.go('download')",
+  game: "app.go('game')",
   faq: "app.go('faq')",
   guestbook: "app.go('guestbook')"
 };
@@ -2027,6 +2067,46 @@ async function loadVisitStats(days){
   return loadVisitStatsRange(fromDateStr, toDateStr);
 }
 
+/* ---------- 알림 ---------- */
+async function loadNotifications(){
+  if(!db || !state.currentUser){ state.notifications = []; return; }
+  try{
+    const snap = await db.collection('notifications').where('toUid', '==', state.currentUser.uid).get();
+    state.notifications = snap.docs.map(d => ({id:d.id, ...d.data()}))
+      .sort((a,b) => (b.createdAt||0) - (a.createdAt||0))
+      .slice(0, 30);
+  }catch(e){
+    console.error('알림 로드 실패', e);
+    state.notifications = [];
+  }
+}
+// 게시물에 댓글이 달리면, 그 게시물 작성자에게 알림을 보낸다.
+// 공지사항/업데이트/미디어처럼 특정 관리자 계정과 연결되지 않은 게시판은(작성자가 'authorUid' 없이 '관리자' 문자열뿐이라)
+// 누구에게 보내야 할지 알 수 없으므로 건너뛴다.
+async function notifyPostAuthorOfComment(boardType, postId, commentText){
+  if(!db || !state.currentUser) return;
+  let authorUid = null, postTitle = '';
+  if(boardType === 'sheets'){
+    const post = state.data.sheets.find(s => s.id === postId);
+    if(post){ authorUid = post.authorUid; postTitle = post.title; }
+  }
+  if(!authorUid || authorUid === state.currentUser.uid) return; // 본인 글에 본인이 단 댓글은 알림을 보내지 않는다
+  try{
+    await db.collection('notifications').add({
+      toUid: authorUid,
+      fromUid: state.currentUser.uid,
+      fromNickname: state.currentUser.nickname,
+      type: 'comment',
+      boardType, postId, postTitle,
+      preview: commentText.slice(0, 60),
+      read: false,
+      createdAt: Date.now()
+    });
+  }catch(e){
+    console.error('알림 생성 실패', e);
+  }
+}
+
 /* ---------- 댓글 / 답글 ---------- */
 async function loadComments(postId){
   if(!db) return [];
@@ -2036,6 +2116,22 @@ async function loadComments(postId){
   }catch(e){
     console.error('댓글 로드 실패', e);
     return [];
+  }
+}
+// 게시물 목록에서 '[N]' 형태로 댓글 개수를 바로 보여주기 위해, 전체 댓글을 한 번에 불러와 개수만 캐시해둔다
+async function loadCommentCounts(){
+  if(!db){ state.commentCounts = {}; return; }
+  try{
+    const snap = await db.collection('comments').get();
+    const counts = {};
+    snap.forEach(doc => {
+      const postId = doc.data().postId;
+      if(postId) counts[postId] = (counts[postId] || 0) + 1;
+    });
+    state.commentCounts = counts;
+  }catch(e){
+    console.error('댓글 개수 로드 실패', e);
+    state.commentCounts = {};
   }
 }
 function buildCommentTree(list){
@@ -2247,6 +2343,7 @@ const app = {
           visitLoggedThisPageLoad = true;
           logDailyVisit();
         }
+        if(state.currentUser){ await loadNotifications(); }else{ state.notifications = []; }
         try{ this.updateAuthArea(); }catch(e){ console.error('updateAuthArea 오류', e); }
         try{ this.renderAll(); }catch(e){ console.error('renderAll 오류', e); }
         const smFrame = document.getElementById('scoreMakerFrame');
@@ -2280,6 +2377,7 @@ const app = {
     await loadHomeCardOrder();
     await loadHeroTagline();
     await loadHeroContact();
+    await loadCommentCounts();
     updateStorageWarning();
     this.renderAll();
     initGuestbookCharLimit();
@@ -2947,8 +3045,13 @@ const app = {
   updateAuthArea(){
     const box = document.getElementById('authArea');
     if(state.currentUser){
+      const unread = state.notifications.filter(n => !n.read).length;
       box.innerHTML = `
         <span class="user-chip" ondblclick="app.go('mypage')" title="더블클릭하면 마이페이지로 이동합니다" style="cursor:pointer;"><strong>${escapeHtml(state.currentUser.nickname)}</strong> 님${state.currentUser.isAdmin ? ' <strong style="color:var(--wood)">(관리자)</strong>' : ''}</span>
+        <div class="notif-bell-wrap">
+          <button class="notif-bell-btn" onclick="app.toggleNotifPanel()" title="알림">🔔${unread > 0 ? `<span class="notif-badge">${unread > 9 ? '9+' : unread}</span>` : ''}</button>
+          <div class="notif-panel" id="notifPanel"></div>
+        </div>
         <button class="pill" onclick="app.logout()">로그아웃</button>`;
     }else{
       box.innerHTML = `
@@ -2959,6 +3062,50 @@ const app = {
   async logout(){
     if(auth) await auth.signOut();
     showToast('로그아웃 되었습니다');
+  },
+
+  /* ---------- 알림 패널 ---------- */
+  toggleNotifPanel(){
+    const panel = document.getElementById('notifPanel');
+    if(!panel) return;
+    const isHidden = !panel.classList.contains('show');
+    if(isHidden){
+      this.renderNotifPanel();
+      panel.classList.add('show');
+    }else{
+      panel.classList.remove('show');
+    }
+  },
+  closeNotifPanel(){
+    const panel = document.getElementById('notifPanel');
+    if(panel) panel.classList.remove('show');
+  },
+  renderNotifPanel(){
+    const panel = document.getElementById('notifPanel');
+    if(!panel) return;
+    if(state.notifications.length === 0){
+      panel.innerHTML = `<div class="notif-panel-empty">아직 온 알림이 없어요.</div>`;
+      return;
+    }
+    panel.innerHTML = state.notifications.map(n => `
+      <button type="button" class="notif-item ${n.read ? '' : 'unread'}" onclick="app.openNotification('${n.id}')">
+        <div class="notif-item-title"><strong>${escapeHtml(n.fromNickname)}</strong>님이 '${escapeHtml(n.postTitle || '게시물')}'에 댓글을 남겼어요</div>
+        <div class="notif-item-meta">${escapeHtml(n.preview || '')}</div>
+      </button>`).join('');
+  },
+  async openNotification(notifId){
+    const notif = state.notifications.find(n => n.id === notifId);
+    if(!notif) return;
+    this.closeNotifPanel();
+    if(!notif.read && db){
+      try{ await db.collection('notifications').doc(notifId).update({ read: true }); }catch(e){ console.error(e); }
+      notif.read = true;
+      this.updateAuthArea();
+    }
+    if(notif.boardType && notif.postId){
+      this.go(notif.boardType === 'sheets' ? 'sheets' : notif.boardType);
+      this.openDetail(notif.boardType, notif.postId);
+    }
   },
 
   renderMyPage(){
@@ -3644,7 +3791,7 @@ const app = {
     const renderRow = (p, isPinnedSection) => `
         <div class="post-row">
           <div style="flex:1;cursor:pointer" onclick="app.openDetail('${name}','${p.id}')">
-            <div class="post-title">${isPinnedSection ? '📌 ' : ''}${escapeHtml(p.title)}${(name==='notice' || name==='noticeUpdate' || name==='download') && isRecentDate(p.date) ? ' <span class="badge new">NEW</span>' : ''}</div>
+            <div class="post-title">${isPinnedSection ? '📌 ' : ''}${escapeHtml(p.title)}${(name==='notice' || name==='noticeUpdate' || name==='download') && isRecentDate(p.date) ? ' <span class="badge new">NEW</span>' : ''}${commentCountBadge(p.id)}</div>
             <div class="post-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</div>
           </div>
           ${isAdminUser() ? `
@@ -4098,7 +4245,7 @@ const app = {
             <div class="post-title">
               <span class="badge ${sheetCategoryBadgeClass(s.category)}">${escapeHtml(s.category || '-')}</span>
               ${escapeHtml(s.title)}
-              ${isRecentDate(s.date) ? '<span class="badge new">NEW</span>' : ''}
+              ${isRecentDate(s.date) ? '<span class="badge new">NEW</span>' : ''}${commentCountBadge(s.id)}
             </div>
             <div class="post-meta">${escapeHtml(s.songName || '')} · ${escapeHtml(s.authorNickname)}${s.authorIsAdmin ? ' (관리자)' : ''} · ${escapeHtml(s.date)}</div>
           </div>
@@ -4333,6 +4480,11 @@ const app = {
     showToast(ok ? '링크가 복사되었습니다' : '복사에 실패했습니다. 주소창에서 직접 복사해주세요');
   },
 
+  refreshListForBoard(boardType){
+    if(boardType === 'sheets') this.renderSheets();
+    else this.renderBoard(boardType);
+  },
+
   /* ---------- 댓글 / 답글 ---------- */
   toggleReplyBox(commentId){
     const box = document.getElementById('reply-form-' + commentId);
@@ -4354,7 +4506,10 @@ const app = {
       });
       if(textEl) textEl.value = '';
       showToast(parentId ? '답글이 등록되었습니다' : '댓글이 등록되었습니다');
+      state.commentCounts[postId] = (state.commentCounts[postId] || 0) + 1;
+      this.refreshListForBoard(boardType);
       await loadAndRenderComments(boardType, postId);
+      await notifyPostAuthorOfComment(boardType, postId, text);
     }catch(e){
       console.error(e);
       showToast('댓글 등록에 실패했습니다');
@@ -4366,6 +4521,8 @@ const app = {
     try{
       await db.collection('comments').doc(commentId).delete();
       showToast('삭제되었습니다');
+      if(state.commentCounts[postId]) state.commentCounts[postId] = Math.max(0, state.commentCounts[postId] - 1);
+      this.refreshListForBoard(boardType);
       await loadAndRenderComments(boardType, postId);
     }catch(e){
       console.error(e);
@@ -5112,6 +5269,10 @@ window.addEventListener('mouseup', () => { stringsDragActive = false; stopString
 document.addEventListener('click', () => {
   const tip = document.getElementById('visitDotTooltip');
   if(tip) tip.style.display = 'none';
+});
+document.addEventListener('click', (e) => {
+  const wrap = e.target.closest && e.target.closest('.notif-bell-wrap');
+  if(!wrap) app.closeNotifPanel();
 });
 window.addEventListener('blur', () => { stringsDragActive = false; stopStringTremolo(); currentHeldNote = null; });
 

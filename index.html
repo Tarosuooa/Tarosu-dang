@@ -2091,12 +2091,15 @@ async function notifyPostAuthorOfComment(boardType, postId, commentText){
   if(!state.currentUser){ dbg('로그인 상태 아님'); return; }
 
   let authorUid = null, postTitle = '';
-  if(boardType === 'sheets'){
-    const post = state.data.sheets.find(s => s.id === postId);
-    if(post){ authorUid = post.authorUid; postTitle = post.title; }
-    dbg(post ? `게시물 찾음, 작성자 uid: ${authorUid}` : '게시물을 state.data.sheets에서 못 찾음 (postId 불일치 가능성)');
+  const post = boardType === 'sheets'
+    ? state.data.sheets.find(s => s.id === postId)
+    : (state.data[boardType] || []).find(p => p.id === postId);
+  if(post){
+    authorUid = post.authorUid || null;
+    postTitle = post.title;
+    dbg(authorUid ? `게시물 찾음, 작성자 uid: ${authorUid}` : '게시물은 찾았지만 작성자 uid가 저장되어 있지 않음 (이 기능이 추가되기 전에 작성된 글일 수 있어요)');
   }else{
-    dbg(`'${boardType}' 게시판은 특정 작성자 uid가 없어 알림을 보내지 않습니다 (공지사항/업데이트/미디어는 원래 그래요)`);
+    dbg('게시물을 찾지 못함 (postId 불일치 가능성)');
   }
   if(!authorUid){ dbg('작성자 uid가 없어 알림을 만들지 않고 종료'); return; }
   if(authorUid === state.currentUser.uid){ dbg('본인 글에 본인이 쓴 댓글이라 알림을 보내지 않습니다'); return; }
@@ -3954,7 +3957,12 @@ const app = {
       if(media!==undefined) post.media = media;
       if(allowComments!==undefined) post.allowComments = allowComments;
     }else{
-      state.data[name].unshift({ id: uid(), title, content, author:'관리자', date: nowStr(), ...(link!==undefined ? {link} : {}), ...(media!==undefined ? {media} : {}), ...(allowComments!==undefined ? {allowComments} : {}) });
+      state.data[name].unshift({
+        id: uid(), title, content, author:'관리자',
+        authorUid: state.currentUser ? state.currentUser.uid : null,
+        date: nowStr(),
+        ...(link!==undefined ? {link} : {}), ...(media!==undefined ? {media} : {}), ...(allowComments!==undefined ? {allowComments} : {})
+      });
     }
     await saveBoard(name);
     const f = document.getElementById(name+'-form'); if(f) f.remove();

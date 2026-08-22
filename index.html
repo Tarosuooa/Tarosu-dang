@@ -2084,14 +2084,25 @@ async function loadNotifications(){
 // 공지사항/업데이트/미디어처럼 특정 관리자 계정과 연결되지 않은 게시판은(작성자가 'authorUid' 없이 '관리자' 문자열뿐이라)
 // 누구에게 보내야 할지 알 수 없으므로 건너뛴다.
 async function notifyPostAuthorOfComment(boardType, postId, commentText){
-  if(!db || !state.currentUser) return;
+  const isDebug = location.search.includes('debugnotif');
+  const dbg = (msg) => { if(isDebug) showDebugVisitPanel('[알림] ' + msg); };
+
+  if(!db){ dbg('Firestore 연결 안 됨'); return; }
+  if(!state.currentUser){ dbg('로그인 상태 아님'); return; }
+
   let authorUid = null, postTitle = '';
   if(boardType === 'sheets'){
     const post = state.data.sheets.find(s => s.id === postId);
     if(post){ authorUid = post.authorUid; postTitle = post.title; }
+    dbg(post ? `게시물 찾음, 작성자 uid: ${authorUid}` : '게시물을 state.data.sheets에서 못 찾음 (postId 불일치 가능성)');
+  }else{
+    dbg(`'${boardType}' 게시판은 특정 작성자 uid가 없어 알림을 보내지 않습니다 (공지사항/업데이트/미디어는 원래 그래요)`);
   }
-  if(!authorUid || authorUid === state.currentUser.uid) return; // 본인 글에 본인이 단 댓글은 알림을 보내지 않는다
+  if(!authorUid){ dbg('작성자 uid가 없어 알림을 만들지 않고 종료'); return; }
+  if(authorUid === state.currentUser.uid){ dbg('본인 글에 본인이 쓴 댓글이라 알림을 보내지 않습니다'); return; }
+
   try{
+    dbg('Firestore에 알림 문서 저장 시도...');
     await db.collection('notifications').add({
       toUid: authorUid,
       fromUid: state.currentUser.uid,
@@ -2102,8 +2113,10 @@ async function notifyPostAuthorOfComment(boardType, postId, commentText){
       read: false,
       createdAt: Date.now()
     });
+    dbg('✓ 알림 저장 성공!');
   }catch(e){
     console.error('알림 생성 실패', e);
+    dbg('✗ 저장 실패: [' + (e && e.code ? e.code : '?') + '] ' + (e && e.message ? e.message : String(e)));
   }
 }
 

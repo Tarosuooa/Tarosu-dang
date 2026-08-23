@@ -175,7 +175,7 @@ main.no-hero{padding-top:44px;}
   color:var(--ink-soft); line-height:1; padding:2px;
 }
 .guzheng-guide-close:hover{ color:var(--wood); }
-#guzhengGuideBody{ font-size:13px; color:var(--ink); white-space:pre-wrap; word-break:break-word; }
+#guzhengGuideBody{ font-size:13px; color:var(--ink); white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word; }
 #guzhengGuideBody textarea{
   width:100%; min-height:110px; padding:8px 10px; border:1px solid var(--paper-deep);
   background:#fff; font-family:'Gowun Batang', 'Noto Serif SC', 'Noto Serif TC', serif; font-size:13px; border-radius:2px; resize:vertical;
@@ -241,7 +241,7 @@ main.no-hero{padding-top:44px;}
 .detail-view{background:#fbf7ec; border:1px solid var(--paper-deep); padding:30px 32px; box-shadow:var(--shadow);}
 .detail-view h3{font-size:22px; margin-bottom:8px;}
 .detail-view .post-meta{margin-bottom:20px;}
-.detail-body{font-size:15.5px; color:var(--ink); word-break:break-word; white-space:pre-wrap;}
+.detail-body{font-size:15.5px; color:var(--ink); word-break:keep-all; overflow-wrap:break-word; white-space:pre-wrap;}
 .detail-body br{content:""; display:block; margin-top:0.4em;}
 .back-link{
   display:inline-block; margin-bottom:18px; font-size:13.5px; color:var(--wood);
@@ -276,7 +276,7 @@ main.no-hero{padding-top:44px;}
 .comment-item:last-child{ border-bottom:none; }
 .comment-meta{ font-size:13px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif; margin-bottom:4px; }
 .comment-meta strong{ color:var(--ink); }
-.comment-text{ font-size:14.5px; white-space:pre-wrap; word-break:break-word; }
+.comment-text{ font-size:14.5px; white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word; }
 .comment-actions{ margin-top:6px; display:flex; gap:12px; }
 .comment-link-btn{
   background:none; border:none; padding:0; cursor:pointer; font-size:12.5px;
@@ -384,7 +384,7 @@ main.no-hero{padding-top:44px;}
 .gb-entry:last-child{border-bottom:none;}
 .gb-author{font-weight:700; font-size:14.5px;}
 .gb-date{font-size:11.5px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif; margin-left:8px;}
-.gb-text{margin-top:5px; font-size:14.5px; word-break:break-word; white-space:pre-wrap;}
+.gb-text{margin-top:5px; font-size:14.5px; word-break:keep-all; overflow-wrap:break-word; white-space:pre-wrap;}
 
 /* ---------- modal ---------- */
 .modal-overlay{
@@ -2942,7 +2942,7 @@ const app = {
         <div style="width:140px; height:140px; border-radius:8px; border:1px solid var(--paper-deep); background:var(--paper-dark); flex:none; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-size:12.5px;">사진 없음</div>
         <div style="flex:1; min-width:200px;">
           <h3 style="font-size:18px; margin-bottom:10px;">${titleHtml}</h3>
-          <div style="font-size:14.5px; white-space:pre-wrap; word-break:break-word;">${contentHtml}</div>
+          <div style="font-size:14.5px; white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word;">${contentHtml}</div>
         </div>`;
       return;
     }
@@ -2956,7 +2956,7 @@ const app = {
         <div style="display:flex; gap:8px;">${topPhotos.map(photoImg).join('')}</div>
         <div style="width:100%;">
           <h3 style="font-size:18px; margin-bottom:10px;">${titleHtml}</h3>
-          <div style="font-size:14.5px; white-space:pre-wrap; word-break:break-word;">${contentHtml}</div>
+          <div style="font-size:14.5px; white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word;">${contentHtml}</div>
         </div>
         ${extraPhoto ? photoImg(extraPhoto) : ''}`;
     }else{
@@ -2966,7 +2966,7 @@ const app = {
         <div style="display:flex; flex-direction:column; gap:8px; flex:none;">${photoUrls.map(photoImg).join('')}</div>
         <div style="flex:1; min-width:200px;">
           <h3 style="font-size:18px; margin-bottom:10px;">${titleHtml}</h3>
-          <div style="font-size:14.5px; white-space:pre-wrap; word-break:break-word;">${contentHtml}</div>
+          <div style="font-size:14.5px; white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word;">${contentHtml}</div>
         </div>`;
     }
   },
@@ -4671,7 +4671,7 @@ const app = {
           <div style="flex:1;">
             <div class="post-title">v${escapeHtml(u.version)}</div>
             <div class="post-meta" style="margin-bottom:6px;">${escapeHtml(u.date)}</div>
-            <div style="font-size:13.5px; white-space:pre-wrap; word-break:break-word;">${escapeHtml(u.content)}</div>
+            <div style="font-size:13.5px; white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word;">${escapeHtml(u.content)}</div>
           </div>
           ${isAdminUser() ? `
             <div class="admin-row-actions">
@@ -4758,7 +4758,7 @@ const app = {
           <div style="flex:1;">
             <div class="post-title">v${escapeHtml(u.version)}</div>
             <div class="post-meta" style="margin-bottom:6px;">${escapeHtml(u.date)}</div>
-            <div style="font-size:13.5px; white-space:pre-wrap; word-break:break-word;">${escapeHtml(u.content)}</div>
+            <div style="font-size:13.5px; white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word;">${escapeHtml(u.content)}</div>
           </div>
           ${isAdminUser() ? `
             <div class="admin-row-actions">
@@ -4845,7 +4845,7 @@ const app = {
           <div style="flex:1;">
             <div class="post-title">v${escapeHtml(u.version)}</div>
             <div class="post-meta" style="margin-bottom:6px;">${escapeHtml(u.date)}</div>
-            <div style="font-size:13.5px; white-space:pre-wrap; word-break:break-word;">${escapeHtml(u.content)}</div>
+            <div style="font-size:13.5px; white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word;">${escapeHtml(u.content)}</div>
           </div>
           ${isAdminUser() ? `
             <div class="admin-row-actions">

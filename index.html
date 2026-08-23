@@ -836,6 +836,15 @@ footer{
         <p class="field-hint" style="margin-top:8px;">관리자 계정으로는 방문이 집계되지 않도록 되어 있어서, 이 버튼으로 대신 저장 권한을 바로 테스트할 수 있어요.</p>
         <div id="visitStatsTestResult" style="font-size:13px; margin-top:8px; white-space:pre-wrap;"></div>
       </div>
+      <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--paper-deep);">
+        <h4 style="font-size:14px; margin-bottom:6px;">방문자 집계 제외 IP</h4>
+        <p class="field-hint" style="margin-bottom:10px;">여기 등록된 IP는 방문자 수 집계에서 제외돼요 (예: 관리자 본인의 집/사무실 IP 등).</p>
+        <div id="excludedIpList" style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;"></div>
+        <div style="display:flex; gap:6px;">
+          <input type="text" id="excludedIpInput" placeholder="예: 123.45.67.89" style="flex:1; padding:7px 10px; border:1px solid var(--paper-deep); border-radius:2px; font-size:13px;">
+          <button class="btn small" onclick="app.addExcludedVisitorIp()">추가</button>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -1134,6 +1143,7 @@ const state = {
   heroContactText: null, // null이면 기본 인스타그램/이메일 문구 사용
   visitStatsRange: null, // { fromDate, toDate, presetDays }
   commentCounts: {}, // postId -> 댓글 개수 (목록에 [N]으로 표시하기 위한 캐시)
+  excludedVisitorIps: [], // 방문자 집계에서 제외할 IP 목록 (마이페이지에서 관리)
   notifications: [], // 로그인한 사용자에게 온 알림 목록
   data: { notice: [], noticeUpdate: [], download: [], faq: [], guestbook: [], sheets: [], updateLog: [], tuningUpdateLog: [], gameUpdateLog: [] },
   detail: { notice: null, noticeUpdate: null, download: null, sheets: null },
@@ -2021,12 +2031,27 @@ function showDebugVisitPanel(msg){
   panel.scrollTop = panel.scrollHeight;
 }
 // 방문자 집계에서 제외할 IP 목록 (예: 관리자 본인이 자주 접속하는 집/사무실 IP 등)
-const EXCLUDED_VISITOR_IPS = new Set([
-  '125.142.254.25',
-  '125.142.202.149',
-  '106.248.180.226',
-  '118.235.4.142'
-]);
+// 마이페이지(관리자)에서 추가/삭제할 수 있도록 Firestore에 저장해서 관리한다
+async function loadExcludedVisitorIps(){
+  if(!db){ state.excludedVisitorIps = []; return; }
+  try{
+    const doc = await db.collection('content').doc('excludedVisitorIps').get();
+    state.excludedVisitorIps = (doc.exists && Array.isArray(doc.data().ips)) ? doc.data().ips : [];
+  }catch(e){
+    console.error('제외 IP 목록 로드 실패', e);
+    state.excludedVisitorIps = [];
+  }
+}
+async function saveExcludedVisitorIps(ips){
+  if(!db) return false;
+  try{
+    await db.collection('content').doc('excludedVisitorIps').set({ ips });
+    return true;
+  }catch(e){
+    console.error('제외 IP 목록 저장 실패', e);
+    return false;
+  }
+}
 async function logDailyVisit(){
   const isDebug = location.search.includes('debugvisit');
   const dbg = (msg) => { if(isDebug) showDebugVisitPanel(msg); };
@@ -2038,7 +2063,7 @@ async function logDailyVisit(){
   const kstDate = kstDateStr();
   let dedupKey = await fetchPublicIP();
   let keyPrefix = 'ip';
-  if(dedupKey && EXCLUDED_VISITOR_IPS.has(dedupKey)){
+  if(dedupKey && state.excludedVisitorIps.includes(dedupKey)){
     dbg('제외 목록에 등록된 IP(' + dedupKey + ')라서 집계하지 않습니다.');
     return;
   }
@@ -2360,6 +2385,8 @@ const app = {
       syncIframeHeightToContent(document.getElementById('scoreMakerFrame'));
       syncIframeHeightToContent(document.getElementById('tuningFrame'));
     }catch(e){ console.error('iframe 높이 동기화 오류', e); }
+    // 방문 기록(logDailyVisit)이 인증 콜백에서 곧바로 실행될 수 있으므로, 제외 IP 목록은 그 전에 미리 로드해둔다
+    await loadExcludedVisitorIps();
     updateStorageWarning();
     if(auth){
       auth.onAuthStateChanged(async (user)=>{
@@ -3263,11 +3290,56 @@ const app = {
     }
   },
 
+  /* ---------- 방문자 집계 제외 IP 관리 ---------- */
+  renderExcludedIpList(){
+    const listEl = document.getElementById('excludedIpList');
+    if(!listEl) return;
+    const ips = state.excludedVisitorIps || [];
+    listEl.innerHTML = ips.length === 0
+      ? `<div class="field-hint" style="margin:0;">등록된 제외 IP가 없어요.</div>`
+      : ips.map(ip => `
+        <div style="display:flex; justify-content:space-between; align-items:center; background:#fbf7ec; border:1px solid var(--paper-deep); border-radius:2px; padding:6px 10px;">
+          <span style="font-size:13px; font-family:monospace;">${escapeHtml(ip)}</span>
+          <button class="btn danger small" style="padding:3px 9px; font-size:11px;" onclick="app.removeExcludedVisitorIp('${escapeHtml(ip)}')">삭제</button>
+        </div>`).join('');
+  },
+  async addExcludedVisitorIp(){
+    if(!isAdminUser()) return;
+    const inputEl = document.getElementById('excludedIpInput');
+    const ip = inputEl.value.trim();
+    if(!ip){ showToast('IP를 입력해주세요'); return; }
+    if(state.excludedVisitorIps.includes(ip)){ showToast('이미 등록된 IP예요'); return; }
+    const updated = [...state.excludedVisitorIps, ip];
+    const ok = await saveExcludedVisitorIps(updated);
+    if(ok){
+      state.excludedVisitorIps = updated;
+      inputEl.value = '';
+      this.renderExcludedIpList();
+      showToast('제외 IP가 추가되었습니다');
+    }else{
+      showToast('저장에 실패했습니다');
+    }
+  },
+  async removeExcludedVisitorIp(ip){
+    if(!isAdminUser()) return;
+    const updated = state.excludedVisitorIps.filter(x => x !== ip);
+    const ok = await saveExcludedVisitorIps(updated);
+    if(ok){
+      state.excludedVisitorIps = updated;
+      this.renderExcludedIpList();
+      showToast('제외 IP가 삭제되었습니다');
+    }else{
+      showToast('저장에 실패했습니다');
+    }
+  },
+
+
   async renderVisitStats(){
     const card = document.getElementById('visitStatsCard');
     if(!card) return;
     if(!isAdminUser()){ card.style.display = 'none'; return; }
     card.style.display = '';
+    this.renderExcludedIpList();
 
     // 기간 프리셋 버튼 (한 번만 그린다)
     const presetRow = document.getElementById('visitStatsPresetRow');

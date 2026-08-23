@@ -2914,17 +2914,44 @@ const app = {
     toolbarEl.innerHTML = isAdminUser() ? `<button class="btn small" onclick="app.openProfileEdit()">프로필 수정</button>` : '';
     const p = state.profile || {photoUrls:[], title:'', content:''};
     const photoUrls = (p.photoUrls || []).filter(u => u && u.trim()); // 비어있는 칸은 제외
-    const photosHtml = photoUrls.length
-      ? `<div style="display:flex; flex-direction:column; gap:8px; flex:none;">
-          ${photoUrls.map(url => `<img src="${escapeHtml(url)}" alt="프로필 사진" style="width:140px; height:140px; object-fit:cover; border-radius:8px; border:1px solid var(--paper-deep);">`).join('')}
-        </div>`
-      : `<div style="width:140px; height:140px; border-radius:8px; border:1px solid var(--paper-deep); background:var(--paper-dark); flex:none; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-size:12.5px;">사진 없음</div>`;
-    displayEl.innerHTML = `
-      ${photosHtml}
-      <div style="flex:1; min-width:200px;">
-        <h3 style="font-size:18px; margin-bottom:10px;">${p.title ? escapeHtml(p.title) : '<span style="color:var(--ink-soft);">등록된 프로필이 없습니다</span>'}</h3>
-        <div style="font-size:14.5px; white-space:pre-wrap; word-break:break-word;">${p.content ? linkifyContactPatterns(sanitizeRichHtml(p.content)) : ''}</div>
-      </div>`;
+    const isMobile = window.innerWidth <= 720;
+    const photoImg = (url) => `<img src="${escapeHtml(url)}" alt="프로필 사진" style="width:140px; height:140px; object-fit:cover; border-radius:8px; border:1px solid var(--paper-deep); flex:none;">`;
+    const titleHtml = p.title ? escapeHtml(p.title) : '<span style="color:var(--ink-soft);">등록된 프로필이 없습니다</span>';
+    const contentHtml = p.content ? linkifyContactPatterns(sanitizeRichHtml(p.content)) : '';
+
+    if(photoUrls.length === 0){
+      displayEl.style.flexDirection = 'row';
+      displayEl.innerHTML = `
+        <div style="width:140px; height:140px; border-radius:8px; border:1px solid var(--paper-deep); background:var(--paper-dark); flex:none; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-size:12.5px;">사진 없음</div>
+        <div style="flex:1; min-width:200px;">
+          <h3 style="font-size:18px; margin-bottom:10px;">${titleHtml}</h3>
+          <div style="font-size:14.5px; white-space:pre-wrap; word-break:break-word;">${contentHtml}</div>
+        </div>`;
+      return;
+    }
+
+    if(isMobile){
+      // 모바일: 1~2장은 가로로 나란히, 3장이면 1·2번은 가로 + 3번째 사진은 프로필(사진+글) 전체 맨 아래에
+      const topPhotos = photoUrls.slice(0, 2);
+      const extraPhoto = photoUrls[2];
+      displayEl.style.flexDirection = 'column';
+      displayEl.innerHTML = `
+        <div style="display:flex; gap:8px;">${topPhotos.map(photoImg).join('')}</div>
+        <div style="width:100%;">
+          <h3 style="font-size:18px; margin-bottom:10px;">${titleHtml}</h3>
+          <div style="font-size:14.5px; white-space:pre-wrap; word-break:break-word;">${contentHtml}</div>
+        </div>
+        ${extraPhoto ? photoImg(extraPhoto) : ''}`;
+    }else{
+      // 데스크톱: 최대 3장을 세로로 쌓아서 글 왼쪽에 배치
+      displayEl.style.flexDirection = 'row';
+      displayEl.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:8px; flex:none;">${photoUrls.map(photoImg).join('')}</div>
+        <div style="flex:1; min-width:200px;">
+          <h3 style="font-size:18px; margin-bottom:10px;">${titleHtml}</h3>
+          <div style="font-size:14.5px; white-space:pre-wrap; word-break:break-word;">${contentHtml}</div>
+        </div>`;
+    }
   },
   openProfileEdit(){
     if(!isAdminUser()) return;
@@ -5304,6 +5331,11 @@ window.addEventListener('resize', () => {
     const tp = document.getElementById(TIP_CONFIGS[key].panelId);
     if(tp && tp.style.display !== 'none') app.positionTipPanel(key);
   });
+  // 창 크기가 모바일/데스크톱 기준을 넘나들면 프로필 사진 배치도 다시 그린다 (너무 자주 다시 그리지 않도록 살짝 지연)
+  clearTimeout(window._profileResizeTimer);
+  window._profileResizeTimer = setTimeout(() => {
+    if(document.getElementById('profile-display')) app.renderProfile();
+  }, 150);
 });
 
 // 고쟁 줄 위가 아닌 곳에서 마우스를 떼거나, 창 밖으로 나가도 드래그(스트럼) 상태를 확실히 해제한다

@@ -359,6 +359,8 @@ main.no-hero{padding-top:44px;}
   background:linear-gradient(135deg, #000000 50%, #ffffff 50%);
   border:1px solid rgba(0,0,0,0.3);
 }
+.rte-link{ color:var(--wood); text-decoration:underline; cursor:pointer; }
+.rte-link-btn{ font-size:12px; }
 
 /* ---------- faq ---------- */
 .faq-item{border-bottom:1px solid var(--paper-deep);}
@@ -1222,7 +1224,7 @@ function validPassword(pw){
 }
 function validEmail(em){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em); }
 
-const RTE_ALLOWED_TAGS = new Set(['B','STRONG','I','EM','U','BR','SPAN']);
+const RTE_ALLOWED_TAGS = new Set(['B','STRONG','I','EM','U','BR','SPAN','A']);
 function sanitizeRichHtml(html){
   const wrapper = document.createElement('div');
   wrapper.innerHTML = html || '';
@@ -1232,6 +1234,21 @@ function sanitizeRichHtml(html){
         if(!RTE_ALLOWED_TAGS.has(child.tagName)){
           while(child.firstChild) node.insertBefore(child.firstChild, child);
           node.removeChild(child);
+          return;
+        }
+        if(child.tagName === 'A'){
+          // 링크는 http(s)로 시작하는 안전한 주소만 허용한다 (javascript: 등 위험한 스킴은 차단)
+          const href = child.getAttribute('href') || '';
+          Array.from(child.attributes).forEach(attr => child.removeAttribute(attr.name));
+          if(/^https?:\/\//i.test(href)){
+            child.setAttribute('href', href);
+            child.setAttribute('target', '_blank');
+            child.setAttribute('rel', 'noopener');
+            child.setAttribute('class', 'rte-link');
+          }else{
+            // 안전하지 않은 링크는 그냥 일반 텍스트로 남긴다 (태그 자체를 제거하지 않고 속성만 없앰)
+          }
+          clean(child);
           return;
         }
         Array.from(child.attributes).forEach(attr => {
@@ -1437,6 +1454,8 @@ function buildRteHtml(editorId, placeholder){
       <button type="button" title="굵게" onmousedown="event.preventDefault()" onclick="app.rteExec('${editorId}','bold')"><b>B</b></button>
       <button type="button" class="i-btn" title="기울임" onmousedown="event.preventDefault()" onclick="app.rteExec('${editorId}','italic')">I</button>
       <button type="button" class="u-btn" title="밑줄" onmousedown="event.preventDefault()" onclick="app.rteExec('${editorId}','underline')">U</button>
+      <span class="rte-sep"></span>
+      <button type="button" class="rte-link-btn" title="선택한 글씨에 링크 걸기" onmousedown="event.preventDefault()" onclick="app.rteApplyLink('${editorId}')">🔗 하이퍼링크</button>
       <span class="rte-sep"></span>
       <div class="rte-size-row">${sizeBtns}</div>
       <span class="rte-sep"></span>
@@ -3055,9 +3074,9 @@ const app = {
     el.focus();
     document.execCommand(cmd, false, null);
   },
-  // 브라우저 내장 명령(execCommand)에 맡기지 않고, 선택 영역을 직접 <span>으로 감싼다.
+  // 브라우저 내장 명령(execCommand)에 맡기지 않고, 선택 영역을 직접 태그로 감싼다.
   // 한자처럼 띄어쓰기 없는 텍스트에서 execCommand의 색상 적용이 브라우저별로 불안정했던 문제를 근본적으로 피하기 위함.
-  wrapSelectionInEditor(editorId, applyStyle){
+  wrapSelectionInEditor(editorId, applyStyle, tagName){
     const el = document.getElementById(editorId);
     if(!el) return;
     const sel = window.getSelection();
@@ -3068,14 +3087,14 @@ const app = {
       return;
     }
     try{
-      const span = document.createElement('span');
-      applyStyle(span);
+      const wrapEl = document.createElement(tagName || 'span');
+      applyStyle(wrapEl);
       const content = range.extractContents();
-      span.appendChild(content);
-      range.insertNode(span);
+      wrapEl.appendChild(content);
+      range.insertNode(wrapEl);
       // 새로 감싼 부분을 다시 선택 상태로 만들어 연속으로 다른 서식을 이어서 적용할 수 있게 한다
       const newRange = document.createRange();
-      newRange.selectNodeContents(span);
+      newRange.selectNodeContents(wrapEl);
       sel.removeAllRanges();
       sel.addRange(newRange);
     }catch(e){
@@ -3094,6 +3113,25 @@ const app = {
     if(!el) return;
     el.focus();
     this.wrapSelectionInEditor(editorId, span => { span.className = 'rte-color-auto'; });
+  },
+  rteApplyLink(editorId){
+    const el = document.getElementById(editorId);
+    if(!el) return;
+    const sel = window.getSelection();
+    if(!sel || !sel.rangeCount || sel.isCollapsed || !el.contains(sel.getRangeAt(0).commonAncestorContainer)){
+      showToast('먼저 링크를 걸 글씨를 드래그해서 선택해주세요');
+      return;
+    }
+    let url = prompt('연결할 링크 주소를 입력하세요 (예: https://example.com)');
+    if(url === null) return; // 취소
+    url = url.trim();
+    if(!url){ showToast('주소를 입력해주세요'); return; }
+    if(!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    el.focus();
+    this.wrapSelectionInEditor(editorId, a => {
+      a.href = url;
+      a.className = 'rte-link';
+    }, 'a');
   },
   rteApplyFontSize(editorId, px){
     const el = document.getElementById(editorId);

@@ -737,7 +737,7 @@ footer{
     <div class="subtabs">
       <button class="subtab-btn" id="subtab-dl" onclick="app.setSheetTab('dl')">악보 다운로드</button>
       <button class="subtab-btn" id="subtab-make" onclick="app.setSheetTab('make')">악보 제작</button>
-      <button class="subtab-btn" id="subtab-tuning" onclick="app.setSheetTab('tuning')">음정 체크&amp;조율</button>
+      <button class="subtab-btn" id="subtab-tuning" onclick="app.setSheetTab('tuning')">고쟁 조율</button>
     </div>
 
     <!-- 악보 다운로드 -->
@@ -1082,11 +1082,11 @@ const BOARD_CONFIG = {
   download:     {label:'자료', hasLink:true, hasMedia:true, hasComments:true},
 };
 
-const FAQ_CATEGORIES = ['악보 제작', '악보 업로드&다운로드', '음정 체크&조율', '게임', '미디어', '악기', '홈페이지', '관리자', '그 외'];
+const FAQ_CATEGORIES = ['악보 제작', '악보 업로드&다운로드', '고쟁 조율', '게임', '미디어', '악기', '홈페이지', '관리자', '그 외'];
 const FAQ_CATEGORY_COLORS = {
   '악보 제작':          {bg:'#E5D9F2', text:'#5B2C82'},
   '악보 업로드&다운로드': {bg:'#D9E8F2', text:'#2C5C82'},
-  '음정 체크&조율':      {bg:'#D9F2EC', text:'#2C826D'},
+  '고쟁 조율':          {bg:'#D9F2EC', text:'#2C826D'},
   '게임':               {bg:'#F2E6D9', text:'#8A5A2C'},
   '미디어':             {bg:'#F2E0D9', text:'#82502C'},
   '악기':               {bg:'#DFF2D9', text:'#3D7A2C'},
@@ -1874,7 +1874,7 @@ const HOME_CARD_HTML = {
   sheetsMake: () => `<h3 style="font-size:16px;">악보 제작 및 조율</h3>
     <div style="display:flex; gap:8px; margin-top:18px; flex-wrap:wrap;">
       <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('make')">악보 제작</button>
-      <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('tuning')">음정 체크&amp;조율</button>
+      <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('tuning')">고쟁 조율</button>
     </div>`,
   download: () => `<h3 style="font-size:16px;">미디어 <span id="homeDownloadNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">관리자 '타로수'의 연주 영상, 사진 등</p>`,
   game: () => `<h3 style="font-size:16px;">게임</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">고쟁으로 즐기는 리듬 게임</p>`,
@@ -2459,7 +2459,7 @@ const app = {
           <div class="nav-submenu">
             <button onclick="app.goSheetsTab('dl')">악보 다운로드</button>
             <button onclick="app.goSheetsTab('make')">악보 제작</button>
-            <button onclick="app.goSheetsTab('tuning')">음정 체크&amp;조율</button>
+            <button onclick="app.goSheetsTab('tuning')">고쟁 조율</button>
           </div>
         </div>`;
       }

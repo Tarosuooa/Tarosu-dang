@@ -1123,7 +1123,7 @@ const state = {
   scoreMakerNoticeText: '',
   tuningNoticeText: '',
   tipText: { scoreMaker: '', tuning: '' },
-  profile: { photoUrl: '', title: '', content: '' },
+  profile: { photoUrls: [], title: '', content: '' },
   homeCardOrder: null, // null이면 기본 순서 사용, 배열이면 그 순서대로 표시
   heroTaglineText: null, // null이면 기본 3줄 문구 사용
   heroContactText: null, // null이면 기본 인스타그램/이메일 문구 사용
@@ -1821,17 +1821,20 @@ async function saveTuningNotice(text){
 
 /* ---------- 소식 > 프로필 ---------- */
 async function loadProfile(){
-  if(!db){ state.profile = {photoUrl:'', title:'', content:''}; return; }
+  if(!db){ state.profile = {photoUrls:[], title:'', content:''}; return; }
   try{
     const doc = await db.collection('content').doc('profile').get();
-    state.profile = doc.exists ? {
-      photoUrl: doc.data().photoUrl || '',
-      title: doc.data().title || '',
-      content: doc.data().content || ''
-    } : {photoUrl:'', title:'', content:''};
+    if(doc.exists){
+      const d = doc.data();
+      // 예전에는 사진이 photoUrl 하나였는데, 그 데이터가 남아있으면 1번 칸으로 그대로 옮겨서 보여준다
+      const photoUrls = Array.isArray(d.photoUrls) ? d.photoUrls : (d.photoUrl ? [d.photoUrl] : []);
+      state.profile = { photoUrls, title: d.title || '', content: d.content || '' };
+    }else{
+      state.profile = {photoUrls:[], title:'', content:''};
+    }
   }catch(e){
     console.error('프로필 로드 실패', e);
-    state.profile = {photoUrl:'', title:'', content:''};
+    state.profile = {photoUrls:[], title:'', content:''};
   }
 }
 
@@ -2909,12 +2912,15 @@ const app = {
     const displayEl = document.getElementById('profile-display');
     if(!toolbarEl || !displayEl) return;
     toolbarEl.innerHTML = isAdminUser() ? `<button class="btn small" onclick="app.openProfileEdit()">프로필 수정</button>` : '';
-    const p = state.profile || {photoUrl:'', title:'', content:''};
-    const photoHtml = p.photoUrl
-      ? `<img src="${escapeHtml(p.photoUrl)}" alt="프로필 사진" style="width:140px; height:140px; object-fit:cover; border-radius:8px; border:1px solid var(--paper-deep); flex:none;">`
+    const p = state.profile || {photoUrls:[], title:'', content:''};
+    const photoUrls = (p.photoUrls || []).filter(u => u && u.trim()); // 비어있는 칸은 제외
+    const photosHtml = photoUrls.length
+      ? `<div style="display:flex; flex-direction:column; gap:8px; flex:none;">
+          ${photoUrls.map(url => `<img src="${escapeHtml(url)}" alt="프로필 사진" style="width:140px; height:140px; object-fit:cover; border-radius:8px; border:1px solid var(--paper-deep);">`).join('')}
+        </div>`
       : `<div style="width:140px; height:140px; border-radius:8px; border:1px solid var(--paper-deep); background:var(--paper-dark); flex:none; display:flex; align-items:center; justify-content:center; color:var(--ink-soft); font-size:12.5px;">사진 없음</div>`;
     displayEl.innerHTML = `
-      ${photoHtml}
+      ${photosHtml}
       <div style="flex:1; min-width:200px;">
         <h3 style="font-size:18px; margin-bottom:10px;">${p.title ? escapeHtml(p.title) : '<span style="color:var(--ink-soft);">등록된 프로필이 없습니다</span>'}</h3>
         <div style="font-size:14.5px; white-space:pre-wrap; word-break:break-word;">${p.content ? linkifyContactPatterns(sanitizeRichHtml(p.content)) : ''}</div>
@@ -2924,12 +2930,18 @@ const app = {
     if(!isAdminUser()) return;
     const wrap = document.getElementById('profile-edit-wrap');
     if(!wrap) return;
-    const p = state.profile || {photoUrl:'', title:'', content:''};
+    const p = state.profile || {photoUrls:[], title:'', content:''};
+    const urls = p.photoUrls || [];
     wrap.style.display = 'block';
     wrap.innerHTML = `
       <div class="form-box">
-        <label>프로필 사진 링크 (URL)</label>
-        <input type="text" id="profile-f-photo" placeholder="https://..." value="${escapeHtml(p.photoUrl || '')}">
+        <label>프로필 사진 링크 1 (URL)</label>
+        <input type="text" id="profile-f-photo1" placeholder="https://..." value="${escapeHtml(urls[0] || '')}">
+        <label>프로필 사진 링크 2 (URL)</label>
+        <input type="text" id="profile-f-photo2" placeholder="https://..." value="${escapeHtml(urls[1] || '')}">
+        <label>프로필 사진 링크 3 (URL)</label>
+        <input type="text" id="profile-f-photo3" placeholder="https://..." value="${escapeHtml(urls[2] || '')}">
+        <div class="field-hint">비워두면 그 칸은 표시되지 않아요. 최대 3장까지 등록할 수 있어요.</div>
         <label>제목</label>
         <input type="text" id="profile-f-title" maxlength="60" value="${escapeHtml(p.title || '')}">
         <label>내용</label>
@@ -2944,14 +2956,18 @@ const app = {
   },
   async saveProfileEdit(){
     if(!isAdminUser()) return;
-    const photoUrl = document.getElementById('profile-f-photo').value.trim();
+    const photoUrls = [
+      document.getElementById('profile-f-photo1').value.trim(),
+      document.getElementById('profile-f-photo2').value.trim(),
+      document.getElementById('profile-f-photo3').value.trim()
+    ];
     const title = document.getElementById('profile-f-title').value.trim();
     const contentEl = document.getElementById('profile-f-content');
     const content = sanitizeRichHtml(contentEl ? contentEl.innerHTML : '');
     if(!db){ showToast('Firebase가 설정되지 않았습니다'); return; }
     try{
-      await db.collection('content').doc('profile').set({ photoUrl, title, content });
-      state.profile = { photoUrl, title, content };
+      await db.collection('content').doc('profile').set({ photoUrls, title, content });
+      state.profile = { photoUrls, title, content };
       const wrap = document.getElementById('profile-edit-wrap');
       if(wrap) wrap.style.display = 'none';
       showToast('프로필이 저장되었습니다');

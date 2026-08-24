@@ -1176,7 +1176,7 @@ const state = {
   sheetCategory: '전체',
   sheetSearchQuery: '',
   sheetPage: 1,
-  faqCategory: '전체',
+  faqCategories: [], // 빈 배열이면 '전체', 아니면 선택된 카테고리들 중 하나라도 맞으면 표시
   noticeTab: 'notice', // 소식 하위 탭: notice(공지사항) / noticeUpdate(업데이트) / profile(프로필)
   guzhengGuideText: '',
   scoreMakerNoticeText: '',
@@ -2433,7 +2433,7 @@ function applyNavState(s){
   state.page = s.page || 'home';
   state.sheetTab = s.sheetTab || 'dl';
   state.sheetCategory = s.sheetCategory || '전체';
-  state.faqCategory = '전체';
+  state.faqCategories = [];
   state.noticeTab = s.noticeTab || 'notice';
   state.detail.notice = s.detailNotice || null;
   state.detail.noticeUpdate = s.detailNoticeUpdate || null;
@@ -3035,7 +3035,7 @@ const app = {
     if(leavingGame) this.stopGameSession(false);
     if(page==='sheets') state.sheetTab = 'dl';
     if(page==='notice') state.noticeTab = 'notice';
-    if(page==='faq') state.faqCategory = '전체';
+    if(page==='faq') state.faqCategories = [];
     state.page = page;
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     document.getElementById('page-'+page).classList.add('active');
@@ -4465,13 +4465,14 @@ const app = {
     const filterEl = document.getElementById('faqCategoryFilter');
     if(filterEl){
       const cats = ['전체', ...FAQ_CATEGORIES];
-      filterEl.innerHTML = cats.map(c =>
-        `<button class="cat-btn ${state.faqCategory===c ? 'active' : ''}" onclick="app.setFaqCategory('${c}')">${c}</button>`
-      ).join('');
+      filterEl.innerHTML = cats.map(c => {
+        const isActive = c==='전체' ? state.faqCategories.length===0 : state.faqCategories.includes(c);
+        return `<button class="cat-btn ${isActive ? 'active' : ''}" onclick="app.toggleFaqCategory('${c}')">${c}</button>`;
+      }).join('');
     }
 
     const listEl = document.getElementById('faq-list');
-    const filtered = state.data.faq.filter(f => state.faqCategory==='전체' || f.category===state.faqCategory);
+    const filtered = state.data.faq.filter(f => state.faqCategories.length===0 || state.faqCategories.includes(f.category));
     const pinnedFaqs = state.data.faq.filter(f => f.pinned);
 
     const buildFaqItem = (f, idSuffix, isPinnedCopy) => {
@@ -4528,14 +4529,20 @@ const app = {
     showToast(f.pinned ? '상단에 고정되었습니다' : '고정이 취소되었습니다');
     this.renderFaq();
   },
-  setFaqCategory(cat){
-    state.faqCategory = cat;
+  toggleFaqCategory(cat){
+    if(cat === '전체'){
+      state.faqCategories = []; // '전체'를 누르면 다른 선택은 전부 해제
+    }else{
+      const idx = state.faqCategories.indexOf(cat);
+      if(idx >= 0) state.faqCategories.splice(idx, 1);
+      else state.faqCategories.push(cat);
+    }
     this.renderFaq();
   },
   async moveFaq(id, direction){
     if(!isAdminUser()) return;
     // 현재 보이는(필터링된) 목록 안에서의 순서를 기준으로 바로 위/아래 항목과 자리를 바꾼다
-    const filtered = state.data.faq.filter(f => state.faqCategory==='전체' || f.category===state.faqCategory);
+    const filtered = state.data.faq.filter(f => state.faqCategories.length===0 || state.faqCategories.includes(f.category));
     const idxInFiltered = filtered.findIndex(f=>f.id===id);
     const targetIdxInFiltered = idxInFiltered + direction;
     if(targetIdxInFiltered < 0 || targetIdxInFiltered >= filtered.length) return;

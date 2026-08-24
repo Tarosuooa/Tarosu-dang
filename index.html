@@ -863,7 +863,8 @@ footer{
       <div style="margin-top:14px; padding-top:14px; border-top:1px solid var(--paper-deep);">
         <h4 style="font-size:14px; margin-bottom:6px;">방문자 집계 제외 IP</h4>
         <p class="field-hint" style="margin-bottom:10px;">여기 등록된 IP는 방문자 수 집계에서 제외돼요 (예: 관리자 본인의 집/사무실 IP 등).</p>
-        <div id="excludedIpList" style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;"></div>
+        <button class="btn ghost small" id="excludedIpToggleBtn" style="margin-bottom:8px;" onclick="app.toggleIpListPanel('excludedIpList','excludedIpToggleBtn')">제외 IP 목록 보기 (0)</button>
+        <div id="excludedIpList" style="display:none; flex-direction:column; gap:6px; margin-bottom:10px;"></div>
         <div style="display:flex; gap:6px;">
           <input type="text" id="excludedIpInput" placeholder="예: 123.45.67.89" style="flex:1; padding:7px 10px; border:1px solid var(--paper-deep); border-radius:2px; font-size:13px;">
           <button class="btn small" onclick="app.addExcludedVisitorIp()">추가</button>
@@ -874,7 +875,8 @@ footer{
     <div class="card" id="ipBanCard" style="display:none;">
       <h3 style="font-size:16px; margin-bottom:4px;">IP 차단 관리 <span class="field-hint" style="margin:0;">(관리자 전용)</span></h3>
       <p class="field-hint" style="margin:8px 0 12px;">여기 등록된 IP는 사이트 접속과 회원가입이 전부 차단돼요. 차단은 관리자가 원할 때 언제든 해제할 수 있어요.</p>
-      <div id="blockedIpList" style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;"></div>
+      <button class="btn ghost small" id="blockedIpToggleBtn" style="margin-bottom:8px;" onclick="app.toggleIpListPanel('blockedIpList','blockedIpToggleBtn')">차단 IP 목록 보기 (0)</button>
+      <div id="blockedIpList" style="display:none; flex-direction:column; gap:6px; margin-bottom:10px;"></div>
       <div style="display:flex; gap:6px; margin-bottom:14px;">
         <input type="text" id="blockedIpInput" placeholder="예: 123.45.67.89" style="flex:1; padding:7px 10px; border:1px solid var(--paper-deep); border-radius:2px; font-size:13px;">
         <button class="btn danger small" onclick="app.addBlockedIp()">차단</button>
@@ -3456,10 +3458,29 @@ const app = {
   },
 
   /* ---------- 방문자 집계 제외 IP 관리 ---------- */
+  /* ---------- IP 목록을 버튼 안에서 펼쳐 보이는 공용 토글 ---------- */
+  toggleIpListPanel(listId, btnId){
+    const listEl = document.getElementById(listId);
+    const btnEl = document.getElementById(btnId);
+    if(!listEl || !btnEl) return;
+    const isHidden = listEl.style.display === 'none' || !listEl.style.display;
+    listEl.style.display = isHidden ? 'flex' : 'none';
+    const label = btnEl.dataset.label || '목록 보기';
+    const count = btnEl.dataset.count || '0';
+    btnEl.textContent = `${label} ${isHidden ? '숨기기' : '보기'} (${count})`;
+  },
+
   renderExcludedIpList(){
     const listEl = document.getElementById('excludedIpList');
+    const btnEl = document.getElementById('excludedIpToggleBtn');
     if(!listEl) return;
     const ips = state.excludedVisitorIps || [];
+    if(btnEl){
+      btnEl.dataset.label = '제외 IP 목록';
+      btnEl.dataset.count = String(ips.length);
+      const isOpen = listEl.style.display === 'flex';
+      btnEl.textContent = `제외 IP 목록 ${isOpen ? '숨기기' : '보기'} (${ips.length})`;
+    }
     listEl.innerHTML = ips.length === 0
       ? `<div class="field-hint" style="margin:0;">등록된 제외 IP가 없어요.</div>`
       : ips.map(ip => `
@@ -3501,8 +3522,15 @@ const app = {
   /* ---------- IP 차단 관리 (사이트 접속/회원가입 자체를 막음) ---------- */
   renderBlockedIpList(){
     const listEl = document.getElementById('blockedIpList');
+    const btnEl = document.getElementById('blockedIpToggleBtn');
     if(!listEl) return;
     const ips = state.blockedIps || [];
+    if(btnEl){
+      btnEl.dataset.label = '차단 IP 목록';
+      btnEl.dataset.count = String(ips.length);
+      const isOpen = listEl.style.display === 'flex';
+      btnEl.textContent = `차단 IP 목록 ${isOpen ? '숨기기' : '보기'} (${ips.length})`;
+    }
     listEl.innerHTML = ips.length === 0
       ? `<div class="field-hint" style="margin:0;">차단된 IP가 없어요.</div>`
       : ips.map(ip => `

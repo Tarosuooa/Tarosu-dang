@@ -372,7 +372,7 @@ main.no-hero{padding-top:44px;}
 .faq-q .mark{color:var(--gold); font-family:'Nanum Myeongjo', 'Noto Serif SC', 'Noto Serif TC', serif; font-size:18px;}
 .faq-a{
   max-height:0; overflow:hidden; transition:max-height .3s ease;
-  padding:0 20px; color:var(--ink-soft); font-size:14.5px; white-space:pre-wrap;
+  padding:0 20px; color:var(--ink); font-size:14.5px; white-space:pre-wrap;
 }
 .faq-a.open{max-height:400px; padding:0 20px 20px;}
 
@@ -710,9 +710,14 @@ footer{
   <div class="page" id="page-game">
     <div class="section-title"><h2>게임</h2><span class="hanja-sub">遊戲</span></div>
     <div class="divider"></div>
-    <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
-      <button class="btn ghost small" onclick="app.openGameUpdateLogModal()">업데이트 내역</button>
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px; flex-wrap:wrap;">
+      <div id="gameNoticeDisplay" style="flex:1; min-width:220px;"></div>
+      <div style="display:flex; flex-direction:column; gap:6px; flex:none;">
+        <button class="btn ghost small" id="gameNoticeEditBtn" style="display:none;" onclick="app.openGameNoticeEdit()">안내 수정</button>
+        <button class="btn ghost small" onclick="app.openGameUpdateLogModal()">업데이트 내역</button>
+      </div>
     </div>
+    <div id="gameNoticeEditWrap" style="display:none; margin-bottom:12px;"></div>
     <div id="gameStatus" class="field-hint" style="margin-bottom:10px; font-size:13px;"></div>
     <div id="gameBlocked" class="card" style="display:none; text-align:center; padding:44px 24px;">
       <h3 style="font-size:17px; margin-bottom:10px;">오늘의 이용 가능 시간을 모두 사용했어요</h3>
@@ -1181,6 +1186,7 @@ const state = {
   guzhengGuideText: '',
   scoreMakerNoticeText: '',
   tuningNoticeText: '',
+  gameNoticeText: '',
   tipText: { scoreMaker: '', tuning: '' },
   profile: { photoUrls: [], title: '', content: '' },
   homeCardOrder: null, // null이면 기본 순서 사용, 배열이면 그 순서대로 표시
@@ -1216,7 +1222,13 @@ function pad2(n){ return String(n).padStart(2,'0'); }
 function nowStr(){
   const d = new Date();
   return d.getFullYear() + '-' + pad2(d.getMonth()+1) + '-' + pad2(d.getDate()) + ' ' +
-    pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds());
+    pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+}
+// 예전에 초까지 저장되어 있던 날짜(예: 2026-08-20 14:35:22)도 화면에는 초 없이(2026-08-20 14:35)만 보여준다
+function displayDate(dateStr){
+  if(!dateStr) return '';
+  const m = String(dateStr).match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})/);
+  return m ? m[1] : dateStr;
 }
 function isRecentDate(dateStr){
   if(!dateStr) return false;
@@ -1899,6 +1911,29 @@ async function saveTuningNotice(text){
   }
 }
 
+/* ---------- 게임 게시판 안내 문구 (다른 툴 안내와는 완전히 별개, 관리자만 수정) ---------- */
+const DEFAULT_GAME_NOTICE = '타로수가 만든 고쟁 리듬 게임입니다.<br>화면의 점이 판정선에 닿는 순간 해당 줄을 터치하면 소리가 나며 점수가 올라갑니다.';
+async function loadGameNotice(){
+  if(!db){ state.gameNoticeText = DEFAULT_GAME_NOTICE; return; }
+  try{
+    const doc = await db.collection('content').doc('gameNotice').get();
+    state.gameNoticeText = (doc.exists && doc.data().text) ? doc.data().text : DEFAULT_GAME_NOTICE;
+  }catch(e){
+    console.error('게임 안내 문구 로드 실패', e);
+    state.gameNoticeText = DEFAULT_GAME_NOTICE;
+  }
+}
+async function saveGameNotice(text){
+  if(!db) return false;
+  try{
+    await db.collection('content').doc('gameNotice').set({ text });
+    return true;
+  }catch(e){
+    console.error('게임 안내 문구 저장 실패', e);
+    return false;
+  }
+}
+
 /* ---------- 소식 > 프로필 ---------- */
 async function loadProfile(){
   if(!db){ state.profile = {photoUrls:[], title:'', content:''}; return; }
@@ -2318,7 +2353,7 @@ function commentsAllowed(post){
 function renderCommentItemHtml(boardType, postId, c){
   const canDelete = state.currentUser && (state.currentUser.uid === c.authorUid || state.currentUser.isAdmin);
   let html = `<div class="comment-item">
-      <div class="comment-meta"><strong>${escapeHtml(c.authorNickname)}</strong> · ${escapeHtml(c.date)}</div>
+      <div class="comment-meta"><strong>${escapeHtml(c.authorNickname)}</strong> · ${escapeHtml(displayDate(c.date))}</div>
       <div class="comment-text">${escapeHtml(c.text)}</div>
       <div class="comment-actions">
         ${state.currentUser ? `<button class="comment-link-btn" onclick="app.toggleReplyBox('${c.id}')">답글</button>` : ''}
@@ -2332,7 +2367,7 @@ function renderCommentItemHtml(boardType, postId, c){
   (c.replies || []).forEach(r => {
     const canDeleteR = state.currentUser && (state.currentUser.uid === r.authorUid || state.currentUser.isAdmin);
     html += `<div class="comment-item comment-reply-item">
-        <div class="comment-meta"><strong>${escapeHtml(r.authorNickname)}</strong> · ${escapeHtml(r.date)}</div>
+        <div class="comment-meta"><strong>${escapeHtml(r.authorNickname)}</strong> · ${escapeHtml(displayDate(r.date))}</div>
         <div class="comment-text">${escapeHtml(r.text)}</div>
         ${canDeleteR ? `<div class="comment-actions"><button class="comment-link-btn" onclick="app.deleteComment('${boardType}','${postId}','${r.id}')">삭제</button></div>` : ''}
       </div>`;
@@ -2475,15 +2510,24 @@ function applyNavState(s){
 
 /* ---------- 글쓰기 폼에 저장 안 된 내용이 있으면, 이동하려 할 때 확인 팝업을 띄운다 ----------
    공지사항/업데이트/미디어/악보/FAQ 등 모든 글쓰기 폼은 id가 '...-form'으로 끝나므로,
-   그 안에서 입력이 있었는지만 감지하면 각 폼마다 따로 손댈 필요 없이 한 번에 처리된다. */
+   그 안에서 입력이 있었는지만 감지하면 각 폼마다 따로 손댈 필요 없이 한 번에 처리된다.
+   방명록 작성창(gbAuthor/gbText)은 다른 폼과 달리 화면에서 사라지지 않고 항상 떠 있으므로,
+   '폼이 사라졌는지'가 아니라 '입력값이 비어있는지'로 따로 판단한다. */
 let hasUnsavedFormChanges = false;
 document.addEventListener('input', (e) => {
   if(e.target.closest && e.target.closest('[id$="-form"]')) hasUnsavedFormChanges = true;
+  if(e.target.id === 'gbAuthor' || e.target.id === 'gbText') hasUnsavedFormChanges = true;
 });
+function guestbookHasContent(){
+  const a = document.getElementById('gbAuthor');
+  const t = document.getElementById('gbText');
+  return !!((a && a.value.trim()) || (t && t.value.trim()));
+}
 function hasOpenUnsavedForm(){
   if(!hasUnsavedFormChanges) return false;
-  // 이미 저장되었거나 취소되어 폼 자체가 화면에서 사라졌다면, 더 이상 작성 중이 아니므로 안전하게 통과시킨다
-  if(!document.querySelector('[id$="-form"]')){ hasUnsavedFormChanges = false; return false; }
+  // 이미 저장되었거나 취소되어 폼 자체가 화면에서 사라졌고, 방명록 입력창도 비어있다면
+  // 더 이상 작성 중이 아니므로 안전하게 통과시킨다
+  if(!document.querySelector('[id$="-form"]') && !guestbookHasContent()){ hasUnsavedFormChanges = false; return false; }
   return true;
 }
 function confirmLeaveIfDirty(){
@@ -2616,6 +2660,7 @@ const app = {
     await loadGuzhengGuide();
     await loadScoreMakerNotice();
     await loadTuningNotice();
+    await loadGameNotice();
     await loadTipText('scoreMaker');
     await loadTipText('tuning');
     await loadProfile();
@@ -2995,7 +3040,7 @@ const app = {
     const displayEl = document.getElementById('scoreMakerNoticeDisplay');
     const editBtn = document.getElementById('scoreMakerNoticeEditBtn');
     if(!displayEl) return;
-    displayEl.innerHTML = `<div style="font-size:13.5px; color:var(--ink-soft); white-space:pre-wrap;">${sanitizeRichHtml(state.scoreMakerNoticeText)}</div>`;
+    displayEl.innerHTML = `<div style="font-size:13.5px; color:var(--ink); white-space:pre-wrap;">${sanitizeRichHtml(state.scoreMakerNoticeText)}</div>`;
     if(editBtn) editBtn.style.display = isAdminUser() ? '' : 'none';
   },
   openScoreMakerNoticeEdit(){
@@ -3031,7 +3076,7 @@ const app = {
     const displayEl = document.getElementById('tuningNoticeDisplay');
     const editBtn = document.getElementById('tuningNoticeEditBtn');
     if(!displayEl) return;
-    displayEl.innerHTML = `<div style="font-size:13.5px; color:var(--ink-soft); white-space:pre-wrap;">${sanitizeRichHtml(state.tuningNoticeText)}</div>`;
+    displayEl.innerHTML = `<div style="font-size:13.5px; color:var(--ink); white-space:pre-wrap;">${sanitizeRichHtml(state.tuningNoticeText)}</div>`;
     if(editBtn) editBtn.style.display = isAdminUser() ? '' : 'none';
   },
   openTuningNoticeEdit(){
@@ -3058,6 +3103,43 @@ const app = {
       const wrap = document.getElementById('tuningNoticeEditWrap');
       if(wrap) wrap.style.display = 'none';
       this.renderTuningNotice();
+    }else{
+      showToast('저장에 실패했습니다');
+    }
+  },
+
+  /* ---------- 게임 게시판 안내 문구 (다른 툴 안내와는 완전히 별개, 관리자만 수정) ---------- */
+  renderGameNotice(){
+    const displayEl = document.getElementById('gameNoticeDisplay');
+    const editBtn = document.getElementById('gameNoticeEditBtn');
+    if(!displayEl) return;
+    displayEl.innerHTML = `<div style="font-size:13.5px; color:var(--ink); white-space:pre-wrap;">${sanitizeRichHtml(state.gameNoticeText)}</div>`;
+    if(editBtn) editBtn.style.display = isAdminUser() ? '' : 'none';
+  },
+  openGameNoticeEdit(){
+    if(!isAdminUser()) return;
+    const wrap = document.getElementById('gameNoticeEditWrap');
+    if(!wrap) return;
+    wrap.style.display = 'block';
+    wrap.innerHTML = `
+      ${this.buildToolNoticeToolbar('gameNoticeEditor')}
+      <div class="rte-editor" id="gameNoticeEditor" contenteditable="true" style="border-radius:0 0 2px 2px;">${sanitizeRichHtml(state.gameNoticeText)}</div>
+      <div class="form-actions" style="margin-top:8px; margin-bottom:0;">
+        <button class="btn small" onclick="app.saveGameNoticeEdit()">저장</button>
+        <button class="btn ghost small" onclick="document.getElementById('gameNoticeEditWrap').style.display='none';">취소</button>
+      </div>`;
+  },
+  async saveGameNoticeEdit(){
+    if(!isAdminUser()) return;
+    const editorEl = document.getElementById('gameNoticeEditor');
+    const text = sanitizeRichHtml(editorEl ? editorEl.innerHTML : '');
+    const ok = await saveGameNotice(text);
+    if(ok){
+      state.gameNoticeText = text;
+      showToast('안내 문구가 저장되었습니다');
+      const wrap = document.getElementById('gameNoticeEditWrap');
+      if(wrap) wrap.style.display = 'none';
+      this.renderGameNotice();
     }else{
       showToast('저장에 실패했습니다');
     }
@@ -3260,6 +3342,7 @@ const app = {
     this.renderSheets();
     this.renderScoreMakerNotice();
     this.renderTuningNotice();
+    this.renderGameNotice();
     this.renderMyPage();
     this.updateAuthArea();
     const guidePanel = document.getElementById('guzhengGuidePanel');
@@ -4322,7 +4405,7 @@ const app = {
         <div class="post-row">
           <div style="flex:1;cursor:pointer" onclick="app.openDetail('${name}','${p.id}')">
             <div class="post-title">${isPinnedSection ? '📌 ' : ''}${escapeHtml(p.title)}${(name==='notice' || name==='noticeUpdate' || name==='download') && isRecentDate(p.date) ? ' <span class="badge new">NEW</span>' : ''}${commentCountBadge(p.id)}</div>
-            <div class="post-meta">${escapeHtml(p.author)} · ${escapeHtml(p.date)}</div>
+            <div class="post-meta">${escapeHtml(p.author)} · ${escapeHtml(displayDate(p.date))}</div>
           </div>
           ${isAdminUser() ? `
             <div class="admin-row-actions">
@@ -4357,7 +4440,7 @@ const app = {
           </div>
           <div class="detail-view">
             <h3>${post.pinned ? '📌 ' : ''}${escapeHtml(post.title)}${(name==='notice' || name==='noticeUpdate' || name==='download') && isRecentDate(post.date) ? ' <span class="badge new">NEW</span>' : ''}</h3>
-            <div class="post-meta">${escapeHtml(post.author)} · ${escapeHtml(post.date)}</div>
+            <div class="post-meta">${escapeHtml(post.author)} · ${escapeHtml(displayDate(post.date))}</div>
             <div class="detail-body">${sanitizeRichHtml(post.content)}</div>
             ${cfg.hasLink && post.link ? `<a class="dl-link" href="${escapeHtml(post.link)}" target="_blank" rel="noopener">자료 링크 열기 ↗</a>` : ''}
             ${cfg.hasMedia ? buildMediaEmbedsHtml(post.media) : ''}
@@ -4522,12 +4605,16 @@ const app = {
     }
 
     const listEl = document.getElementById('faq-list');
-    const filtered = state.data.faq.filter(f => state.faqCategories.length===0 || state.faqCategories.includes(f.category));
+    const getCats = f => f.categories || (f.category ? [f.category] : []);
+    const filtered = state.data.faq.filter(f => state.faqCategories.length===0 || getCats(f).some(c => state.faqCategories.includes(c)));
     const pinnedFaqs = state.data.faq.filter(f => f.pinned);
 
     const buildFaqItem = (f, idSuffix, isPinnedCopy) => {
-      const catColor = f.category ? FAQ_CATEGORY_COLORS[f.category] : null;
-      const badgeHtml = catColor ? `<span class="badge" style="background:${catColor.bg}; color:${catColor.text}; font-weight:700;">${escapeHtml(f.category)}</span>` : '';
+      const cats = getCats(f);
+      const badgeHtml = cats.map(c => {
+        const catColor = FAQ_CATEGORY_COLORS[c];
+        return `<span class="badge" style="background:${catColor?catColor.bg:'#eee'}; color:${catColor?catColor.text:'#333'}; font-weight:700;">${escapeHtml(c)}</span>`;
+      }).join(' ');
       const isFirst = filtered[0] && filtered[0].id === f.id;
       const isLast = filtered[filtered.length-1] && filtered[filtered.length-1].id === f.id;
       const answerId = 'faq-a-' + idSuffix;
@@ -4592,7 +4679,10 @@ const app = {
   async moveFaq(id, direction){
     if(!isAdminUser()) return;
     // 현재 보이는(필터링된) 목록 안에서의 순서를 기준으로 바로 위/아래 항목과 자리를 바꾼다
-    const filtered = state.data.faq.filter(f => state.faqCategories.length===0 || state.faqCategories.includes(f.category));
+    const filtered = state.data.faq.filter(f => {
+      const cats = f.categories || (f.category ? [f.category] : []);
+      return state.faqCategories.length===0 || cats.some(c => state.faqCategories.includes(c));
+    });
     const idxInFiltered = filtered.findIndex(f=>f.id===id);
     const targetIdxInFiltered = idxInFiltered + direction;
     if(targetIdxInFiltered < 0 || targetIdxInFiltered >= filtered.length) return;
@@ -4607,22 +4697,24 @@ const app = {
   openFaqForm(editId){
     if(!isAdminUser()) return;
     const existing = editId ? state.data.faq.find(f=>f.id===editId) : null;
+    const existingCats = existing ? (existing.categories || (existing.category ? [existing.category] : [])) : [];
     const toolbarEl = document.getElementById('faq-toolbar');
     let form = document.getElementById('faq-form');
     if(form) form.remove();
     form = document.createElement('div');
     form.className='form-box'; form.id='faq-form';
-    const catRadios = FAQ_CATEGORIES.map(c =>
+    const catChecks = FAQ_CATEGORIES.map(c =>
       `<label style="display:flex; align-items:center; gap:6px; font-size:13.5px; font-family:'Noto Sans KR',sans-serif; cursor:pointer; margin:0;">
-        <input type="radio" name="faq-f-cat" value="${c}" ${existing && existing.category===c ? 'checked' : ''}> ${c}
+        <input type="checkbox" name="faq-f-cat" value="${escapeHtml(c)}" ${existingCats.includes(c) ? 'checked' : ''}> ${escapeHtml(c)}
       </label>`
     ).join('');
     form.innerHTML = `
       <label>질문</label>
       <input type="text" id="faq-f-q" value="${existing?escapeHtml(existing.question):''}" maxlength="150">
-      <label>카테고리</label>
+      <label>카테고리 (여러 개 선택 가능)</label>
+      <div id="faq-f-cat-selected" style="display:flex; flex-wrap:wrap; gap:6px; min-height:22px; margin-bottom:6px;"></div>
       <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:8px; padding:4px 0 4px;">
-        ${catRadios}
+        ${catChecks}
       </div>
       <label>답변</label>
       <div id="faq-f-a-wrap"></div>
@@ -4634,16 +4726,34 @@ const app = {
     document.getElementById('faq-f-a-wrap').innerHTML = buildRteHtml('faq-f-a', '답변을 입력하세요');
     if(existing) document.getElementById('faq-f-a').innerHTML = sanitizeRichHtml(existing.answer);
     document.getElementById('faq-f-q').focus();
+
+    // 체크할 때마다, 지금까지 선택한 카테고리들의 배지를 위에 실시간으로 보여준다
+    const updateSelectedBadges = () => {
+      const badgeWrap = document.getElementById('faq-f-cat-selected');
+      const checked = Array.from(form.querySelectorAll('input[name="faq-f-cat"]:checked')).map(i => i.value);
+      badgeWrap.innerHTML = checked.length === 0
+        ? `<span class="field-hint" style="margin:0;">선택된 카테고리가 없어요</span>`
+        : checked.map(c => {
+            const color = FAQ_CATEGORY_COLORS[c];
+            return `<span class="badge" style="background:${color?color.bg:'#eee'}; color:${color?color.text:'#333'}; font-weight:700;">${escapeHtml(c)}</span>`;
+          }).join('');
+    };
+    form.querySelectorAll('input[name="faq-f-cat"]').forEach(cb => cb.addEventListener('change', updateSelectedBadges));
+    updateSelectedBadges();
   },
   async saveFaq(editId){
     const q = document.getElementById('faq-f-q').value.trim();
     const aEl = document.getElementById('faq-f-a');
     const a = sanitizeRichHtml(aEl ? aEl.innerHTML : '');
-    const checkedCat = document.querySelector('input[name="faq-f-cat"]:checked');
-    const category = checkedCat ? checkedCat.value : null;
+    const categories = Array.from(document.querySelectorAll('input[name="faq-f-cat"]:checked')).map(i => i.value);
     if(!q || !richTextHasContent(a)){ showToast('질문과 답변을 입력해주세요'); return; }
-    if(editId){ const item = state.data.faq.find(f=>f.id===editId); item.question=q; item.answer=a; item.category=category; }
-    else{ state.data.faq.push({id:uid(), question:q, answer:a, category}); }
+    if(categories.length === 0){ showToast('카테고리를 하나 이상 선택해주세요'); return; }
+    if(editId){
+      const item = state.data.faq.find(f=>f.id===editId);
+      item.question=q; item.answer=a; item.categories=categories; delete item.category;
+    }else{
+      state.data.faq.push({id:uid(), question:q, answer:a, categories});
+    }
     await saveBoard('faq');
     const f=document.getElementById('faq-form'); if(f) f.remove();
     showToast(editId?'수정되었습니다':'등록되었습니다');
@@ -4665,7 +4775,7 @@ const app = {
     listEl.innerHTML = items.map(g => `
       <div class="gb-entry">
         <div>
-          <span class="gb-author">${escapeHtml(g.author)}</span><span class="gb-date">${escapeHtml(g.date)}</span>
+          <span class="gb-author">${escapeHtml(g.author)}</span><span class="gb-date">${escapeHtml(displayDate(g.date))}</span>
           <div class="gb-text">${escapeHtml(g.text)}</div>
         </div>
         ${isAdminUser() ? `<button class="btn danger small" onclick="app.deleteGuestbook('${g.id}')">삭제</button>` : ''}
@@ -4785,7 +4895,7 @@ const app = {
         <div class="post-row">
           <div style="flex:1; color:var(--ink-soft);">
             <div class="post-title">${escapeHtml(s.title)}</div>
-            <div class="post-meta">${escapeHtml(s.date)}</div>
+            <div class="post-meta">${escapeHtml(displayDate(s.date))}</div>
           </div>
           ${isAdminUser() ? `
             <div class="admin-row-actions">
@@ -4801,7 +4911,7 @@ const app = {
               ${escapeHtml(s.title)}
               ${isRecentDate(s.date) ? '<span class="badge new">NEW</span>' : ''}${commentCountBadge(s.id)}
             </div>
-            <div class="post-meta">${escapeHtml(s.songName || '')} · ${escapeHtml(s.authorNickname)}${s.authorIsAdmin ? ' (관리자)' : ''} · ${escapeHtml(s.date)}</div>
+            <div class="post-meta">${escapeHtml(s.songName || '')} · ${escapeHtml(s.authorNickname)}${s.authorIsAdmin ? ' (관리자)' : ''} · ${escapeHtml(displayDate(s.date))}</div>
           </div>
           ${(state.currentUser && state.currentUser.uid === s.authorUid) ? `
             <div class="admin-row-actions">
@@ -4851,7 +4961,7 @@ const app = {
           <div class="detail-view">
             <span class="badge ${sheetCategoryBadgeClass(post.category)}">${escapeHtml(post.category || '-')}</span>
             <h3 style="margin-top:8px;">${escapeHtml(post.title)}${isRecentDate(post.date) ? ' <span class="badge new">NEW</span>' : ''}</h3>
-            <div class="post-meta">${escapeHtml(post.authorNickname)}${post.authorIsAdmin ? ' (관리자)' : ''} · ${escapeHtml(post.date)}</div>
+            <div class="post-meta">${escapeHtml(post.authorNickname)}${post.authorIsAdmin ? ' (관리자)' : ''} · ${escapeHtml(displayDate(post.date))}</div>
             <div class="sheet-fields" style="margin-bottom:16px; font-size:14px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif;">
               <div>곡명: ${escapeHtml(post.songName || '-')}</div>
               <div>가수: ${escapeHtml(post.artistName || '-')}</div>
@@ -5111,7 +5221,7 @@ const app = {
         <div class="post-row" style="cursor:default;">
           <div style="flex:1;">
             <div class="post-title">v${escapeHtml(u.version)}</div>
-            <div class="post-meta" style="margin-bottom:6px;">${escapeHtml(u.date)}</div>
+            <div class="post-meta" style="margin-bottom:6px;">${escapeHtml(displayDate(u.date))}</div>
             <div style="font-size:13.5px; white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word;">${escapeHtml(u.content)}</div>
           </div>
           ${isAdminUser() ? `
@@ -5132,7 +5242,7 @@ const app = {
     form.id = 'updateLog-form';
     form.innerHTML = `
       <label>날짜</label>
-      <input type="text" id="ul-f-date" placeholder="예: 2026-08-14" value="${existing ? escapeHtml(existing.date) : todayStr()}">
+      <input type="text" id="ul-f-date" placeholder="예: 2026-08-14" value="${existing ? escapeHtml(displayDate(existing.date)) : todayStr()}">
       <label>버전</label>
       <input type="text" id="ul-f-version" placeholder="예: 0.0.2" value="${existing ? escapeHtml(existing.version) : ''}">
       <label>내용</label>
@@ -5198,7 +5308,7 @@ const app = {
         <div class="post-row" style="cursor:default;">
           <div style="flex:1;">
             <div class="post-title">v${escapeHtml(u.version)}</div>
-            <div class="post-meta" style="margin-bottom:6px;">${escapeHtml(u.date)}</div>
+            <div class="post-meta" style="margin-bottom:6px;">${escapeHtml(displayDate(u.date))}</div>
             <div style="font-size:13.5px; white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word;">${escapeHtml(u.content)}</div>
           </div>
           ${isAdminUser() ? `
@@ -5219,7 +5329,7 @@ const app = {
     form.id = 'tuningUpdateLog-form';
     form.innerHTML = `
       <label>날짜</label>
-      <input type="text" id="tul-f-date" placeholder="예: 2026-08-14" value="${existing ? escapeHtml(existing.date) : todayStr()}">
+      <input type="text" id="tul-f-date" placeholder="예: 2026-08-14" value="${existing ? escapeHtml(displayDate(existing.date)) : todayStr()}">
       <label>버전</label>
       <input type="text" id="tul-f-version" placeholder="예: 0.0.1" value="${existing ? escapeHtml(existing.version) : ''}">
       <label>내용</label>
@@ -5285,7 +5395,7 @@ const app = {
         <div class="post-row" style="cursor:default;">
           <div style="flex:1;">
             <div class="post-title">v${escapeHtml(u.version)}</div>
-            <div class="post-meta" style="margin-bottom:6px;">${escapeHtml(u.date)}</div>
+            <div class="post-meta" style="margin-bottom:6px;">${escapeHtml(displayDate(u.date))}</div>
             <div style="font-size:13.5px; white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word;">${escapeHtml(u.content)}</div>
           </div>
           ${isAdminUser() ? `
@@ -5306,7 +5416,7 @@ const app = {
     form.id = 'gameUpdateLog-form';
     form.innerHTML = `
       <label>날짜</label>
-      <input type="text" id="gul-f-date" placeholder="예: 2026-08-14" value="${existing ? escapeHtml(existing.date) : todayStr()}">
+      <input type="text" id="gul-f-date" placeholder="예: 2026-08-14" value="${existing ? escapeHtml(displayDate(existing.date)) : todayStr()}">
       <label>버전</label>
       <input type="text" id="gul-f-version" placeholder="예: 0.0.1" value="${existing ? escapeHtml(existing.version) : ''}">
       <label>내용</label>

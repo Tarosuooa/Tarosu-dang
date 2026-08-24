@@ -2427,6 +2427,7 @@ function pushNavState(){
   if(isRestoringHistory) return;
   try{ history.pushState(captureNavState(), ''); }catch(e){}
 }
+
 function applyNavState(s){
   if(!s) return;
   isRestoringHistory = true;
@@ -2471,7 +2472,44 @@ function applyNavState(s){
   window.scrollTo({top:0, behavior:'smooth'});
   isRestoringHistory = false;
 }
-window.addEventListener('popstate', (e)=>{ applyNavState(e.state); });
+
+/* ---------- 글쓰기 폼에 저장 안 된 내용이 있으면, 이동하려 할 때 확인 팝업을 띄운다 ----------
+   공지사항/업데이트/미디어/악보/FAQ 등 모든 글쓰기 폼은 id가 '...-form'으로 끝나므로,
+   그 안에서 입력이 있었는지만 감지하면 각 폼마다 따로 손댈 필요 없이 한 번에 처리된다. */
+let hasUnsavedFormChanges = false;
+document.addEventListener('input', (e) => {
+  if(e.target.closest && e.target.closest('[id$="-form"]')) hasUnsavedFormChanges = true;
+});
+function hasOpenUnsavedForm(){
+  if(!hasUnsavedFormChanges) return false;
+  // 이미 저장되었거나 취소되어 폼 자체가 화면에서 사라졌다면, 더 이상 작성 중이 아니므로 안전하게 통과시킨다
+  if(!document.querySelector('[id$="-form"]')){ hasUnsavedFormChanges = false; return false; }
+  return true;
+}
+function confirmLeaveIfDirty(){
+  if(!hasOpenUnsavedForm()) return true;
+  const ok = confirm('작성 중인 내용이 있어요. 저장하지 않고 이동하시겠어요?');
+  if(ok) hasUnsavedFormChanges = false;
+  return ok;
+}
+window.addEventListener('beforeunload', (e) => {
+  if(hasOpenUnsavedForm()){
+    e.preventDefault();
+    e.returnValue = '';
+  }
+});
+window.addEventListener('popstate', (e)=>{
+  if(hasOpenUnsavedForm()){
+    const ok = confirm('작성 중인 내용이 있어요. 저장하지 않고 이동하시겠어요?');
+    if(!ok){
+      // 뒤로가기를 취소한 것이므로, 방금 이동해버린 히스토리를 다시 앞으로 되돌려 원래 화면을 유지한다
+      try{ history.pushState(captureNavState(), ''); }catch(err){}
+      return;
+    }
+    hasUnsavedFormChanges = false;
+  }
+  applyNavState(e.state);
+});
 
 const app = {
   async checkIpBlocked(){
@@ -3026,6 +3064,7 @@ const app = {
   },
 
   go(page, skipPush){
+    if(!skipPush && !confirmLeaveIfDirty()) return;
     if(page==='mypage' && !state.currentUser){ showToast('로그인이 필요합니다'); return; }
     const leavingScoreMaker = (state.page==='sheets' && state.sheetTab==='make' && page!=='sheets');
     if(leavingScoreMaker) this.stopScoreMakerSession(false);
@@ -3064,6 +3103,7 @@ const app = {
     if(tab !== 'notice') this.setNoticeTab(tab);
   },
   setNoticeTab(tab){
+    if(!confirmLeaveIfDirty()) return;
     state.noticeTab = tab;
     state.detail.notice = null;
     state.detail.noticeUpdate = null;
@@ -4353,12 +4393,14 @@ const app = {
   },
 
   openDetail(name, id){
+    if(!confirmLeaveIfDirty()) return;
     state.detail[name] = id;
     if(name === 'sheets') this.renderSheets(); else this.renderBoard(name);
     window.scrollTo({top:0, behavior:'smooth'});
     pushNavState();
   },
   closeDetail(name){
+    if(!confirmLeaveIfDirty()) return;
     state.detail[name] = null;
     if(name === 'sheets') this.renderSheets(); else this.renderBoard(name);
     pushNavState();
@@ -4467,8 +4509,16 @@ const app = {
       const cats = ['전체', ...FAQ_CATEGORIES];
       filterEl.innerHTML = cats.map(c => {
         const isActive = c==='전체' ? state.faqCategories.length===0 : state.faqCategories.includes(c);
-        return `<button class="cat-btn ${isActive ? 'active' : ''}" onclick="app.toggleFaqCategory('${c}')">${c}</button>`;
+        return `<button type="button" class="cat-btn ${isActive ? 'active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`;
       }).join('');
+      if(!filterEl.dataset.bound){
+        filterEl.dataset.bound = '1';
+        filterEl.addEventListener('click', (e) => {
+          const btn = e.target.closest('.cat-btn');
+          if(!btn) return;
+          app.toggleFaqCategory(btn.dataset.cat);
+        });
+      }
     }
 
     const listEl = document.getElementById('faq-list');
@@ -4646,6 +4696,7 @@ const app = {
   },
 
   setSheetTab(tab){
+    if(!confirmLeaveIfDirty()) return;
     try{
       const prevTab = state.sheetTab;
       state.sheetTab = tab;

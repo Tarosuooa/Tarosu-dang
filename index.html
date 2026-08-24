@@ -422,6 +422,15 @@ footer{
 .mobile-guzheng-toggle-btn{ display:none; }
 .mobile-guzheng-close{ display:none; }
 
+/* 타로당 13현 고쟁 버튼과 동일한 스타일 (프로필로 이동 버튼과 공유) */
+.hero-pill-btn{
+  display:inline-block; padding:9px 16px;
+  border:1px solid var(--gold); background:transparent; color:var(--wood);
+  border-radius:20px; cursor:pointer; font-size:13px;
+  font-family:'Noto Sans KR',sans-serif; letter-spacing:0.5px;
+}
+.hero-pill-btn:active{ background:var(--wood); color:var(--paper); border-color:var(--wood); }
+
 @media (max-width:720px){
   .hero h1{font-size:32px;}
   .strings-wrap{display:none;}
@@ -429,7 +438,7 @@ footer{
   nav{order:3; width:100%; justify-content:flex-start;}
 
   .mobile-guzheng-toggle-btn{
-    display:inline-block; margin-top:16px; padding:9px 16px;
+    display:inline-block; margin-top:28px; padding:9px 16px;
     border:1px solid var(--gold); background:transparent; color:var(--wood);
     border-radius:20px; cursor:pointer; font-size:13px;
     font-family:'Noto Sans KR',sans-serif; letter-spacing:0.5px;
@@ -602,7 +611,7 @@ footer{
         <button type="button" id="heroContactEditBtn" class="btn ghost small" style="display:none; position:absolute; top:0; right:0; padding:3px 9px; font-size:11px;" onclick="app.openHeroContactEdit()">수정</button>
       </div>
       <div id="heroContactEditWrap" style="display:none; max-width:480px; margin-bottom:8px;"></div>
-      <button type="button" class="btn ghost small" style="margin-top:10px;" onclick="app.go('profile')">프로필로 이동</button>
+      <button type="button" class="hero-pill-btn" style="margin-top:10px;" onclick="app.go('profile')">프로필로 이동</button>
       <button type="button" class="mobile-guzheng-toggle-btn" onclick="app.toggleMobileGuzheng()">타로당 13현 고쟁</button>
     </div>
     <div class="strings-wrap" id="stringsWrap">

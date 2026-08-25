@@ -740,6 +740,7 @@ footer{
   <div class="page" id="page-faq">
     <div class="section-title"><h2>FAQ</h2><span class="hanja-sub">問答</span></div>
     <div class="divider"></div>
+    <div class="category-filter" id="faqCategoryFilter"></div>
     <div class="toolbar" id="faq-toolbar"></div>
     <div class="list-box" id="faq-list"></div>
   </div>
@@ -1196,6 +1197,7 @@ const state = {
   sheetCategory: '전체',
   sheetSearchQuery: '',
   sheetPage: 1,
+  faqCategories: [], // 빈 배열이면 '전체', 아니면 선택된 카테고리들 중 하나라도 맞으면 표시
   noticeTab: 'notice', // 소식 하위 탭: notice(공지사항) / noticeUpdate(업데이트) / profile(프로필)
   guzhengGuideText: '',
   scoreMakerNoticeText: '',
@@ -2514,6 +2516,7 @@ function applyNavState(s){
   state.page = s.page || 'home';
   state.sheetTab = s.sheetTab || 'dl';
   state.sheetCategory = s.sheetCategory || '전체';
+  state.faqCategories = [];
   state.noticeTab = s.noticeTab || 'notice';
   state.detail.notice = s.detailNotice || null;
   state.detail.noticeUpdate = s.detailNoticeUpdate || null;
@@ -3214,6 +3217,7 @@ const app = {
     if(leavingGame) this.stopGameSession(false);
     if(page==='sheets') state.sheetTab = 'dl';
     if(page==='notice') state.noticeTab = 'notice';
+    if(page==='faq') state.faqCategories = [];
     state.page = page;
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     document.getElementById('page-'+page).classList.add('active');
@@ -4795,9 +4799,26 @@ const app = {
     const existingForm = document.getElementById('faq-form');
     if(existingForm) existingForm.remove();
 
+    const filterEl = document.getElementById('faqCategoryFilter');
+    if(filterEl){
+      const cats = ['전체', ...FAQ_CATEGORIES];
+      filterEl.innerHTML = cats.map(c => {
+        const isActive = c==='전체' ? state.faqCategories.length===0 : state.faqCategories.includes(c);
+        return `<button type="button" class="cat-btn ${isActive ? 'active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`;
+      }).join('');
+      if(!filterEl.dataset.bound){
+        filterEl.dataset.bound = '1';
+        filterEl.addEventListener('click', (e) => {
+          const btn = e.target.closest('.cat-btn');
+          if(!btn) return;
+          app.toggleFaqCategory(btn.dataset.cat);
+        });
+      }
+    }
+
     const listEl = document.getElementById('faq-list');
     const getCats = f => f.categories || (f.category ? [f.category] : []);
-    const filtered = state.data.faq;
+    const filtered = state.data.faq.filter(f => state.faqCategories.length===0 || getCats(f).some(c => state.faqCategories.includes(c)));
     const pinnedFaqs = state.data.faq.filter(f => f.pinned);
 
     const buildFaqItem = (f, idSuffix, isPinnedCopy) => {
@@ -4857,10 +4878,23 @@ const app = {
     showToast(f.pinned ? '상단에 고정되었습니다' : '고정이 취소되었습니다');
     this.renderFaq();
   },
+  toggleFaqCategory(cat){
+    if(cat === '전체'){
+      state.faqCategories = []; // '전체'를 누르면 다른 선택은 전부 해제
+    }else{
+      const idx = state.faqCategories.indexOf(cat);
+      if(idx >= 0) state.faqCategories.splice(idx, 1);
+      else state.faqCategories.push(cat);
+    }
+    this.renderFaq();
+  },
   async moveFaq(id, direction){
     if(!isAdminUser()) return;
-    // 이제 상단 필터가 없으므로, 전체 목록 순서를 기준으로 바로 위/아래 항목과 자리를 바꾼다
-    const filtered = state.data.faq;
+    // 현재 보이는(필터링된) 목록 안에서의 순서를 기준으로 바로 위/아래 항목과 자리를 바꾼다
+    const filtered = state.data.faq.filter(f => {
+      const cats = f.categories || (f.category ? [f.category] : []);
+      return state.faqCategories.length===0 || cats.some(c => state.faqCategories.includes(c));
+    });
     const idxInFiltered = filtered.findIndex(f=>f.id===id);
     const targetIdxInFiltered = idxInFiltered + direction;
     if(targetIdxInFiltered < 0 || targetIdxInFiltered >= filtered.length) return;
@@ -6118,8 +6152,12 @@ document.addEventListener('click', () => {
   if(tip) tip.style.display = 'none';
 });
 document.addEventListener('click', (e) => {
-  const wrap = e.target.closest && e.target.closest('.notif-bell-wrap');
-  if(!wrap) app.closeNotifPanel();
+  // e.target.closest()는 클릭 이후 DOM이 바뀌면(예: 알림 삭제 모드로 다시 그려질 때
+  // 방금 누른 버튼 자체가 사라짐) 부모를 못 찾아 오작동할 수 있어서,
+  // 클릭이 실제로 발생한 시점의 경로를 그대로 담고 있는 composedPath()를 사용한다.
+  const path = e.composedPath ? e.composedPath() : [];
+  const clickedInsideWrap = path.some(el => el.classList && el.classList.contains('notif-bell-wrap'));
+  if(!clickedInsideWrap) app.closeNotifPanel();
 });
 window.addEventListener('blur', () => { stringsDragActive = false; stopStringTremolo(); currentHeldNote = null; });
 

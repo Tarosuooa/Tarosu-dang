@@ -507,6 +507,10 @@ footer{
   font-family:'Noto Sans KR',sans-serif; text-decoration:underline; padding:0;
 }
 .notif-readall-btn:disabled{ color:var(--ink-soft); text-decoration:none; cursor:default; opacity:0.6; }
+.notif-panel-footer{
+  display:flex; gap:8px; padding:10px 14px; border-top:1px solid var(--paper-deep);
+  position:sticky; bottom:0; background:#fbf7ec;
+}
 .notif-new-badge{
   display:inline-block; background:var(--danger); color:#fff; font-size:9.5px; font-weight:800;
   border-radius:8px; padding:1px 6px; vertical-align:1px; margin-right:2px;
@@ -736,7 +740,6 @@ footer{
   <div class="page" id="page-faq">
     <div class="section-title"><h2>FAQ</h2><span class="hanja-sub">問答</span></div>
     <div class="divider"></div>
-    <div class="category-filter" id="faqCategoryFilter"></div>
     <div class="toolbar" id="faq-toolbar"></div>
     <div class="list-box" id="faq-list"></div>
   </div>
@@ -894,6 +897,16 @@ footer{
           <button class="btn small" onclick="app.findMembersByIp()">찾기</button>
         </div>
         <div id="findByIpResult" style="margin-top:10px; display:flex; flex-direction:column; gap:6px;"></div>
+      </div>
+    </div>
+
+    <div class="card" id="heroTitlesCard" style="display:none;">
+      <h3 style="font-size:16px; margin-bottom:4px;">홈 타이틀 (랜덤 5개) 관리 <span class="field-hint" style="margin:0;">(관리자 전용)</span></h3>
+      <p class="field-hint" style="margin:8px 0 12px;">홈 화면에 접속할 때마다 아래 5개 중 하나가 지정한 확률로 무작위로 보여요. 문구에 '고쟁'이 들어가면 그 부분만 자동으로 갈색 밑줄로 강조돼요. 최대 2줄까지 작성할 수 있어요.</p>
+      <div id="heroTitlesRows" style="display:flex; flex-direction:column; gap:12px;"></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; padding-top:14px; border-top:1px solid var(--paper-deep);">
+        <span id="heroTitlesSumLabel" style="font-size:13.5px; font-weight:700;">확률 합계: 100%</span>
+        <button class="btn" id="heroTitlesApplyBtn" onclick="app.applyHeroTitles()">적용</button>
       </div>
     </div>
 
@@ -1116,12 +1129,14 @@ if(FIREBASE_CONFIGURED){
    ▼▼▼ 홈 화면 큰 문구 (10개 중 접속할 때마다 무작위로 하나 표시) ▼▼▼
    각 항목은 그대로 화면에 HTML로 들어갑니다. 줄바꿈은 <br>, 강조는 <em>강조할 단어</em>로 표시할 수 있어요.
    ===================================================================== */
-const HERO_TAGLINES = [
-  '타로수가 선명하게<br><em>고쟁</em>을 핥고 있었다.',
-  '<em>고쟁</em> 위로<br>고양이가 걸어 다닙니다.',
-  '<em>고쟁~</em> 야~호',
-  '새벽 3시에 <em>고쟁</em> 치는<br>사람이 어딨냐구!!',
-  '이 <em>고쟁</em>은 제 겁니다.'
+// 홈 화면 랜덤 타이틀의 기본값 (관리자가 아직 한 번도 저장한 적 없을 때 사용).
+// '고쟁'이라는 글자는 렌더링할 때 시스템이 자동으로 강조하므로, 여기서는 일반 텍스트로만 적는다.
+const DEFAULT_HERO_TITLES = [
+  { text: '타로수가 선명하게\n고쟁을 핥고 있었다.', weight: 20 },
+  { text: '고쟁 위로\n고양이가 걸어 다닙니다.', weight: 20 },
+  { text: '고쟁~ 야~호', weight: 20 },
+  { text: '새벽 3시에 고쟁 치는\n사람이 어딨냐구!!', weight: 20 },
+  { text: '이 고쟁은 제 겁니다.', weight: 20 }
 ];
 
 const NAV_ITEMS = [
@@ -1181,7 +1196,6 @@ const state = {
   sheetCategory: '전체',
   sheetSearchQuery: '',
   sheetPage: 1,
-  faqCategories: [], // 빈 배열이면 '전체', 아니면 선택된 카테고리들 중 하나라도 맞으면 표시
   noticeTab: 'notice', // 소식 하위 탭: notice(공지사항) / noticeUpdate(업데이트) / profile(프로필)
   guzhengGuideText: '',
   scoreMakerNoticeText: '',
@@ -1191,6 +1205,7 @@ const state = {
   profile: { photoUrls: [], title: '', content: '' },
   homeCardOrder: null, // null이면 기본 순서 사용, 배열이면 그 순서대로 표시
   heroTaglineText: null, // null이면 기본 3줄 문구 사용
+  heroTitles: null, // null이면 DEFAULT_HERO_TITLES 사용. 관리자가 저장하면 [{text, weight}, ...] 5개
   heroContactText: null, // null이면 기본 인스타그램/이메일 문구 사용
   visitStatsRange: null, // { fromDate, toDate, presetDays }
   commentCounts: {}, // postId -> 댓글 개수 (목록에 [N]으로 표시하기 위한 캐시)
@@ -1281,6 +1296,13 @@ function initGuestbookCharLimit(){
 }
 
 function escapeHtml(s){ return (s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+// 홈 화면 랜덤 타이틀 표시용: 관리자가 입력한 일반 텍스트를 안전하게 이스케이프한 뒤,
+// 줄바꿈은 <br>로, '고쟁'이라는 글자는 자동으로 <em>(갈색 + 밑줄)</em>으로 감싼다.
+function renderHeroTitleHtml(text){
+  const escaped = escapeHtml(text || '');
+  const withBreaks = escaped.replace(/\n/g, '<br>');
+  return withBreaks.split('고쟁').join('<em>고쟁</em>');
+}
 function commentCountBadge(postId){
   const n = state.commentCounts[postId] || 0;
   return n > 0 ? ` <span class="comment-count-badge">[${n}]</span>` : '';
@@ -2021,6 +2043,27 @@ async function loadHeroTagline(){
     state.heroTaglineText = null;
   }
 }
+async function loadHeroTitles(){
+  if(!db){ state.heroTitles = null; return; }
+  try{
+    const doc = await db.collection('content').doc('heroTitles').get();
+    const titles = (doc.exists && Array.isArray(doc.data().titles) && doc.data().titles.length === 5) ? doc.data().titles : null;
+    state.heroTitles = titles;
+  }catch(e){
+    console.error('홈 랜덤 타이틀 로드 실패', e);
+    state.heroTitles = null;
+  }
+}
+async function saveHeroTitles(titles){
+  if(!db) return false;
+  try{
+    await db.collection('content').doc('heroTitles').set({ titles });
+    return true;
+  }catch(e){
+    console.error('홈 랜덤 타이틀 저장 실패', e);
+    return false;
+  }
+}
 async function saveHeroTagline(text){
   if(!db) return false;
   try{
@@ -2227,6 +2270,8 @@ async function loadVisitStats(days){
 }
 
 /* ---------- 알림 ---------- */
+let notifDeleteMode = false; // 알림 패널의 삭제 모드 on/off
+let notifSelectedIds = new Set(); // 삭제 모드에서 체크한 알림 id들
 async function loadNotifications(){
   if(!db || !state.currentUser){ state.notifications = []; return; }
   try{
@@ -2469,7 +2514,6 @@ function applyNavState(s){
   state.page = s.page || 'home';
   state.sheetTab = s.sheetTab || 'dl';
   state.sheetCategory = s.sheetCategory || '전체';
-  state.faqCategories = [];
   state.noticeTab = s.noticeTab || 'notice';
   state.detail.notice = s.detailNotice || null;
   state.detail.noticeUpdate = s.detailNoticeUpdate || null;
@@ -2666,6 +2710,7 @@ const app = {
     await loadProfile();
     await loadHomeCardOrder();
     await loadHeroTagline();
+    await loadHeroTitles();
     await loadHeroContact();
     await loadCommentCounts();
     updateStorageWarning();
@@ -2810,11 +2855,24 @@ const app = {
 
   pickRandomHeroTagline(){
     const el = document.getElementById('heroTagline');
-    if(!el || !HERO_TAGLINES.length) return;
+    if(!el) return;
+    const titles = (state.heroTitles || DEFAULT_HERO_TITLES).filter(t => t.text && t.text.trim());
+    if(titles.length === 0) return;
 
-    // 첫 접속이든 그 이후 재접속/새로고침이든 상관없이, 매번 5개 문구 중 완전히 동일한 확률(1/5씩)로 뽑는다.
-    const idx = Math.floor(Math.random() * HERO_TAGLINES.length);
-    el.innerHTML = HERO_TAGLINES[idx];
+    // 각 문구에 지정된 확률(weight)에 비례해서 하나를 뽑는다
+    const totalWeight = titles.reduce((sum, t) => sum + (Number(t.weight) || 0), 0);
+    let picked = titles[titles.length - 1];
+    if(totalWeight > 0){
+      let r = Math.random() * totalWeight;
+      for(const t of titles){
+        r -= (Number(t.weight) || 0);
+        if(r <= 0){ picked = t; break; }
+      }
+    }else{
+      // 확률이 전부 0으로 저장되어 있는 예외 상황에서도, 완전 균등 확률로라도 하나는 보여준다
+      picked = titles[Math.floor(Math.random() * titles.length)];
+    }
+    el.innerHTML = renderHeroTitleHtml(picked.text);
   },
 
   /* ---------- 고쟁 줄 사용법 패널 (모달 아님 — 열려 있어도 뒤의 줄을 계속 클릭할 수 있다) ---------- */
@@ -3156,7 +3214,6 @@ const app = {
     if(leavingGame) this.stopGameSession(false);
     if(page==='sheets') state.sheetTab = 'dl';
     if(page==='notice') state.noticeTab = 'notice';
-    if(page==='faq') state.faqCategories = [];
     state.page = page;
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     document.getElementById('page-'+page).classList.add('active');
@@ -3459,6 +3516,8 @@ const app = {
     if(!panel) return;
     const isHidden = !panel.classList.contains('show');
     if(isHidden){
+      notifDeleteMode = false;
+      notifSelectedIds.clear();
       this.renderNotifPanel();
       panel.classList.add('show');
     }else{
@@ -3468,6 +3527,16 @@ const app = {
   closeNotifPanel(){
     const panel = document.getElementById('notifPanel');
     if(panel) panel.classList.remove('show');
+  },
+  toggleNotifDeleteMode(){
+    notifDeleteMode = !notifDeleteMode;
+    notifSelectedIds.clear();
+    this.renderNotifPanel();
+  },
+  toggleNotifSelect(id){
+    if(notifSelectedIds.has(id)) notifSelectedIds.delete(id);
+    else notifSelectedIds.add(id);
+    this.renderNotifPanel();
   },
   renderNotifPanel(){
     const panel = document.getElementById('notifPanel');
@@ -3480,17 +3549,34 @@ const app = {
     const headerHtml = `
       <div class="notif-panel-header">
         <span>알림</span>
-        <button type="button" class="notif-readall-btn" onclick="app.markAllNotificationsRead()" ${hasUnread ? '' : 'disabled'}>모두 읽기</button>
+        <div style="display:flex; gap:10px;">
+          ${!notifDeleteMode ? `<button type="button" class="notif-readall-btn" onclick="app.markAllNotificationsRead()" ${hasUnread ? '' : 'disabled'}>모두 읽기</button>` : ''}
+          <button type="button" class="notif-readall-btn" onclick="app.toggleNotifDeleteMode()">${notifDeleteMode ? '취소' : '삭제'}</button>
+        </div>
       </div>`;
     const itemsHtml = state.notifications.map(n => {
       const actionText = n.type === 'guestbook' ? '방명록에 글을 남겼어요' : `'${escapeHtml(n.postTitle || '게시물')}'에 댓글을 남겼어요`;
+      const bodyHtml = `
+        <div class="notif-item-title">${n.read ? '' : '<span class="notif-new-badge">NEW</span> '}<strong>${escapeHtml(n.fromNickname)}</strong>님이 ${actionText}</div>
+        <div class="notif-item-meta">${escapeHtml(n.preview || '')}</div>`;
+      if(notifDeleteMode){
+        return `
+        <label class="notif-item ${n.read ? '' : 'unread'}" style="display:flex; align-items:flex-start; gap:8px; cursor:pointer;">
+          <input type="checkbox" style="margin-top:3px;" ${notifSelectedIds.has(n.id) ? 'checked' : ''} onchange="app.toggleNotifSelect('${n.id}')">
+          <div style="flex:1;">${bodyHtml}</div>
+        </label>`;
+      }
       return `
       <button type="button" class="notif-item ${n.read ? '' : 'unread'}" onclick="app.openNotification('${n.id}')">
-        <div class="notif-item-title">${n.read ? '' : '<span class=\"notif-new-badge\">NEW</span> '}<strong>${escapeHtml(n.fromNickname)}</strong>님이 ${actionText}</div>
-        <div class="notif-item-meta">${escapeHtml(n.preview || '')}</div>
+        ${bodyHtml}
       </button>`;
     }).join('');
-    panel.innerHTML = headerHtml + itemsHtml;
+    const footerHtml = notifDeleteMode ? `
+      <div class="notif-panel-footer">
+        <button type="button" class="btn danger small" onclick="app.deleteSelectedNotifications()">선택 삭제 (${notifSelectedIds.size})</button>
+        <button type="button" class="btn ghost small" onclick="app.deleteAllNotifications()">모두 삭제</button>
+      </div>` : '';
+    panel.innerHTML = headerHtml + itemsHtml + footerHtml;
   },
   async openNotification(notifId){
     const notif = state.notifications.find(n => n.id === notifId);
@@ -3531,11 +3617,133 @@ const app = {
     this.renderNotifPanel();
     this.updateAuthArea();
   },
+  async deleteSelectedNotifications(){
+    const ids = Array.from(notifSelectedIds);
+    if(ids.length === 0){ showToast('삭제할 알림을 선택해주세요'); return; }
+    if(!confirm(`선택한 ${ids.length}개의 알림을 삭제할까요?`)) return;
+    await this._deleteNotificationsByIds(ids);
+  },
+  async deleteAllNotifications(){
+    const ids = state.notifications.map(n => n.id);
+    if(ids.length === 0){ showToast('삭제할 알림이 없어요'); return; }
+    if(!confirm(`내게 온 모든 알림(${ids.length}개)을 삭제할까요?`)) return;
+    await this._deleteNotificationsByIds(ids);
+  },
+  async _deleteNotificationsByIds(ids){
+    if(db){
+      try{
+        const CHUNK = 400;
+        for(let i = 0; i < ids.length; i += CHUNK){
+          const batch = db.batch();
+          ids.slice(i, i + CHUNK).forEach(id => batch.delete(db.collection('notifications').doc(id)));
+          await batch.commit();
+        }
+      }catch(e){
+        console.error('알림 삭제 실패', e);
+        showToast('삭제에 실패했어요');
+        return;
+      }
+    }
+    state.notifications = state.notifications.filter(n => !ids.includes(n.id));
+    notifSelectedIds.clear();
+    notifDeleteMode = false;
+    this.renderNotifPanel();
+    this.updateAuthArea();
+    showToast('삭제되었습니다');
+  },
 
   renderMyPage(){
     if(!state.currentUser) return;
     const nickEl = document.getElementById('mpNickname');
     if(nickEl && document.activeElement !== nickEl) nickEl.value = state.currentUser.nickname;
+
+    const heroCard = document.getElementById('heroTitlesCard');
+    if(heroCard){
+      if(isAdminUser()){
+        heroCard.style.display = '';
+        this.renderHeroTitlesEditor();
+      }else{
+        heroCard.style.display = 'none';
+      }
+    }
+  },
+
+  /* ---------- 홈 화면 랜덤 타이틀(5개) 관리 ---------- */
+  renderHeroTitlesEditor(){
+    const wrap = document.getElementById('heroTitlesRows');
+    if(!wrap) return;
+    const titles = (state.heroTitles || DEFAULT_HERO_TITLES).map(t => ({ text: t.text || '', weight: Number(t.weight) || 0 }));
+    // 편집 중 입력을 덮어쓰지 않도록, 이미 그려진 상태에서는 다시 그리지 않는다 (합계 등 값만 실시간으로 갱신)
+    if(wrap.dataset.built){ this.updateHeroTitlesSum(); return; }
+    wrap.dataset.built = '1';
+    wrap.innerHTML = titles.map((t, i) => `
+      <div style="display:flex; gap:10px; align-items:flex-start; border:1px solid var(--paper-deep); border-radius:4px; padding:10px 12px; background:#fbf7ec;">
+        <span style="font-size:12.5px; color:var(--ink-soft); font-weight:700; padding-top:8px;">${i+1}</span>
+        <textarea id="heroTitle-f-${i}" rows="2" maxlength="60" placeholder="문구를 입력하세요 (최대 2줄, 'Enter'로 줄바꿈)"
+          style="flex:1; min-width:0; padding:8px 10px; border:1px solid var(--paper-deep); border-radius:2px; font-family:'Gowun Batang', 'Noto Serif SC', 'Noto Serif TC', serif; font-size:14px; resize:none;"
+          oninput="app.enforceHeroTitleLineLimit(${i})">${escapeHtml(t.text)}</textarea>
+        <div style="display:flex; align-items:center; gap:4px; flex:none;">
+          <input type="number" id="heroTitle-f-w-${i}" min="0" max="100" value="${t.weight}" oninput="app.updateHeroTitlesSum()"
+            style="width:58px; padding:8px 6px; border:1px solid var(--paper-deep); border-radius:2px; font-size:14px; text-align:center;">
+          <span style="font-size:13px; color:var(--ink-soft);">%</span>
+        </div>
+        <button class="btn ghost small" style="flex:none;" onclick="app.deleteHeroTitle(${i})">삭제</button>
+      </div>`).join('');
+    this.updateHeroTitlesSum();
+  },
+  // textarea에서 Enter로 줄이 2줄을 넘어가면, 초과분을 즉시 잘라내서 최대 2줄로 제한한다
+  enforceHeroTitleLineLimit(idx){
+    const el = document.getElementById('heroTitle-f-' + idx);
+    if(!el) return;
+    const lines = el.value.split('\n');
+    if(lines.length > 2){
+      el.value = lines.slice(0, 2).join('\n');
+    }
+  },
+  deleteHeroTitle(idx){
+    if(!confirm('이 문구를 지울까요? (지운 뒤에는 확률을 0으로 맞추고, 남은 문구들의 확률 합이 100%가 되도록 다시 배분해주세요)')) return;
+    const textEl = document.getElementById('heroTitle-f-' + idx);
+    const weightEl = document.getElementById('heroTitle-f-w-' + idx);
+    if(textEl) textEl.value = '';
+    if(weightEl) weightEl.value = '0';
+    this.updateHeroTitlesSum();
+  },
+  updateHeroTitlesSum(){
+    let sum = 0;
+    for(let i=0; i<5; i++){
+      const weightEl = document.getElementById('heroTitle-f-w-' + i);
+      if(weightEl) sum += Number(weightEl.value) || 0;
+    }
+    const sumLabel = document.getElementById('heroTitlesSumLabel');
+    const applyBtn = document.getElementById('heroTitlesApplyBtn');
+    if(sumLabel){
+      sumLabel.textContent = `확률 합계: ${sum}%`;
+      sumLabel.style.color = sum === 100 ? 'var(--jade)' : 'var(--danger)';
+    }
+    if(applyBtn) applyBtn.disabled = (sum !== 100);
+  },
+  async applyHeroTitles(){
+    if(!isAdminUser()) return;
+    let sum = 0;
+    const titles = [];
+    for(let i=0; i<5; i++){
+      const textEl = document.getElementById('heroTitle-f-' + i);
+      const weightEl = document.getElementById('heroTitle-f-w-' + i);
+      const text = textEl ? textEl.value.replace(/\r/g, '') : '';
+      const weight = weightEl ? (Number(weightEl.value) || 0) : 0;
+      if(text.split('\n').length > 2){ showToast(`${i+1}번 문구는 최대 2줄까지만 작성할 수 있어요`); return; }
+      sum += weight;
+      titles.push({ text, weight });
+    }
+    if(sum !== 100){ showToast('5개 확률의 합이 100%가 되어야 적용할 수 있어요'); return; }
+    if(titles.every(t => !t.text.trim())){ showToast('최소 하나의 문구는 입력해주세요'); return; }
+    const ok = await saveHeroTitles(titles);
+    if(ok){
+      state.heroTitles = titles;
+      showToast('홈 타이틀이 적용되었습니다');
+    }else{
+      showToast('저장에 실패했습니다');
+    }
   },
 
   async testVisitLogging(){
@@ -4587,26 +4795,9 @@ const app = {
     const existingForm = document.getElementById('faq-form');
     if(existingForm) existingForm.remove();
 
-    const filterEl = document.getElementById('faqCategoryFilter');
-    if(filterEl){
-      const cats = ['전체', ...FAQ_CATEGORIES];
-      filterEl.innerHTML = cats.map(c => {
-        const isActive = c==='전체' ? state.faqCategories.length===0 : state.faqCategories.includes(c);
-        return `<button type="button" class="cat-btn ${isActive ? 'active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`;
-      }).join('');
-      if(!filterEl.dataset.bound){
-        filterEl.dataset.bound = '1';
-        filterEl.addEventListener('click', (e) => {
-          const btn = e.target.closest('.cat-btn');
-          if(!btn) return;
-          app.toggleFaqCategory(btn.dataset.cat);
-        });
-      }
-    }
-
     const listEl = document.getElementById('faq-list');
     const getCats = f => f.categories || (f.category ? [f.category] : []);
-    const filtered = state.data.faq.filter(f => state.faqCategories.length===0 || getCats(f).some(c => state.faqCategories.includes(c)));
+    const filtered = state.data.faq;
     const pinnedFaqs = state.data.faq.filter(f => f.pinned);
 
     const buildFaqItem = (f, idSuffix, isPinnedCopy) => {
@@ -4666,23 +4857,10 @@ const app = {
     showToast(f.pinned ? '상단에 고정되었습니다' : '고정이 취소되었습니다');
     this.renderFaq();
   },
-  toggleFaqCategory(cat){
-    if(cat === '전체'){
-      state.faqCategories = []; // '전체'를 누르면 다른 선택은 전부 해제
-    }else{
-      const idx = state.faqCategories.indexOf(cat);
-      if(idx >= 0) state.faqCategories.splice(idx, 1);
-      else state.faqCategories.push(cat);
-    }
-    this.renderFaq();
-  },
   async moveFaq(id, direction){
     if(!isAdminUser()) return;
-    // 현재 보이는(필터링된) 목록 안에서의 순서를 기준으로 바로 위/아래 항목과 자리를 바꾼다
-    const filtered = state.data.faq.filter(f => {
-      const cats = f.categories || (f.category ? [f.category] : []);
-      return state.faqCategories.length===0 || cats.some(c => state.faqCategories.includes(c));
-    });
+    // 이제 상단 필터가 없으므로, 전체 목록 순서를 기준으로 바로 위/아래 항목과 자리를 바꾼다
+    const filtered = state.data.faq;
     const idxInFiltered = filtered.findIndex(f=>f.id===id);
     const targetIdxInFiltered = idxInFiltered + direction;
     if(targetIdxInFiltered < 0 || targetIdxInFiltered >= filtered.length) return;

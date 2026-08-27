@@ -477,6 +477,20 @@ footer{
 .pill.solid:hover{opacity:0.85;}
 .user-chip{font-size:13px; color:var(--ink-soft); font-family:'Noto Sans KR',sans-serif; white-space:nowrap;}
 .user-chip strong{color:var(--wood);}
+.user-chip-wrap{ position:relative; }
+.user-menu-panel{
+  display:none; position:absolute; top:calc(100% + 8px); left:0; z-index:80;
+  min-width:130px; background:#fbf7ec; border:1px solid var(--paper-deep); border-radius:6px; box-shadow:var(--shadow);
+  overflow:hidden;
+}
+.user-menu-panel.show{ display:block; }
+.user-menu-panel button{
+  display:block; width:100%; text-align:left; background:none; border:none; cursor:pointer;
+  padding:10px 14px; font-size:13px; font-family:'Noto Sans KR',sans-serif; color:var(--ink);
+  border-bottom:1px solid var(--paper-deep);
+}
+.user-menu-panel button:last-child{ border-bottom:none; }
+.user-menu-panel button:hover{ background:var(--paper-dark); }
 
 /* ---------- 알림(종) ---------- */
 .notif-bell-wrap{ position:relative; }
@@ -846,6 +860,14 @@ footer{
     <div id="tuningTipBody"></div>
   </div>
 
+
+  <!-- ARCHIVE (관리자 전용) -->
+  <div class="page" id="page-archive">
+    <div class="section-title"><h2>보관함</h2><span class="hanja-sub">保管函</span></div>
+    <div class="divider"></div>
+    <p class="field-hint" style="margin-bottom:14px;">'보관' 처리한 게시물들이 여기에 모여요. 클릭하면 내용을 볼 수 있고, '복원'을 누르면 원래 게시판으로 다시 돌아가요.</p>
+    <div id="archive-list" class="list-box"></div>
+  </div>
 
   <!-- MYPAGE -->
   <div class="page" id="page-mypage">
@@ -3209,6 +3231,7 @@ const app = {
   go(page, skipPush){
     if(!skipPush && !confirmLeaveIfDirty()) return;
     if(page==='mypage' && !state.currentUser){ showToast('로그인이 필요합니다'); return; }
+    if(page==='archive' && !isAdminUser()){ showToast('관리자만 이용할 수 있습니다'); return; }
     const leavingScoreMaker = (state.page==='sheets' && state.sheetTab==='make' && page!=='sheets');
     if(leavingScoreMaker) this.stopScoreMakerSession(false);
     const leavingTuning = (state.page==='sheets' && state.sheetTab==='tuning' && page!=='sheets');
@@ -3405,6 +3428,7 @@ const app = {
     this.renderTuningNotice();
     this.renderGameNotice();
     this.renderMyPage();
+    this.renderArchive();
     this.updateAuthArea();
     const guidePanel = document.getElementById('guzhengGuidePanel');
     if(guidePanel && guidePanel.style.display !== 'none') this.renderGuzhengGuide();
@@ -3491,7 +3515,13 @@ const app = {
     if(state.currentUser){
       const unread = state.notifications.filter(n => !n.read).length;
       box.innerHTML = `
-        <span class="user-chip" ondblclick="app.go('mypage')" title="더블클릭하면 마이페이지로 이동합니다" style="cursor:pointer;"><strong>${escapeHtml(state.currentUser.nickname)}</strong> 님${state.currentUser.isAdmin ? ' <strong style="color:var(--wood)">(관리자)</strong>' : ''}</span>
+        <div class="user-chip-wrap">
+          <span class="user-chip" onclick="app.toggleUserMenu()" style="cursor:pointer;"><strong>${escapeHtml(state.currentUser.nickname)}</strong> 님${state.currentUser.isAdmin ? ' <strong style="color:var(--wood)">(관리자)</strong>' : ''}</span>
+          <div class="user-menu-panel" id="userMenuPanel">
+            <button type="button" onclick="app.closeUserMenu(); app.go('mypage');">마이페이지</button>
+            ${isAdminUser() ? `<button type="button" onclick="app.closeUserMenu(); app.go('archive');">보관함</button>` : ''}
+          </div>
+        </div>
         <div class="notif-bell-wrap">
           <button class="notif-bell-btn" onclick="app.toggleNotifPanel()" title="알림">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--wood)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -3515,6 +3545,15 @@ const app = {
   },
 
   /* ---------- 알림 패널 ---------- */
+  toggleUserMenu(){
+    const panel = document.getElementById('userMenuPanel');
+    if(!panel) return;
+    panel.classList.toggle('show');
+  },
+  closeUserMenu(){
+    const panel = document.getElementById('userMenuPanel');
+    if(panel) panel.classList.remove('show');
+  },
   toggleNotifPanel(){
     const panel = document.getElementById('notifPanel');
     if(!panel) return;
@@ -3654,6 +3693,48 @@ const app = {
     this.renderNotifPanel();
     this.updateAuthArea();
     showToast('삭제되었습니다');
+  },
+
+  /* ---------- 보관함 (관리자 전용): 보관 처리한 게시물을 모아서 보고, 복원할 수 있다 ---------- */
+  renderArchive(){
+    const listEl = document.getElementById('archive-list');
+    if(!listEl) return;
+    if(!isAdminUser()){
+      listEl.innerHTML = `<div class="empty-note">관리자만 이용할 수 있습니다</div>`;
+      return;
+    }
+    const BOARD_LABELS = { notice:'공지사항', noticeUpdate:'업데이트', download:'미디어', faq:'FAQ' };
+    const items = [];
+    ['notice','noticeUpdate','download'].forEach(name => {
+      (state.data[name] || []).filter(p => p.archived).forEach(p => items.push({ board:name, id:p.id, title:p.title, date:p.date, content:p.content }));
+    });
+    (state.data.faq || []).filter(f => f.archived).forEach(f => items.push({ board:'faq', id:f.id, title:f.question, date:'', content:f.answer }));
+    items.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+
+    if(items.length === 0){
+      listEl.innerHTML = `<div class="empty-note">보관된 게시물이 없습니다</div>`;
+      return;
+    }
+    listEl.innerHTML = items.map((it, i) => {
+      const restoreOnclick = it.board === 'faq'
+        ? `app.restoreFaq('${it.id}')`
+        : `app.restorePost('${it.board}','${it.id}')`;
+      return `
+      <div class="post-row">
+        <div style="flex:1;cursor:pointer" onclick="app.toggleArchiveItem('arch-${i}')">
+          <div class="post-title"><span class="badge">${BOARD_LABELS[it.board]}</span> ${escapeHtml(it.title)}</div>
+          <div class="post-meta">${escapeHtml(displayDate(it.date))}</div>
+          <div id="arch-${i}" style="display:none; margin-top:10px; font-size:14px; color:var(--ink); white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word;">${sanitizeRichHtml(it.content)}</div>
+        </div>
+        <div class="admin-row-actions">
+          <button class="btn ghost small" onclick="event.stopPropagation(); ${restoreOnclick}">복원</button>
+        </div>
+      </div>`;
+    }).join('');
+  },
+  toggleArchiveItem(elId){
+    const el = document.getElementById(elId);
+    if(el) el.style.display = el.style.display === 'none' ? '' : 'none';
   },
 
   renderMyPage(){
@@ -4609,7 +4690,7 @@ const app = {
       ? `<button class="btn" onclick="app.openForm('${name}')">+ 새 글 작성</button>`
       : '';
 
-    const items = state.data[name].slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    const items = state.data[name].filter(p => !p.archived).slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
     const pinnedItems = canPin ? items.filter(p => p.pinned) : [];
     const pinnedCount = pinnedItems.length;
 
@@ -4623,6 +4704,7 @@ const app = {
             <div class="admin-row-actions">
               ${canPin ? `<button class="btn ghost small" onclick="event.stopPropagation();app.togglePin('${name}','${p.id}')" title="${p.pinned ? '고정 취소' : '상단에 고정'}">${p.pinned ? '📌 취소' : '📌 고정'}</button>` : ''}
               <button class="btn ghost small" onclick="event.stopPropagation();app.openForm('${name}','${p.id}')">수정</button>
+              <button class="btn ghost small" onclick="event.stopPropagation();app.archivePost('${name}','${p.id}')">보관</button>
               <button class="btn danger small" onclick="event.stopPropagation();app.deletePost('${name}','${p.id}')">삭제</button>
             </div>` : ''}
         </div>`;
@@ -4792,6 +4874,28 @@ const app = {
     this.renderBoard(name);
     if(name==='notice') this.renderHome();
   },
+  async archivePost(name, id){
+    if(!isAdminUser()) return;
+    const p = state.data[name].find(x=>x.id===id);
+    if(!p) return;
+    p.archived = true;
+    if(state.detail[name] === id) state.detail[name] = null;
+    await saveBoard(name);
+    showToast('보관함으로 옮겼습니다');
+    this.renderBoard(name);
+    if(name==='notice') this.renderHome();
+  },
+  async restorePost(name, id){
+    if(!isAdminUser()) return;
+    const p = state.data[name].find(x=>x.id===id);
+    if(!p) return;
+    p.archived = false;
+    await saveBoard(name);
+    showToast('복원되었습니다');
+    this.renderArchive();
+    this.renderBoard(name);
+    if(name==='notice') this.renderHome();
+  },
 
   renderFaq(){
     const toolbarEl = document.getElementById('faq-toolbar');
@@ -4818,8 +4922,8 @@ const app = {
 
     const listEl = document.getElementById('faq-list');
     const getCats = f => f.categories || (f.category ? [f.category] : []);
-    const filtered = state.data.faq.filter(f => state.faqCategories.length===0 || getCats(f).some(c => state.faqCategories.includes(c)));
-    const pinnedFaqs = state.data.faq.filter(f => f.pinned);
+    const filtered = state.data.faq.filter(f => !f.archived && (state.faqCategories.length===0 || getCats(f).some(c => state.faqCategories.includes(c))));
+    const pinnedFaqs = state.data.faq.filter(f => f.pinned && !f.archived);
 
     const buildFaqItem = (f, idSuffix, isPinnedCopy) => {
       const cats = getCats(f);
@@ -4841,6 +4945,7 @@ const app = {
                 ${!isPinnedCopy ? `<button class="btn ghost small" onclick="app.moveFaq('${f.id}',-1)" ${isFirst ? 'disabled' : ''} title="위로 이동">▲</button>
                 <button class="btn ghost small" onclick="app.moveFaq('${f.id}',1)" ${isLast ? 'disabled' : ''} title="아래로 이동">▼</button>` : ''}
                 <button class="btn ghost small" onclick="app.openFaqForm('${f.id}')">수정</button>
+                <button class="btn ghost small" onclick="app.archiveFaq('${f.id}')">보관</button>
                 <button class="btn danger small" onclick="app.deleteFaq('${f.id}')">삭제</button>
               </span>` : `<span class="mark" onclick="app.toggleFaqAnswer('${answerId}')" style="cursor:pointer;">＋</span>`}
           </span>
@@ -4977,6 +5082,25 @@ const app = {
     state.data.faq = state.data.faq.filter(f=>f.id!==id);
     await saveBoard('faq');
     showToast('삭제되었습니다');
+    this.renderFaq();
+  },
+  async archiveFaq(id){
+    if(!isAdminUser()) return;
+    const f = state.data.faq.find(x=>x.id===id);
+    if(!f) return;
+    f.archived = true;
+    await saveBoard('faq');
+    showToast('보관함으로 옮겼습니다');
+    this.renderFaq();
+  },
+  async restoreFaq(id){
+    if(!isAdminUser()) return;
+    const f = state.data.faq.find(x=>x.id===id);
+    if(!f) return;
+    f.archived = false;
+    await saveBoard('faq');
+    showToast('복원되었습니다');
+    this.renderArchive();
     this.renderFaq();
   },
 
@@ -6158,6 +6282,8 @@ document.addEventListener('click', (e) => {
   const path = e.composedPath ? e.composedPath() : [];
   const clickedInsideWrap = path.some(el => el.classList && el.classList.contains('notif-bell-wrap'));
   if(!clickedInsideWrap) app.closeNotifPanel();
+  const clickedInsideUserChip = path.some(el => el.classList && el.classList.contains('user-chip-wrap'));
+  if(!clickedInsideUserChip) app.closeUserMenu();
 });
 window.addEventListener('blur', () => { stringsDragActive = false; stopStringTremolo(); currentHeldNote = null; });
 

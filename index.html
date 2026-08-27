@@ -3706,7 +3706,10 @@ const app = {
     const BOARD_LABELS = { notice:'공지사항', noticeUpdate:'업데이트', download:'미디어', faq:'FAQ' };
     const items = [];
     ['notice','noticeUpdate','download'].forEach(name => {
-      (state.data[name] || []).filter(p => p.archived).forEach(p => items.push({ board:name, id:p.id, title:p.title, date:p.date, content:p.content }));
+      (state.data[name] || []).filter(p => p.archived).forEach(p => items.push({
+        board:name, id:p.id, title:p.title, date:p.date, content:p.content,
+        link: p.link, media: p.media
+      }));
     });
     (state.data.faq || []).filter(f => f.archived).forEach(f => items.push({ board:'faq', id:f.id, title:f.question, date:'', content:f.answer }));
     items.sort((a,b) => (b.date||'').localeCompare(a.date||''));
@@ -3719,12 +3722,18 @@ const app = {
       const restoreOnclick = it.board === 'faq'
         ? `app.restoreFaq('${it.id}')`
         : `app.restorePost('${it.board}','${it.id}')`;
+      const cfg = BOARD_CONFIG[it.board];
+      // 보관되기 전 상세보기와 동일하게, 본문뿐 아니라 자료 링크·사진/영상까지 그대로 보여준다
+      const previewHtml = `
+        <div class="detail-body">${sanitizeRichHtml(it.content)}</div>
+        ${cfg && cfg.hasLink && it.link ? `<a class="dl-link" href="${escapeHtml(it.link)}" target="_blank" rel="noopener">자료 링크 열기 ↗</a>` : ''}
+        ${cfg && cfg.hasMedia ? buildMediaEmbedsHtml(it.media) : ''}`;
       return `
       <div class="post-row">
         <div style="flex:1;cursor:pointer" onclick="app.toggleArchiveItem('arch-${i}')">
           <div class="post-title"><span class="badge">${BOARD_LABELS[it.board]}</span> ${escapeHtml(it.title)}</div>
           <div class="post-meta">${escapeHtml(displayDate(it.date))}</div>
-          <div id="arch-${i}" style="display:none; margin-top:10px; font-size:14px; color:var(--ink); white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word;">${sanitizeRichHtml(it.content)}</div>
+          <div id="arch-${i}" style="display:none; margin-top:10px;" onclick="event.stopPropagation()">${previewHtml}</div>
         </div>
         <div class="admin-row-actions">
           <button class="btn ghost small" onclick="event.stopPropagation(); ${restoreOnclick}">복원</button>
@@ -4742,6 +4751,7 @@ const app = {
               <div class="form-actions" style="margin-top:18px;">
                 ${canPin ? `<button class="btn ghost small" onclick="app.togglePin('${name}','${post.id}')">${post.pinned ? '📌 고정 취소' : '📌 상단에 고정'}</button>` : ''}
                 <button class="btn ghost small" onclick="app.openForm('${name}','${post.id}')">수정</button>
+                <button class="btn ghost small" onclick="app.archivePost('${name}','${post.id}')">보관</button>
                 <button class="btn danger small" onclick="app.deletePost('${name}','${post.id}')">삭제</button>
               </div>` : ''}
             ${cfg.hasComments && commentsAllowed(post) ? `<div id="comments-container-${post.id}"></div>` : ''}

@@ -2566,6 +2566,7 @@ function applyNavState(s){
   });
 
   app.renderAll();
+  if(state.page==='mypage') app.renderVisitStats();
   if(state.page==='sheets' && state.sheetTab==='make') app.startScoreMakerSession();
   else app.stopScoreMakerSession(false);
   if(state.page==='sheets' && state.sheetTab==='tuning') app.startTuningSession();
@@ -2703,6 +2704,7 @@ const app = {
         }
         try{ this.updateAuthArea(); }catch(e){ console.error('updateAuthArea 오류', e); }
         try{ this.renderAll(); }catch(e){ console.error('renderAll 오류', e); }
+        if(state.page==='mypage'){ try{ this.renderVisitStats(); }catch(e){ console.error('renderVisitStats 오류', e); } }
         const smFrame = document.getElementById('scoreMakerFrame');
         if(smFrame && smFrame.contentWindow && scoreMakerState.frameSrcSet){
           try{ smFrame.contentWindow.postMessage({ type:'auth', loggedIn: !!state.currentUser }, '*'); }catch(e){}
@@ -3767,9 +3769,10 @@ const app = {
     const wrap = document.getElementById('heroTitlesRows');
     if(!wrap) return;
     const titles = (state.heroTitles || DEFAULT_HERO_TITLES).map(t => ({ text: t.text || '', weight: Number(t.weight) || 0 }));
-    // 편집 중 입력을 덮어쓰지 않도록, 이미 그려진 상태에서는 다시 그리지 않는다 (합계 등 값만 실시간으로 갱신)
-    if(wrap.dataset.built){ this.updateHeroTitlesSum(); return; }
-    wrap.dataset.built = '1';
+    // 관리자가 지금 이 편집창 중 하나에 포커스를 두고 실제로 입력 중이라면, 다시 그려서 그 입력을 덮어쓰지 않는다.
+    // (단순히 '한 번이라도 그려진 적 있는지'로만 판단하면, 로그인 직후 데이터가 아직 다 안 불려온 시점에
+    //  먼저 한 번 그려져 버린 뒤에는 실제 저장된 데이터가 나중에 도착해도 영영 반영이 안 되는 문제가 있었다)
+    if(wrap.contains(document.activeElement)){ this.updateHeroTitlesSum(); return; }
     wrap.innerHTML = titles.map((t, i) => `
       <div style="display:flex; gap:10px; align-items:flex-start; border:1px solid var(--paper-deep); border-radius:4px; padding:10px 12px; background:#fbf7ec;">
         <span style="font-size:12.5px; color:var(--ink-soft); font-weight:700; padding-top:8px;">${i+1}</span>

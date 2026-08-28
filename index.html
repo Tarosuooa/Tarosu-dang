@@ -2655,7 +2655,6 @@ const app = {
     const isBlocked = await this.checkIpBlocked();
     if(isBlocked) return;
 
-    try{ this.pickRandomHeroTagline(); }catch(e){ console.error('pickRandomHeroTagline 오류', e); }
     try{ this.buildNav(); }catch(e){ console.error('buildNav 오류', e); }
     try{ this.buildStrings(); }catch(e){ console.error('buildStrings 오류', e); }
     try{
@@ -2736,6 +2735,7 @@ const app = {
     await loadHomeCardOrder();
     await loadHeroTagline();
     await loadHeroTitles();
+    try{ this.pickRandomHeroTagline(); }catch(e){ console.error('pickRandomHeroTagline 오류', e); }
     await loadHeroContact();
     await loadCommentCounts();
     updateStorageWarning();

@@ -1623,6 +1623,11 @@ function ensureGameFrameSrc(iframeEl){
   if(gameState.frameSrcLoaded) return;
   gameState.frameSrcLoaded = true;
   iframeEl.src = 'https://tarosuooa.github.io/Tarosuooa-Guzheng-game-Tarosu/';
+  // 게임이 키보드 단축키로 조작되는 경우, 브라우저 포커스가 이 iframe 안에 있어야
+  // 키 입력이 부모 페이지가 아니라 게임 화면으로 정확히 전달된다. 로드 직후 자동으로 포커스를 준다.
+  iframeEl.addEventListener('load', () => {
+    try{ iframeEl.focus(); }catch(e){}
+  });
 }
 
 // 음정 체크 툴 전용 시간제한 상태 (악보 제작 툴의 시간과는 완전히 별개로 관리)
@@ -6123,6 +6128,11 @@ const app = {
       statusEl.textContent = '⚠ 오류가 발생했습니다: ' + (e && e.message ? e.message : String(e));
       wrapEl.style.display = '';
       ensureGameFrameSrc(iframeEl);
+    }
+    // 게임 화면이 실제로 보이는 상태라면, 키보드 단축키가 곧바로 게임 쪽으로 전달되도록 포커스를 준다
+    // (다른 페이지를 보다가 다시 게임 페이지로 돌아왔을 때도 매번 다시 포커스를 맞춰준다)
+    if(wrapEl.style.display !== 'none'){
+      setTimeout(() => { try{ iframeEl.focus(); }catch(e){} }, 200);
     }
   },
 

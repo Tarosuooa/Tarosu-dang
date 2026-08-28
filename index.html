@@ -2658,6 +2658,7 @@ const app = {
     try{
       syncIframeHeightToContent(document.getElementById('scoreMakerFrame'));
       syncIframeHeightToContent(document.getElementById('tuningFrame'));
+      syncIframeHeightToContent(document.getElementById('gameFrame'));
     }catch(e){ console.error('iframe 높이 동기화 오류', e); }
     // 방문 기록(logDailyVisit)이 인증 콜백에서 곧바로 실행될 수 있으므로, 제외 IP 목록은 그 전에 미리 로드해둔다
     await loadExcludedVisitorIps();

@@ -775,7 +775,7 @@ footer{
 
   <!-- SHEETS (악보) -->
   <div class="page" id="page-sheets">
-    <div class="section-title"><h2>악보</h2><span class="hanja-sub">樂譜</span></div>
+    <div class="section-title"><h2>도구</h2><span class="hanja-sub">道具</span></div>
     <div class="divider"></div>
 
     <div class="subtabs">
@@ -1197,7 +1197,7 @@ const NAV_ITEMS = [
   {id:'notice', label:'소식'},
   {id:'profile', label:'프로필'},
   {id:'download', label:'미디어'},
-  {id:'sheets', label:'악보'},
+  {id:'sheets', label:'도구'},
   {id:'game', label:'게임'},
   {id:'faq', label:'FAQ'},
   {id:'guestbook', label:'방명록'},
@@ -1209,11 +1209,12 @@ const BOARD_CONFIG = {
   download:     {label:'자료', hasLink:true, hasMedia:true, hasComments:true},
 };
 
-const FAQ_CATEGORIES = ['악보 제작', '악보 업로드&다운로드', '고쟁 조율', '게임', '미디어', '악기', '홈페이지', '관리자', '그 외'];
+const FAQ_CATEGORIES = ['악보 제작', '악보 업로드&다운로드', '고쟁 조율', '고쟁 조옮김', '게임', '미디어', '악기', '홈페이지', '관리자', '그 외'];
 const FAQ_CATEGORY_COLORS = {
   '악보 제작':          {bg:'#E5D9F2', text:'#5B2C82'},
   '악보 업로드&다운로드': {bg:'#D9E8F2', text:'#2C5C82'},
   '고쟁 조율':          {bg:'#D9F2EC', text:'#2C826D'},
+  '고쟁 조옮김':        {bg:'#D9E4F2', text:'#2C4F82'},
   '게임':               {bg:'#F2E6D9', text:'#8A5A2C'},
   '미디어':             {bg:'#F2E0D9', text:'#82502C'},
   '악기':               {bg:'#DFF2D9', text:'#3D7A2C'},
@@ -1265,6 +1266,7 @@ const state = {
   heroContactText: null, // null이면 기본 인스타그램/이메일 문구 사용
   visitStatsRange: null, // { fromDate, toDate, presetDays }
   commentCounts: {}, // postId -> 댓글 개수 (목록에 [N]으로 표시하기 위한 캐시)
+  postViewCounts: {}, // '{board}_{postId}' -> 조회수 캐시
   excludedVisitorIps: [], // 방문자 집계에서 제외할 IP 목록 (마이페이지에서 관리)
   blockedIps: [], // 사이트 접속 자체를 막을 IP 목록 (마이페이지에서 관리)
   notifications: [], // 로그인한 사용자에게 온 알림 목록
@@ -2086,7 +2088,7 @@ const HOME_CARD_HTML = {
       <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goNoticeTab('noticeUpdate')">업데이트</button>
     </div>`,
   sheetsDl: () => `<h3 style="font-size:16px;">악보 다운로드 <span id="homeSheetsNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">타로수와 회원님들이 공유한 악보를 받아 보세요.</p>`,
-  sheetsMake: () => `<h3 style="font-size:16px;">악보 제작 및 조율</h3>
+  sheetsMake: () => `<h3 style="font-size:16px;">도구</h3>
     <div style="display:flex; gap:8px; margin-top:18px; flex-wrap:wrap;">
       <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('make')">악보 제작</button>
       <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('tuning')">고쟁 조율</button>
@@ -2370,6 +2372,54 @@ async function loadVisitStats(days){
   const fromDateStr = kstDateStr(days - 1);
   const toDateStr = kstDateStr(0);
   return loadVisitStatsRange(fromDateStr, toDateStr);
+}
+
+/* ---------- 게시물 조회수 (방문자 수 집계와 완전히 동일한 기준: 제외 IP, 관리자 제외, 하루 1회 중복 방지) ---------- */
+async function loadPostViewCounts(){
+  if(!db){ state.postViewCounts = {}; return; }
+  try{
+    const snap = await db.collection('postViews').get();
+    const counts = {};
+    snap.forEach(doc => { counts[doc.id] = doc.data().count || 0; });
+    state.postViewCounts = counts;
+  }catch(e){
+    console.error('조회수 로드 실패', e);
+    state.postViewCounts = {};
+  }
+}
+async function logPostView(board, postId){
+  if(!db || !postId) return;
+  if(isAdminUser()) return; // 방문자 수 집계와 동일하게, 관리자 본인의 조회는 세지 않는다
+  const postKey = board + '_' + postId;
+
+  const kstDate = kstDateStr();
+  let dedupKey = await fetchPublicIP();
+  let keyPrefix = 'ip';
+  if(dedupKey && state.excludedVisitorIps.includes(dedupKey)) return; // 방문자 수 집계와 동일한 제외 IP 목록을 그대로 적용
+  if(!dedupKey){
+    dedupKey = getOrCreateLocalVisitorId();
+    keyPrefix = 'dev';
+  }
+  if(!dedupKey) return;
+  const dedupKeySafe = dedupKey.replace(/[^a-zA-Z0-9._:-]/g, '_');
+  const markerRef = db.collection('postViewMarkers').doc(kstDate + '_' + postKey + '_' + keyPrefix + '_' + dedupKeySafe);
+  const viewsRef = db.collection('postViews').doc(postKey);
+
+  try{
+    let alreadyCounted = false;
+    await db.runTransaction(async (tx) => {
+      const markerDoc = await tx.get(markerRef);
+      if(markerDoc.exists){ alreadyCounted = true; return; } // 오늘(한국시간) 이 방문자는 이 게시물을 이미 조회함
+      tx.set(markerRef, { date: kstDate, loggedAt: Date.now() });
+      tx.set(viewsRef, { count: firebase.firestore.FieldValue.increment(1) }, { merge: true });
+    });
+    if(!alreadyCounted){
+      state.postViewCounts[postKey] = (state.postViewCounts[postKey] || 0) + 1;
+      app.refreshPostViewDisplay(board, postId);
+    }
+  }catch(e){
+    console.error('조회수 집계 실패', e);
+  }
 }
 
 /* ---------- 알림 ---------- */
@@ -2822,6 +2872,7 @@ const app = {
     try{ this.pickRandomHeroTagline(); }catch(e){ console.error('pickRandomHeroTagline 오류', e); }
     await loadHeroContact();
     await loadCommentCounts();
+    await loadPostViewCounts();
     updateStorageWarning();
     this.renderAll();
     initGuestbookCharLimit();
@@ -4871,6 +4922,7 @@ const app = {
             <div class="detail-body">${sanitizeRichHtml(post.content)}</div>
             ${cfg.hasLink && post.link ? `<a class="dl-link" href="${escapeHtml(post.link)}" target="_blank" rel="noopener">자료 링크 열기 ↗</a>` : ''}
             ${cfg.hasMedia ? buildMediaEmbedsHtml(post.media) : ''}
+            <div class="field-hint" id="postViewCount-${name}-${post.id}" style="margin-top:10px;">조회수 ${state.postViewCounts[name+'_'+post.id] || 0}</div>
             ${isAdminUser() ? `
               <div class="form-actions" style="margin-top:18px;">
                 ${canPin ? `<button class="btn ghost small" onclick="app.togglePin('${name}','${post.id}')">${post.pinned ? '📌 고정 취소' : '📌 상단에 고정'}</button>` : ''}
@@ -4909,6 +4961,7 @@ const app = {
     if(name === 'sheets') this.renderSheets(); else this.renderBoard(name);
     window.scrollTo({top:0, behavior:'smooth'});
     pushNavState();
+    logPostView(name, id);
   },
   closeDetail(name){
     if(!confirmLeaveIfDirty()) return;
@@ -5070,7 +5123,7 @@ const app = {
       const answerId = 'faq-a-' + idSuffix;
       return `
       <div class="faq-item">
-        <div class="faq-q" onclick="app.toggleFaqAnswer('${answerId}')">
+        <div class="faq-q" onclick="app.toggleFaqAnswer('${answerId}','${f.id}')">
           <span>${isPinnedCopy ? '📌 ' : ''}<span class="mark">問 ·</span> ${escapeHtml(f.question)}</span>
           <span style="display:flex; align-items:center; gap:10px; flex:none;" onclick="event.stopPropagation()">
             ${badgeHtml}
@@ -5081,10 +5134,13 @@ const app = {
                 <button class="btn ghost small" onclick="app.openFaqForm('${f.id}')">수정</button>
                 <button class="btn ghost small" onclick="app.archiveFaq('${f.id}')">보관</button>
                 <button class="btn danger small" onclick="app.deleteFaq('${f.id}')">삭제</button>
-              </span>` : `<span class="mark" onclick="app.toggleFaqAnswer('${answerId}')" style="cursor:pointer;">＋</span>`}
+              </span>` : `<span class="mark" onclick="app.toggleFaqAnswer('${answerId}','${f.id}')" style="cursor:pointer;">＋</span>`}
           </span>
         </div>
-        <div class="faq-a" id="${answerId}"><strong style="color:var(--jade)">答 ·</strong> <span>${sanitizeRichHtml(f.answer)}</span></div>
+        <div class="faq-a" id="${answerId}">
+          <strong style="color:var(--jade)">答 ·</strong> <span>${sanitizeRichHtml(f.answer)}</span>
+          <div class="field-hint" id="postViewCount-faq-${f.id}" style="margin-top:10px;">조회수 ${state.postViewCounts['faq_'+f.id] || 0}</div>
+        </div>
       </div>`;
     };
 
@@ -5097,9 +5153,12 @@ const app = {
     listEl.innerHTML = pinnedHtml + (filtered.length===0 ? `<div class="empty-note">등록된 FAQ가 없습니다</div>` :
       filtered.map(f => buildFaqItem(f, f.id, false)).join(''));
   },
-  toggleFaqAnswer(elId){
+  toggleFaqAnswer(elId, faqId){
     const el = document.getElementById(elId);
-    if(el) el.classList.toggle('open');
+    if(!el) return;
+    const willOpen = !el.classList.contains('open');
+    el.classList.toggle('open');
+    if(willOpen && faqId) logPostView('faq', faqId);
   },
   async togglePinFaq(id){
     if(!isAdminUser()) return;
@@ -5447,6 +5506,7 @@ const app = {
             <div class="detail-body">${sanitizeRichHtml(post.content)}</div>
             ${post.link ? `<a class="dl-link" href="${escapeHtml(post.link)}" target="_blank" rel="noopener">악보 링크 열기 ↗</a>` : ''}
             ${buildMediaEmbedsHtml(post.media)}
+            <div class="field-hint" id="postViewCount-sheets-${post.id}" style="margin-top:10px;">조회수 ${state.postViewCounts['sheets_'+post.id] || 0}</div>
             ${(state.currentUser && state.currentUser.uid === post.authorUid) ? `
               <div class="form-actions" style="margin-top:18px;">
                 <button class="btn ghost small" onclick="app.openSheetForm('${post.id}')">수정</button>
@@ -5623,6 +5683,10 @@ const app = {
   refreshListForBoard(boardType){
     if(boardType === 'sheets') this.renderSheets();
     else this.renderBoard(boardType);
+  },
+  refreshPostViewDisplay(board, postId){
+    const el = document.getElementById('postViewCount-' + board + '-' + postId);
+    if(el) el.textContent = '조회수 ' + (state.postViewCounts[board + '_' + postId] || 0);
   },
 
   /* ---------- 댓글 / 답글 ---------- */

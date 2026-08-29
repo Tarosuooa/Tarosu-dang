@@ -782,6 +782,7 @@ footer{
       <button class="subtab-btn" id="subtab-dl" onclick="app.setSheetTab('dl')">악보 다운로드</button>
       <button class="subtab-btn" id="subtab-make" onclick="app.setSheetTab('make')">악보 제작</button>
       <button class="subtab-btn" id="subtab-tuning" onclick="app.setSheetTab('tuning')">고쟁 조율</button>
+      <button class="subtab-btn" id="subtab-keychange" onclick="app.setSheetTab('keychange')">고쟁 조옮김</button>
     </div>
 
     <!-- 악보 다운로드 -->
@@ -838,6 +839,25 @@ footer{
         <button class="btn" onclick="app.openLoginModal()">로그인하고 제한 없이 이용하기</button>
       </div>
       <iframe id="tuningFrame" src="" title="고쟁 음정 체크" scrolling="no" style="display:none; width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
+    </div>
+
+    <!-- 고쟁 조옮김 (도구 임베드) -->
+    <div id="sheets-keychange-view" style="display:none;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin:-4px 0 4px; flex-wrap:wrap;">
+        <div id="keyChangeNoticeDisplay" style="flex:1; min-width:220px;"></div>
+        <div style="display:flex; flex-direction:column; gap:6px; flex:none;">
+          <button class="btn ghost small" id="keyChangeNoticeEditBtn" style="display:none;" onclick="app.openKeyChangeNoticeEdit()">안내 수정</button>
+          <button class="btn ghost small" onclick="app.openKeyChangeUpdateLogModal()">업데이트 내역</button>
+        </div>
+      </div>
+      <div id="keyChangeNoticeEditWrap" style="display:none; margin-bottom:12px;"></div>
+      <div id="keyChangeStatus" class="field-hint" style="margin-bottom:10px; font-size:13px;"></div>
+      <div id="keyChangeBlocked" class="card" style="display:none; text-align:center; padding:44px 24px;">
+        <h3 style="font-size:17px; margin-bottom:10px;">오늘의 이용 가능 시간을 모두 사용했어요</h3>
+        <p id="keyChangeBlockedMsg" style="font-size:13.5px; color:var(--ink-soft); margin-bottom:18px;"></p>
+        <button class="btn" onclick="app.openLoginModal()">로그인하고 제한 없이 이용하기</button>
+      </div>
+      <iframe id="keyChangeFrame" src="" title="고쟁 조옮김" scrolling="no" style="display:none; width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
     </div>
   </div>
 
@@ -1099,6 +1119,19 @@ footer{
   </div>
 </div>
 
+<!-- 고쟁 조옮김 업데이트 내역 모달 (다른 툴들과는 별개의 데이터) -->
+<div class="modal-overlay" id="keyChangeUpdateLogModal">
+  <div class="modal-box wide" style="width:460px; max-height:80vh; display:flex; flex-direction:column;">
+    <h3>고쟁 조옮김 업데이트 내역</h3>
+    <p class="sub" id="keyChangeUpdateLogCurrentVersion">현재 버전: -</p>
+    <div class="toolbar" id="keyChangeUpdateLog-toolbar" style="margin-bottom:12px;"></div>
+    <div class="list-box" id="keyChangeUpdateLog-list" style="overflow-y:auto; flex:1 1 auto;"></div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="btn ghost" onclick="app.closeKeyChangeUpdateLogModal()" style="flex:1;">닫기</button>
+    </div>
+  </div>
+</div>
+
 <!-- 게임 게시판 업데이트 내역 모달 (악보 제작/음정 체크 툴과는 별개의 데이터) -->
 <div class="modal-overlay" id="gameUpdateLogModal">
   <div class="modal-box wide" style="width:460px; max-height:80vh; display:flex; flex-direction:column;">
@@ -1206,7 +1239,8 @@ const SEED = {
     {id:'seed-u1', version:'0.0.1', date:'2026-08-01', content:'악보 제작 도구 첫 배포'}
   ],
   tuningUpdateLog: [],
-  gameUpdateLog: []
+  gameUpdateLog: [],
+  keyChangeUpdateLog: []
 };
 
 const state = {
@@ -1221,6 +1255,7 @@ const state = {
   guzhengGuideText: '',
   scoreMakerNoticeText: '',
   tuningNoticeText: '',
+  keyChangeNoticeText: '',
   gameNoticeText: '',
   tipText: { scoreMaker: '', tuning: '' },
   profile: { photoUrls: [], title: '', content: '' },
@@ -1233,7 +1268,7 @@ const state = {
   excludedVisitorIps: [], // 방문자 집계에서 제외할 IP 목록 (마이페이지에서 관리)
   blockedIps: [], // 사이트 접속 자체를 막을 IP 목록 (마이페이지에서 관리)
   notifications: [], // 로그인한 사용자에게 온 알림 목록
-  data: { notice: [], noticeUpdate: [], download: [], faq: [], guestbook: [], sheets: [], updateLog: [], tuningUpdateLog: [], gameUpdateLog: [] },
+  data: { notice: [], noticeUpdate: [], download: [], faq: [], guestbook: [], sheets: [], updateLog: [], tuningUpdateLog: [], gameUpdateLog: [], keyChangeUpdateLog: [] },
   detail: { notice: null, noticeUpdate: null, download: null, sheets: null },
   pendingSignup: null,
   pendingWithdraw: null,
@@ -1649,6 +1684,25 @@ function ensureTuningIframeSrc(iframeEl){
   iframeEl.src = 'https://tarosuooa.github.io/Guzheng-Tuning-Tarosu/';
 }
 
+// 고쟁 조옮김 툴 전용 시간제한 상태 (다른 툴들의 시간과는 완전히 별개로 관리)
+const keyChangeState = {
+  active: false,
+  timerHandle: null,
+  ip: null,
+  windowStart: null,
+  usedSecondsAtStart: 0,
+  sessionStartTime: null,
+  remainingSeconds: 0,
+  blocked: false,
+  resetAt: null,
+  frameSrcLoaded: false
+};
+function ensureKeyChangeIframeSrc(iframeEl){
+  if(keyChangeState.frameSrcLoaded) return;
+  keyChangeState.frameSrcLoaded = true;
+  iframeEl.src = 'https://tarosuooa.github.io/Guzheng-key-change-Tarosu/';
+}
+
 // 모바일 크롬 여부를 대략적으로 판별해, 마이크 권한 관련 안내를 한 번 보여준다
 function isMobileChromeBrowser(){
   const ua = navigator.userAgent || '';
@@ -1959,6 +2013,28 @@ async function saveTuningNotice(text){
   }
 }
 
+const DEFAULT_KEYCHANGE_NOTICE = '타로수가 만든 고쟁 조옮김 도구입니다.<br>원하는 조(키)로 악보를 옮겨서 확인할 수 있습니다.';
+async function loadKeyChangeNotice(){
+  if(!db){ state.keyChangeNoticeText = DEFAULT_KEYCHANGE_NOTICE; return; }
+  try{
+    const doc = await db.collection('content').doc('keyChangeNotice').get();
+    state.keyChangeNoticeText = (doc.exists && doc.data().text) ? doc.data().text : DEFAULT_KEYCHANGE_NOTICE;
+  }catch(e){
+    console.error('고쟁 조옮김 안내 문구 로드 실패', e);
+    state.keyChangeNoticeText = DEFAULT_KEYCHANGE_NOTICE;
+  }
+}
+async function saveKeyChangeNotice(text){
+  if(!db) return false;
+  try{
+    await db.collection('content').doc('keyChangeNotice').set({ text });
+    return true;
+  }catch(e){
+    console.error('고쟁 조옮김 안내 문구 저장 실패', e);
+    return false;
+  }
+}
+
 /* ---------- 게임 게시판 안내 문구 (다른 툴 안내와는 완전히 별개, 관리자만 수정) ---------- */
 const DEFAULT_GAME_NOTICE = '타로수가 만든 고쟁 리듬 게임입니다.<br>화면의 점이 판정선에 닿는 순간 해당 줄을 터치하면 소리가 나며 점수가 올라갑니다.';
 async function loadGameNotice(){
@@ -2014,6 +2090,7 @@ const HOME_CARD_HTML = {
     <div style="display:flex; gap:8px; margin-top:18px; flex-wrap:wrap;">
       <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('make')">악보 제작</button>
       <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('tuning')">고쟁 조율</button>
+      <button class="btn small" style="background:#fff; border-color:#A9784E; color:#A9784E;" onclick="app.goSheetsTab('keychange')">고쟁 조옮김</button>
     </div>`,
   download: () => `<h3 style="font-size:16px;">미디어 <span id="homeDownloadNewBadge" class="badge new" style="display:none;">NEW</span></h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">관리자 '타로수'의 연주 영상, 사진 등</p>`,
   game: () => `<h3 style="font-size:16px;">게임</h3><p style="font-size:13.5px;color:var(--ink-soft);margin-top:6px;">고쟁으로 즐기는 리듬 게임</p>`,
@@ -2663,6 +2740,7 @@ const app = {
     try{
       syncIframeHeightToContent(document.getElementById('scoreMakerFrame'));
       syncIframeHeightToContent(document.getElementById('tuningFrame'));
+      syncIframeHeightToContent(document.getElementById('keyChangeFrame'));
       syncIframeHeightToContent(document.getElementById('gameFrame'));
     }catch(e){ console.error('iframe 높이 동기화 오류', e); }
     // 방문 기록(logDailyVisit)이 인증 콜백에서 곧바로 실행될 수 있으므로, 제외 IP 목록은 그 전에 미리 로드해둔다
@@ -2728,11 +2806,12 @@ const app = {
     }else{
       logDailyVisit(); // Firebase Auth를 못 쓰는 경우에도(설정 미완료 등) 최소한 시도는 한다
     }
-    await Promise.all(['notice','noticeUpdate','download','faq','guestbook','updateLog','tuningUpdateLog','gameUpdateLog'].map(loadBoard));
+    await Promise.all(['notice','noticeUpdate','download','faq','guestbook','updateLog','tuningUpdateLog','gameUpdateLog','keyChangeUpdateLog'].map(loadBoard));
     await loadSheets();
     await loadGuzhengGuide();
     await loadScoreMakerNotice();
     await loadTuningNotice();
+    await loadKeyChangeNotice();
     await loadGameNotice();
     await loadTipText('scoreMaker');
     await loadTipText('tuning');
@@ -2778,6 +2857,7 @@ const app = {
             <button onclick="app.goSheetsTab('dl')">악보 다운로드</button>
             <button onclick="app.goSheetsTab('make')">악보 제작</button>
             <button onclick="app.goSheetsTab('tuning')">고쟁 조율</button>
+            <button onclick="app.goSheetsTab('keychange')">고쟁 조옮김</button>
           </div>
         </div>`;
       }
@@ -3196,6 +3276,43 @@ const app = {
     }
   },
 
+  /* ---------- 고쟁 조옮김 안내 문구 (다른 툴 안내와는 완전히 별개, 관리자만 수정) ---------- */
+  renderKeyChangeNotice(){
+    const displayEl = document.getElementById('keyChangeNoticeDisplay');
+    const editBtn = document.getElementById('keyChangeNoticeEditBtn');
+    if(!displayEl) return;
+    displayEl.innerHTML = `<div style="font-size:13.5px; color:var(--ink); white-space:pre-wrap;">${sanitizeRichHtml(state.keyChangeNoticeText)}</div>`;
+    if(editBtn) editBtn.style.display = isAdminUser() ? '' : 'none';
+  },
+  openKeyChangeNoticeEdit(){
+    if(!isAdminUser()) return;
+    const wrap = document.getElementById('keyChangeNoticeEditWrap');
+    if(!wrap) return;
+    wrap.style.display = 'block';
+    wrap.innerHTML = `
+      ${this.buildToolNoticeToolbar('keyChangeNoticeEditor')}
+      <div class="rte-editor" id="keyChangeNoticeEditor" contenteditable="true" style="border-radius:0 0 2px 2px;">${sanitizeRichHtml(state.keyChangeNoticeText)}</div>
+      <div class="form-actions" style="margin-top:8px; margin-bottom:0;">
+        <button class="btn small" onclick="app.saveKeyChangeNoticeEdit()">저장</button>
+        <button class="btn ghost small" onclick="document.getElementById('keyChangeNoticeEditWrap').style.display='none';">취소</button>
+      </div>`;
+  },
+  async saveKeyChangeNoticeEdit(){
+    if(!isAdminUser()) return;
+    const editorEl = document.getElementById('keyChangeNoticeEditor');
+    const text = sanitizeRichHtml(editorEl ? editorEl.innerHTML : '');
+    const ok = await saveKeyChangeNotice(text);
+    if(ok){
+      state.keyChangeNoticeText = text;
+      showToast('안내 문구가 저장되었습니다');
+      const wrap = document.getElementById('keyChangeNoticeEditWrap');
+      if(wrap) wrap.style.display = 'none';
+      this.renderKeyChangeNotice();
+    }else{
+      showToast('저장에 실패했습니다');
+    }
+  },
+
   /* ---------- 게임 게시판 안내 문구 (다른 툴 안내와는 완전히 별개, 관리자만 수정) ---------- */
   renderGameNotice(){
     const displayEl = document.getElementById('gameNoticeDisplay');
@@ -3431,6 +3548,7 @@ const app = {
     this.renderSheets();
     this.renderScoreMakerNotice();
     this.renderTuningNotice();
+    this.renderKeyChangeNotice();
     this.renderGameNotice();
     this.renderMyPage();
     this.renderArchive();
@@ -5165,15 +5283,19 @@ const app = {
       document.getElementById('subtab-dl').classList.toggle('active', tab==='dl');
       document.getElementById('subtab-make').classList.toggle('active', tab==='make');
       document.getElementById('subtab-tuning').classList.toggle('active', tab==='tuning');
+      document.getElementById('subtab-keychange').classList.toggle('active', tab==='keychange');
       document.getElementById('sheets-dl-view').style.display = tab==='dl' ? '' : 'none';
       document.getElementById('sheets-make-view').style.display = tab==='make' ? '' : 'none';
       document.getElementById('sheets-tuning-view').style.display = tab==='tuning' ? '' : 'none';
+      document.getElementById('sheets-keychange-view').style.display = tab==='keychange' ? '' : 'none';
       state.detail.sheets = null;
       this.renderSheets();
       if(prevTab==='make' && tab!=='make') this.stopScoreMakerSession(false);
       if(prevTab==='tuning' && tab!=='tuning') this.stopTuningSession(false);
+      if(prevTab==='keychange' && tab!=='keychange') this.stopKeyChangeSession(false);
       if(tab==='make') this.startScoreMakerSession();
       if(tab==='tuning') this.startTuningSession();
+      if(tab==='keychange') this.startKeyChangeSession();
       pushNavState();
     }catch(e){
       console.error('setSheetTab 오류', e);
@@ -5184,9 +5306,11 @@ const app = {
     document.getElementById('subtab-dl').classList.toggle('active', state.sheetTab==='dl');
     document.getElementById('subtab-make').classList.toggle('active', state.sheetTab==='make');
     document.getElementById('subtab-tuning').classList.toggle('active', state.sheetTab==='tuning');
+    document.getElementById('subtab-keychange').classList.toggle('active', state.sheetTab==='keychange');
     document.getElementById('sheets-dl-view').style.display = state.sheetTab==='dl' ? '' : 'none';
     document.getElementById('sheets-make-view').style.display = state.sheetTab==='make' ? '' : 'none';
     document.getElementById('sheets-tuning-view').style.display = state.sheetTab==='tuning' ? '' : 'none';
+    document.getElementById('sheets-keychange-view').style.display = state.sheetTab==='keychange' ? '' : 'none';
   },
 
   setSheetCategory(cat){
@@ -5720,6 +5844,93 @@ const app = {
     this.renderTuningUpdateLog();
   },
 
+  /* ---------- 고쟁 조옮김 업데이트 내역 (다른 툴들과는 별개의 데이터) ---------- */
+  openKeyChangeUpdateLogModal(){
+    document.getElementById('keyChangeUpdateLogModal').classList.add('show');
+    this.renderKeyChangeUpdateLog();
+  },
+  closeKeyChangeUpdateLogModal(){
+    document.getElementById('keyChangeUpdateLogModal').classList.remove('show');
+    const f = document.getElementById('keyChangeUpdateLog-form');
+    if(f) f.remove();
+  },
+  renderKeyChangeUpdateLog(){
+    const toolbarEl = document.getElementById('keyChangeUpdateLog-toolbar');
+    const listEl = document.getElementById('keyChangeUpdateLog-list');
+    const versionEl = document.getElementById('keyChangeUpdateLogCurrentVersion');
+    if(!toolbarEl || !listEl) return;
+
+    toolbarEl.innerHTML = isAdminUser() ? `<button class="btn small" onclick="app.openKeyChangeUpdateLogForm()">+ 새 업데이트 추가</button>` : '';
+
+    const items = state.data.keyChangeUpdateLog.slice().sort((a,b)=> (b.date||'').localeCompare(a.date||''));
+    if(versionEl){
+      versionEl.textContent = items.length ? `현재 버전: ${items[0].version}` : '현재 버전: -';
+    }
+    listEl.innerHTML = items.length===0 ? `<div class="empty-note">등록된 업데이트 내역이 없습니다</div>` :
+      items.map(u => `
+        <div class="post-row" style="cursor:default;">
+          <div style="flex:1;">
+            <div class="post-title">v${escapeHtml(u.version)}</div>
+            <div class="post-meta" style="margin-bottom:6px;">${escapeHtml(displayDate(u.date))}</div>
+            <div style="font-size:13.5px; white-space:pre-wrap; word-break:keep-all; overflow-wrap:break-word;">${escapeHtml(u.content)}</div>
+          </div>
+          ${isAdminUser() ? `
+            <div class="admin-row-actions">
+              <button class="btn ghost small" onclick="app.openKeyChangeUpdateLogForm('${u.id}')">수정</button>
+              <button class="btn danger small" onclick="app.deleteKeyChangeUpdateLog('${u.id}')">삭제</button>
+            </div>` : ''}
+        </div>`).join('');
+  },
+  openKeyChangeUpdateLogForm(editId){
+    if(!isAdminUser()) return;
+    const existing = editId ? state.data.keyChangeUpdateLog.find(u=>u.id===editId) : null;
+    const toolbarEl = document.getElementById('keyChangeUpdateLog-toolbar');
+    let form = document.getElementById('keyChangeUpdateLog-form');
+    if(form) form.remove();
+    form = document.createElement('div');
+    form.className = 'form-box';
+    form.id = 'keyChangeUpdateLog-form';
+    form.innerHTML = `
+      <label>날짜</label>
+      <input type="text" id="kcul-f-date" placeholder="예: 2026-08-14" value="${existing ? escapeHtml(displayDate(existing.date)) : todayStr()}">
+      <label>버전</label>
+      <input type="text" id="kcul-f-version" placeholder="예: 0.0.1" value="${existing ? escapeHtml(existing.version) : ''}">
+      <label>내용</label>
+      <textarea id="kcul-f-content" maxlength="1000" placeholder="업데이트 내용을 입력하세요">${existing ? escapeHtml(existing.content) : ''}</textarea>
+      <div class="form-actions">
+        <button class="btn small" onclick="app.saveKeyChangeUpdateLog(${existing ? `'${existing.id}'` : 'null'})">${existing ? '수정 완료' : '등록'}</button>
+        <button class="btn ghost small" onclick="document.getElementById('keyChangeUpdateLog-form').remove()">취소</button>
+      </div>`;
+    toolbarEl.insertAdjacentElement('afterend', form);
+    document.getElementById('kcul-f-version').focus();
+  },
+  async saveKeyChangeUpdateLog(editId){
+    if(!isAdminUser()) return;
+    const date = document.getElementById('kcul-f-date').value.trim();
+    const version = document.getElementById('kcul-f-version').value.trim();
+    const content = document.getElementById('kcul-f-content').value.trim();
+    if(!date || !version || !content){ showToast('날짜, 버전, 내용을 모두 입력해주세요'); return; }
+
+    if(editId){
+      const item = state.data.keyChangeUpdateLog.find(u=>u.id===editId);
+      item.date = date; item.version = version; item.content = content;
+    }else{
+      state.data.keyChangeUpdateLog.push({ id: uid(), date, version, content });
+    }
+    await saveBoard('keyChangeUpdateLog');
+    const f = document.getElementById('keyChangeUpdateLog-form'); if(f) f.remove();
+    showToast(editId ? '수정되었습니다' : '등록되었습니다');
+    this.renderKeyChangeUpdateLog();
+  },
+  async deleteKeyChangeUpdateLog(id){
+    if(!isAdminUser()) return;
+    if(!confirm('이 업데이트 내역을 삭제하시겠습니까?')) return;
+    state.data.keyChangeUpdateLog = state.data.keyChangeUpdateLog.filter(u=>u.id!==id);
+    await saveBoard('keyChangeUpdateLog');
+    showToast('삭제되었습니다');
+    this.renderKeyChangeUpdateLog();
+  },
+
   /* ---------- 게임 게시판 업데이트 내역 (악보 제작/음정 체크 툴과는 별개의 데이터) ---------- */
   openGameUpdateLogModal(){
     document.getElementById('gameUpdateLogModal').classList.add('show');
@@ -6109,6 +6320,155 @@ const app = {
     }
   },
 
+  /* ---------- 고쟁 조옮김 시간제한 (비회원 5분/일, 로그인 시 무제한 — 다른 툴들과 완전히 별개) ---------- */
+  async startKeyChangeSession(){
+    const statusEl = document.getElementById('keyChangeStatus');
+    const blockedEl = document.getElementById('keyChangeBlocked');
+    const iframeEl = document.getElementById('keyChangeFrame');
+    if(!statusEl || !blockedEl || !iframeEl){
+      console.error('고쟁 조옮김 도구: 필요한 화면 요소를 찾지 못했습니다', {statusEl, blockedEl, iframeEl});
+      return;
+    }
+    try{
+      await this._startKeyChangeSessionInner(statusEl, blockedEl, iframeEl);
+    }catch(e){
+      console.error('고쟁 조옮김 도구 오류', e);
+      statusEl.style.display = '';
+      statusEl.style.color = 'var(--danger)';
+      statusEl.textContent = '⚠ 오류가 발생했습니다: ' + (e && e.message ? e.message : String(e));
+      iframeEl.style.display = '';
+      ensureKeyChangeIframeSrc(iframeEl);
+    }
+  },
+
+  async _startKeyChangeSessionInner(statusEl, blockedEl, iframeEl){
+    if(state.currentUser){
+      if(keyChangeState.timerHandle){ clearInterval(keyChangeState.timerHandle); keyChangeState.timerHandle = null; }
+      keyChangeState.active = false;
+      statusEl.style.display = 'none';
+      blockedEl.style.display = 'none';
+      iframeEl.style.display = '';
+      ensureKeyChangeIframeSrc(iframeEl);
+      return;
+    }
+
+    statusEl.style.display = '';
+    statusEl.textContent = '이용 가능 시간을 확인하는 중...';
+    blockedEl.style.display = 'none';
+    iframeEl.style.display = 'none';
+
+    if(!db){
+      statusEl.textContent = '⚠ 이용 시간 확인 기능을 사용할 수 없습니다 (Firebase 설정 필요). 제한 없이 이용됩니다.';
+      iframeEl.style.display = '';
+      ensureKeyChangeIframeSrc(iframeEl);
+      return;
+    }
+
+    const ip = await fetchPublicIP();
+    keyChangeState.ip = ip;
+
+    if(!ip){
+      statusEl.textContent = '⚠ 접속 정보를 확인할 수 없어 이용 시간 제한을 적용할 수 없습니다. 로그인하면 언제든 제한 없이 이용할 수 있어요.';
+      iframeEl.style.display = '';
+      ensureKeyChangeIframeSrc(iframeEl);
+      return;
+    }
+
+    const docId = ip.replace(/[^a-zA-Z0-9._-]/g, '_');
+    let usedSeconds = 0;
+    let windowStart = Date.now();
+    try{
+      const snap = await db.collection('keyChangeIpUsage').doc(docId).get();
+      if(snap.exists){
+        const d = snap.data();
+        const elapsed = Date.now() - (d.windowStart || 0);
+        if(elapsed < 24*60*60*1000){
+          usedSeconds = d.usedSeconds || 0;
+          windowStart = d.windowStart;
+        }
+      }
+    }catch(e){ console.error('이용 기록 조회 실패', e); }
+
+    keyChangeState.windowStart = windowStart;
+    const remaining = Math.max(0, 300 - usedSeconds);
+
+    if(remaining <= 0){
+      keyChangeState.blocked = true;
+      keyChangeState.resetAt = windowStart + 24*60*60*1000;
+      statusEl.style.display = 'none';
+      blockedEl.style.display = '';
+      this.updateKeyChangeBlockedCountdown();
+      return;
+    }
+
+    keyChangeState.blocked = false;
+    keyChangeState.remainingSeconds = remaining;
+    keyChangeState.sessionStartTime = Date.now();
+    keyChangeState.usedSecondsAtStart = usedSeconds;
+    keyChangeState.active = true;
+
+    iframeEl.style.display = '';
+    ensureKeyChangeIframeSrc(iframeEl);
+    statusEl.style.display = '';
+    this.updateKeyChangeCountdown();
+
+    if(keyChangeState.timerHandle) clearInterval(keyChangeState.timerHandle);
+    keyChangeState.timerHandle = setInterval(()=>{
+      keyChangeState.remainingSeconds--;
+      this.updateKeyChangeCountdown();
+      if(keyChangeState.remainingSeconds % 10 === 0) this.persistKeyChangeUsage();
+      if(keyChangeState.remainingSeconds <= 0) this.stopKeyChangeSession(true);
+    }, 1000);
+  },
+
+  updateKeyChangeCountdown(){
+    const statusEl = document.getElementById('keyChangeStatus');
+    if(!statusEl) return;
+    const s = Math.max(0, keyChangeState.remainingSeconds);
+    const mm = String(Math.floor(s/60)).padStart(2,'0');
+    const ss = String(s%60).padStart(2,'0');
+    statusEl.textContent = `비회원 이용 가능 시간: ${mm}:${ss} 남음 · 로그인하면 시간 제한 없이 이용할 수 있어요`;
+  },
+
+  updateKeyChangeBlockedCountdown(){
+    const blockedMsgEl = document.getElementById('keyChangeBlockedMsg');
+    if(!blockedMsgEl) return;
+    const remainMs = Math.max(0, keyChangeState.resetAt - Date.now());
+    const remainH = Math.floor(remainMs / 3600000);
+    const remainM = Math.floor((remainMs % 3600000) / 60000);
+    blockedMsgEl.textContent = `오늘 사용 가능한 5분을 모두 사용했어요. 약 ${remainH}시간 ${remainM}분 후 다시 이용할 수 있어요.`;
+  },
+
+  persistKeyChangeUsage(){
+    if(!keyChangeState.ip || !db) return;
+    const elapsedSinceStart = Math.floor((Date.now() - keyChangeState.sessionStartTime) / 1000);
+    const totalUsed = Math.min(300, keyChangeState.usedSecondsAtStart + Math.max(0, elapsedSinceStart));
+    const docId = keyChangeState.ip.replace(/[^a-zA-Z0-9._-]/g, '_');
+    db.collection('keyChangeIpUsage').doc(docId).set({
+      windowStart: keyChangeState.windowStart,
+      usedSeconds: totalUsed,
+      lastSeen: Date.now()
+    }, { merge: true }).catch(e => console.error('이용 기록 저장 실패', e));
+  },
+
+  stopKeyChangeSession(expired){
+    if(keyChangeState.timerHandle){ clearInterval(keyChangeState.timerHandle); keyChangeState.timerHandle = null; }
+    if(keyChangeState.active && !state.currentUser){ this.persistKeyChangeUsage(); }
+    keyChangeState.active = false;
+    if(expired){
+      const iframeEl = document.getElementById('keyChangeFrame');
+      const statusEl = document.getElementById('keyChangeStatus');
+      const blockedEl = document.getElementById('keyChangeBlocked');
+      if(iframeEl){ iframeEl.style.display = 'none'; iframeEl.src = ''; }
+      keyChangeState.frameSrcLoaded = false;
+      if(statusEl) statusEl.style.display = 'none';
+      keyChangeState.blocked = true;
+      keyChangeState.resetAt = keyChangeState.windowStart + 24*60*60*1000;
+      if(blockedEl) blockedEl.style.display = '';
+      this.updateKeyChangeBlockedCountdown();
+    }
+  },
+
   /* ---------- 게임 게시판 시간제한 (비회원 5분/일, 로그인 시 무제한) ---------- */
   async startGameSession(){
     const statusEl = document.getElementById('gameStatus');
@@ -6272,6 +6632,7 @@ document.getElementById('loginModal').addEventListener('click', (e)=>{ if(e.targ
 document.getElementById('forgotPasswordModal').addEventListener('click', (e)=>{ if(e.target.id==='forgotPasswordModal') app.closeForgotPasswordModal(); });
 document.getElementById('updateLogModal').addEventListener('click', (e)=>{ if(e.target.id==='updateLogModal') app.closeUpdateLogModal(); });
 document.getElementById('tuningUpdateLogModal').addEventListener('click', (e)=>{ if(e.target.id==='tuningUpdateLogModal') app.closeTuningUpdateLogModal(); });
+document.getElementById('keyChangeUpdateLogModal').addEventListener('click', (e)=>{ if(e.target.id==='keyChangeUpdateLogModal') app.closeKeyChangeUpdateLogModal(); });
 document.getElementById('gameUpdateLogModal').addEventListener('click', (e)=>{ if(e.target.id==='gameUpdateLogModal') app.closeGameUpdateLogModal(); });
 document.getElementById('liPassword')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') app.submitLogin(); });
 

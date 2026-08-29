@@ -5137,10 +5137,7 @@ const app = {
               </span>` : `<span class="mark" onclick="app.toggleFaqAnswer('${answerId}','${f.id}')" style="cursor:pointer;">＋</span>`}
           </span>
         </div>
-        <div class="faq-a" id="${answerId}">
-          <strong style="color:var(--jade)">答 ·</strong> <span>${sanitizeRichHtml(f.answer)}</span>
-          <div class="field-hint" id="postViewCount-faq-${f.id}" style="margin-top:10px;">조회수 ${state.postViewCounts['faq_'+f.id] || 0}</div>
-        </div>
+        <div class="faq-a" id="${answerId}"><strong style="color:var(--jade)">答 ·</strong> <span>${sanitizeRichHtml(f.answer)}</span><div class="field-hint" id="postViewCount-faq-${f.id}" style="margin-top:10px;">조회수 ${state.postViewCounts['faq_'+f.id] || 0}</div></div>
       </div>`;
     };
 

@@ -187,16 +187,20 @@ main.no-hero{padding-top:44px;}
   background:#fff; font-family:'Gowun Batang', 'Noto Serif SC', 'Noto Serif TC', serif; font-size:13px; border-radius:2px; resize:vertical;
 }
 .string-line{
-  stroke:var(--gold); stroke-width:1.1; opacity:0.55;
+  stroke:var(--gold); stroke-width:1.8; opacity:0.55;
   transform-origin:center;
   animation:pluck 4.2s ease-in-out infinite;
   pointer-events:none;
   transition:opacity .15s, stroke-width .15s;
 }
 .string-line.teal{ stroke:#127C77; }
-.string-line.plucked{ opacity:1; stroke-width:2.4; }
+.string-line.plucked{ opacity:1; stroke-width:3.2; }
+/* A+클릭(반키 상승)=파랑, S+클릭(F#/B 현 전용)=보라, D+클릭(한 키 상승)=빨강 */
+.string-line.plucked.pitch-a{ stroke:#3b82f6; }
+.string-line.plucked.pitch-s{ stroke:#9333ea; }
+.string-line.plucked.pitch-d{ stroke:#dc2626; }
 .string-hit{
-  stroke:transparent; stroke-width:16;
+  stroke:transparent; stroke-width:22;
   cursor:pointer; pointer-events:auto;
 }
 .bridge{fill:var(--wood); opacity:0.8; pointer-events:none;}
@@ -376,6 +380,7 @@ main.no-hero{padding-top:44px;}
   cursor:pointer; font-weight:700; font-size:15.5px;
 }
 .faq-q .mark{color:var(--gold); font-family:'Nanum Myeongjo', 'Noto Serif SC', 'Noto Serif TC', serif; font-size:18px;}
+.faq-badges-mobile{ display:none; }
 .faq-a{
   max-height:0; overflow:hidden; transition:max-height .3s ease;
   padding:0 20px; color:var(--ink); font-size:14.5px; white-space:pre-wrap;
@@ -442,6 +447,10 @@ footer{
   .strings-wrap{display:none;}
   .header-inner{flex-wrap:wrap;}
   nav{order:3; width:100%; justify-content:flex-start;}
+
+  /* FAQ 목록: 모바일에서는 배지를 질문 옆이 아니라 그 아랫줄에 별도로 보여준다 */
+  .faq-badges-inline{ display:none; }
+  .faq-badges-mobile{ display:flex; flex-wrap:wrap; gap:6px; padding:0 20px 14px; margin-top:-6px; }
 
   .mobile-guzheng-toggle-btn{
     display:inline-block; margin-top:28px; padding:9px 16px;
@@ -1844,6 +1853,44 @@ let stringsDragActive = false;
 let tremoloHoldTimeout = null;
 let tremoloInterval = null;
 let currentHeldNote = null;
+
+/* ---------- 13현 고쟁: A/S/D 키를 누른 채로 현을 뜯으면 음을 반음/한키 올리는 기능 (PC 전용) ----------
+   A + 클릭 = 반음(1반음) 상승, 파란색 효과
+   S + 클릭 = 2반음 상승, F#/B 계열 현에서만 적용됨, 보라색 효과
+   D + 클릭 = 한 키(2반음) 상승, 빨간색 효과
+   마우스/키보드가 있는 PC 환경에서만 동작하도록, 정밀 포인터 장치가 아니면 아예 추적하지 않는다. */
+let heroPitchModifierKey = null; // 'a' | 's' | 'd' | null
+const isFinePointerDevice = window.matchMedia && window.matchMedia('(pointer:fine)').matches;
+function isTypingIntoField(el){
+  if(!el) return false;
+  const tag = el.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || el.isContentEditable;
+}
+if(isFinePointerDevice){
+  document.addEventListener('keydown', (e) => {
+    if(isTypingIntoField(e.target)) return;
+    const k = e.key.toLowerCase();
+    if(k === 'a' || k === 's' || k === 'd') heroPitchModifierKey = k;
+  });
+  document.addEventListener('keyup', (e) => {
+    const k = e.key.toLowerCase();
+    if(heroPitchModifierKey === k) heroPitchModifierKey = null;
+  });
+  // 다른 창/탭으로 포커스가 넘어가면, 키가 눌린 채로 고정되는 것을 방지
+  window.addEventListener('blur', () => { heroPitchModifierKey = null; });
+}
+// 현재 눌려있는 보조키와 그 현의 음이름을 바탕으로, 반음 이동량과 시각효과 클래스를 결정한다
+function getPitchModifierForNote(note){
+  if(!isFinePointerDevice || !heroPitchModifierKey) return { shift: 0, colorClass: null };
+  if(heroPitchModifierKey === 'a') return { shift: 1, colorClass: 'pitch-a' };
+  if(heroPitchModifierKey === 's'){
+    if(/^(F#|B)/.test(note)) return { shift: 2, colorClass: 'pitch-s' };
+    return { shift: 0, colorClass: null }; // S는 F#/B 계열 현이 아니면 적용되지 않는다
+  }
+  if(heroPitchModifierKey === 'd') return { shift: 2, colorClass: 'pitch-d' };
+  return { shift: 0, colorClass: null };
+}
+
 function stopStringTremolo(){
   if(tremoloHoldTimeout){ clearTimeout(tremoloHoldTimeout); tremoloHoldTimeout = null; }
   if(tremoloInterval){ clearInterval(tremoloInterval); tremoloInterval = null; }
@@ -1851,14 +1898,14 @@ function stopStringTremolo(){
 function beginStringHold(hit, pluckFn){
   stopStringTremolo();
   currentHeldNote = hit.dataset.note;
-  // 잠깐(60ms) 그대로 누르고 있으면, 같은 줄에서 빠르게 반복 연주(트레몰로)가 시작된다
+  // 잠깐(80ms) 그대로 누르고 있으면, 같은 줄에서 빠르게 반복 연주(트레몰로)가 시작된다
   tremoloHoldTimeout = setTimeout(() => {
     if(!stringsDragActive || currentHeldNote !== hit.dataset.note) return;
     tremoloInterval = setInterval(() => {
       if(!stringsDragActive || currentHeldNote !== hit.dataset.note){ stopStringTremolo(); return; }
       pluckFn(hit);
     }, 55);
-  }, 60);
+  }, 80);
 }
 
 // 모바일 터치 전용: 손가락(touch identifier)별로 독립적인 트레몰로/스트럼 상태를 관리한다 (최대 3개 동시)
@@ -1888,7 +1935,7 @@ function startTouchOnString(touchId, hit, pluckFn){
       }
       pluckFn(hit);
     }, 55);
-  }, 60);
+  }, 80);
 }
 
 let guzhengVolume = 0.2; // 슬라이더로 조절되는 볼륨 (기본 20%)
@@ -1925,17 +1972,20 @@ function dampingForFreq(freq){
   return Math.pow(GUZHENG_REF_DAMPING, GUZHENG_REF_FREQ / freq);
 }
 
-async function playGuzhengNote(note){
-  const freq = GUZHENG_NOTE_FREQ[note];
-  if(!freq) return;
+async function playGuzhengNote(note, semitoneShift){
+  const baseFreq = GUZHENG_NOTE_FREQ[note];
+  if(!baseFreq) return;
+  // A/S/D 키를 누른 채로 현을 뜯으면, 실제 손가락으로 줄을 눌러 음을 올리는 것처럼 주파수를 반음 단위로 올린다
+  const freq = semitoneShift ? baseFreq * Math.pow(2, semitoneShift / 12) : baseFreq;
+  const cacheKey = semitoneShift ? (note + '+' + semitoneShift) : note;
   try{
     if(!heroAudioCtx) heroAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if(heroAudioCtx.state === 'suspended') await heroAudioCtx.resume();
 
-    let buffer = guzhengBufferCache[note];
+    let buffer = guzhengBufferCache[cacheKey];
     if(!buffer){
       buffer = buildPluckedStringBuffer(heroAudioCtx, freq, 2.6, dampingForFreq(freq)); // 소리 유지시간을 음 높이와 무관하게 비슷하게 맞춤
-      guzhengBufferCache[note] = buffer;
+      guzhengBufferCache[cacheKey] = buffer;
     }
 
     const src = heroAudioCtx.createBufferSource();
@@ -3095,11 +3145,17 @@ const app = {
     svg.innerHTML = html;
 
     const pluckString = (hit) => {
-      playGuzhengNote(hit.dataset.note);
-      const line = svg.querySelector('.string-line[data-note="' + hit.dataset.note + '"]');
+      const note = hit.dataset.note;
+      const { shift, colorClass } = getPitchModifierForNote(note);
+      playGuzhengNote(note, shift);
+      const line = svg.querySelector('.string-line[data-note="' + note + '"]');
       if(line){
         line.classList.add('plucked');
-        setTimeout(() => line.classList.remove('plucked'), 260);
+        if(colorClass) line.classList.add(colorClass);
+        setTimeout(() => {
+          line.classList.remove('plucked');
+          if(colorClass) line.classList.remove(colorClass);
+        }, 260);
       }
     };
     svg.querySelectorAll('.string-hit-right').forEach(hit => {
@@ -5249,7 +5305,7 @@ const app = {
         <div class="faq-q" onclick="app.toggleFaqAnswer('${answerId}','${f.id}')">
           <span>${isPinnedCopy ? '📌 ' : ''}<span class="mark">問 ·</span> ${escapeHtml(f.question)}</span>
           <span style="display:flex; align-items:center; gap:10px; flex:none;" onclick="event.stopPropagation()">
-            ${badgeHtml}
+            <span class="faq-badges-inline">${badgeHtml}</span>
             ${isAdminUser() ? `<span class="admin-row-actions">
                 <button class="btn ghost small" onclick="app.togglePinFaq('${f.id}')" title="${f.pinned ? '고정 취소' : '상단에 고정'}">${f.pinned ? '📌 취소' : '📌 고정'}</button>
                 ${!isPinnedCopy ? `<button class="btn ghost small" onclick="app.moveFaq('${f.id}',-1)" ${isFirst ? 'disabled' : ''} title="위로 이동">▲</button>
@@ -5260,6 +5316,7 @@ const app = {
               </span>` : `<span class="mark" onclick="app.toggleFaqAnswer('${answerId}','${f.id}')" style="cursor:pointer;">＋</span>`}
           </span>
         </div>
+        <div class="faq-badges-mobile" onclick="event.stopPropagation()">${badgeHtml}</div>
         <div class="faq-a" id="${answerId}"><strong style="color:var(--jade)">答 ·</strong> <span>${sanitizeRichHtml(f.answer)}</span><div class="field-hint" id="postViewCount-faq-${f.id}" style="margin-top:10px;">조회수 ${state.postViewCounts['faq_'+f.id] || 0}</div></div>
       </div>`;
     };

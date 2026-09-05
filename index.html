@@ -1539,34 +1539,42 @@ function syncIframeHeightToContent(iframeEl){
       );
       if(height > 100){ iframeEl.style.height = height + 'px'; }
 
-      // 모바일에서는 main의 좌우 여백(28px)만큼 화면이 좁아 보이므로, 그 여백을 상쇄해서
-      // 화면 끝까지 꽉 차 보이게 한다. 그래도 외부 사이트의 실제 콘텐츠가 그보다 더 넓다면,
-      // 필요한 만큼 iframe 자체 너비를 넉넉하게 늘리고, 부모 쪽에 가로 스크롤을 허용해서
-      // 잘리지 않고 옆으로 스크롤해서 전부 볼 수 있게 한다.
+      // 모바일에서는 main의 좌우 여백(28px)만큼 화면이 좁아 보이므로, 뷰포트 단위(100vw)를 직접 써서
+      // 부모 요소의 패딩 계산과 무관하게 확실히 화면 끝까지 꽉 차 보이게 한다(표준적인 '풀블리드' 기법).
+      // 외부 사이트의 실제 콘텐츠가 화면 자체보다도 더 넓다면, 필요한 만큼 iframe 너비를 늘리고
+      // 부모 쪽에 가로 스크롤을 허용해서 잘리지 않고 옆으로 스크롤해서 전부 볼 수 있게 한다.
       const contentWidth = Math.max(
         doc.documentElement ? doc.documentElement.scrollWidth : 0,
         doc.body ? doc.body.scrollWidth : 0
       );
       const isMobile = window.innerWidth <= 720 && iframeEl.classList.contains('tool-embed-frame');
-      const viewportWidth = iframeEl.parentElement ? iframeEl.parentElement.clientWidth : iframeEl.clientWidth;
-      const bleedExtra = isMobile ? 56 : 0; // 모바일 풀블리드용 여유 (좌우 28px씩)
-      const availableWidth = viewportWidth + bleedExtra;
 
-      if(contentWidth > availableWidth + 4){
-        iframeEl.style.width = contentWidth + 'px';
-        iframeEl.style.maxWidth = 'none';
-        iframeEl.style.marginLeft = isMobile ? '-28px' : '';
-        iframeEl.style.marginRight = '';
-        if(iframeEl.parentElement) iframeEl.parentElement.style.overflowX = 'auto';
-      }else if(isMobile){
-        iframeEl.style.width = 'calc(100% + 56px)';
-        iframeEl.style.maxWidth = 'none';
-        iframeEl.style.marginLeft = '-28px';
-        iframeEl.style.marginRight = '-28px';
-        if(iframeEl.parentElement) iframeEl.parentElement.style.overflowX = '';
+      if(isMobile){
+        if(contentWidth > window.innerWidth + 4){
+          iframeEl.style.width = contentWidth + 'px';
+          iframeEl.style.maxWidth = 'none';
+          iframeEl.style.position = '';
+          iframeEl.style.left = '';
+          iframeEl.style.right = '';
+          iframeEl.style.marginLeft = '';
+          iframeEl.style.marginRight = '';
+          if(iframeEl.parentElement) iframeEl.parentElement.style.overflowX = 'auto';
+        }else{
+          iframeEl.style.width = '100vw';
+          iframeEl.style.maxWidth = 'none';
+          iframeEl.style.position = 'relative';
+          iframeEl.style.left = '50%';
+          iframeEl.style.right = '50%';
+          iframeEl.style.marginLeft = '-50vw';
+          iframeEl.style.marginRight = '-50vw';
+          if(iframeEl.parentElement) iframeEl.parentElement.style.overflowX = '';
+        }
       }else{
         iframeEl.style.width = '100%';
         iframeEl.style.maxWidth = '';
+        iframeEl.style.position = '';
+        iframeEl.style.left = '';
+        iframeEl.style.right = '';
         iframeEl.style.marginLeft = '';
         iframeEl.style.marginRight = '';
         if(iframeEl.parentElement) iframeEl.parentElement.style.overflowX = '';

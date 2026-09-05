@@ -1551,14 +1551,24 @@ function syncIframeHeightToContent(iframeEl){
 
       if(isMobile){
         if(contentWidth > window.innerWidth + 4){
+          // 콘텐츠가 화면 자체보다 넓은 경우: 가로 스크롤을 시키는 대신,
+          // iframe은 원래 크기(자연스러운 너비) 그대로 렌더링해서 내부 레이아웃이 안 깨지게 하고,
+          // 그 iframe 전체를 화면 너비에 딱 맞게 비율대로 축소(scale)해서 스크롤 없이 한 화면에 다 보이게 한다.
+          const scale = window.innerWidth / contentWidth;
           iframeEl.style.width = contentWidth + 'px';
+          iframeEl.style.height = height + 'px';
           iframeEl.style.maxWidth = 'none';
-          iframeEl.style.position = '';
-          iframeEl.style.left = '';
+          iframeEl.style.position = 'relative';
+          iframeEl.style.left = '50%';
           iframeEl.style.right = '';
-          iframeEl.style.marginLeft = '';
+          iframeEl.style.marginLeft = '-50vw';
           iframeEl.style.marginRight = '';
-          if(iframeEl.parentElement) iframeEl.parentElement.style.overflowX = 'auto';
+          iframeEl.style.transform = `scale(${scale})`;
+          iframeEl.style.transformOrigin = 'top left';
+          if(iframeEl.parentElement){
+            iframeEl.parentElement.style.overflow = 'hidden';
+            iframeEl.parentElement.style.height = Math.ceil(height * scale) + 'px';
+          }
         }else{
           iframeEl.style.width = '100vw';
           iframeEl.style.maxWidth = 'none';
@@ -1567,7 +1577,12 @@ function syncIframeHeightToContent(iframeEl){
           iframeEl.style.right = '50%';
           iframeEl.style.marginLeft = '-50vw';
           iframeEl.style.marginRight = '-50vw';
-          if(iframeEl.parentElement) iframeEl.parentElement.style.overflowX = '';
+          iframeEl.style.transform = '';
+          iframeEl.style.transformOrigin = '';
+          if(iframeEl.parentElement){
+            iframeEl.parentElement.style.overflow = '';
+            iframeEl.parentElement.style.height = '';
+          }
         }
       }else{
         iframeEl.style.width = '100%';
@@ -1577,7 +1592,13 @@ function syncIframeHeightToContent(iframeEl){
         iframeEl.style.right = '';
         iframeEl.style.marginLeft = '';
         iframeEl.style.marginRight = '';
-        if(iframeEl.parentElement) iframeEl.parentElement.style.overflowX = '';
+        iframeEl.style.transform = '';
+        iframeEl.style.transformOrigin = '';
+        if(iframeEl.parentElement){
+          iframeEl.parentElement.style.overflowX = '';
+          iframeEl.parentElement.style.overflow = '';
+          iframeEl.parentElement.style.height = '';
+        };
       }
     }catch(e){
       // 다른 출처라 접근이 막힌 경우: 기존 고정 높이(80vh)를 그대로 둔다

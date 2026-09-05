@@ -437,14 +437,6 @@ footer{
   .header-inner{flex-wrap:wrap;}
   nav{order:3; width:100%; justify-content:flex-start;}
 
-  /* 악보 제작/고쟁 조율/고쟁 조옮김/고쟁 코드/게임처럼 외부 사이트를 그대로 보여주는 화면은,
-     모바일에서 화면 끝까지 꽉 차 보이도록 아래 JS(syncIframeHeightToContent)에서 너비/여백을 직접 조정한다. */
-  .tool-embed-frame{
-    border-radius:0;
-    border-left:none;
-    border-right:none;
-  }
-
   .mobile-guzheng-toggle-btn{
     display:inline-block; margin-top:28px; padding:9px 16px;
     border:1px solid var(--gold); background:transparent; color:var(--wood);
@@ -751,7 +743,7 @@ footer{
       <button class="btn" onclick="app.openLoginModal()">로그인하고 제한 없이 이용하기</button>
     </div>
     <div id="gameFrameWrap" style="position:relative; display:none;">
-      <iframe class="tool-embed-frame" id="gameFrame" src="" title="타로당 고쟁 게임" scrolling="no" style="width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
+      <iframe id="gameFrame" src="" title="타로당 고쟁 게임" scrolling="no" style="width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
     </div>
   </div>
 
@@ -827,7 +819,7 @@ footer{
         <p id="scoreMakerBlockedMsg" style="font-size:13.5px; color:var(--ink-soft); margin-bottom:18px;"></p>
         <button class="btn" onclick="app.openLoginModal()">로그인하고 제한 없이 이용하기</button>
       </div>
-      <iframe class="tool-embed-frame" id="scoreMakerFrame" src="" title="숫자 악보 만들기" scrolling="no" style="display:none; width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
+      <iframe id="scoreMakerFrame" src="" title="숫자 악보 만들기" scrolling="no" style="display:none; width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
     </div>
 
     <!-- 음정 체크&조율 (도구 임베드) -->
@@ -847,7 +839,7 @@ footer{
         <p id="tuningBlockedMsg" style="font-size:13.5px; color:var(--ink-soft); margin-bottom:18px;"></p>
         <button class="btn" onclick="app.openLoginModal()">로그인하고 제한 없이 이용하기</button>
       </div>
-      <iframe class="tool-embed-frame" id="tuningFrame" src="" title="고쟁 음정 체크" scrolling="no" style="display:none; width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
+      <iframe id="tuningFrame" src="" title="고쟁 음정 체크" scrolling="no" style="display:none; width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
     </div>
 
     <!-- 고쟁 조옮김 (도구 임베드) -->
@@ -866,7 +858,7 @@ footer{
         <p id="keyChangeBlockedMsg" style="font-size:13.5px; color:var(--ink-soft); margin-bottom:18px;"></p>
         <button class="btn" onclick="app.openLoginModal()">로그인하고 제한 없이 이용하기</button>
       </div>
-      <iframe class="tool-embed-frame" id="keyChangeFrame" src="" title="고쟁 조옮김" scrolling="no" style="display:none; width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
+      <iframe id="keyChangeFrame" src="" title="고쟁 조옮김" scrolling="no" style="display:none; width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
     </div>
 
     <!-- 고쟁 코드 (도구 임베드) -->
@@ -885,7 +877,7 @@ footer{
         <p id="guzhengCodeBlockedMsg" style="font-size:13.5px; color:var(--ink-soft); margin-bottom:18px;"></p>
         <button class="btn" onclick="app.openLoginModal()">로그인하고 제한 없이 이용하기</button>
       </div>
-      <iframe class="tool-embed-frame" id="guzhengCodeFrame" src="" title="고쟁 코드" scrolling="no" style="display:none; width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
+      <iframe id="guzhengCodeFrame" src="" title="고쟁 코드" scrolling="no" style="display:none; width:100%; height:80vh; border:1px solid var(--paper-deep); border-radius:4px; background:#fff;"></iframe>
     </div>
   </div>
 
@@ -1538,75 +1530,6 @@ function syncIframeHeightToContent(iframeEl){
         doc.body ? doc.body.scrollHeight : 0
       );
       if(height > 100){ iframeEl.style.height = height + 'px'; }
-
-      // body/documentElement 전체의 scrollWidth만으로는, 그 안의 특정 요소 하나(예: 안내 문구,
-      // 드롭다운이 나열된 줄)만 유독 넘치는 경우를 놓칠 수 있어서, 페이지 안의 모든 요소를 하나하나
-      // 확인해서 실제로 필요한 진짜 최대 너비를 찾는다.
-      let contentWidth = Math.max(
-        doc.documentElement ? doc.documentElement.scrollWidth : 0,
-        doc.body ? doc.body.scrollWidth : 0
-      );
-      if(doc.body){
-        const allEls = doc.body.querySelectorAll('*');
-        for(let i=0; i<allEls.length; i++){
-          const w = allEls[i].scrollWidth;
-          if(w > contentWidth) contentWidth = w;
-        }
-      }
-      const isMobile = window.innerWidth <= 720 && iframeEl.classList.contains('tool-embed-frame');
-      const safeContentWidth = contentWidth + 20; // 측정 오차/반올림 대비 여유
-
-      if(isMobile){
-        if(safeContentWidth > window.innerWidth + 4){
-          // 콘텐츠가 화면 자체보다 넓은 경우: 가로 스크롤을 시키는 대신,
-          // iframe은 원래 크기(자연스러운 너비) 그대로 렌더링해서 내부 레이아웃이 안 깨지게 하고,
-          // 그 iframe 전체를 화면 너비에 딱 맞게 비율대로 축소(scale)해서 스크롤 없이 한 화면에 다 보이게 한다.
-          const scale = window.innerWidth / safeContentWidth;
-          iframeEl.style.width = safeContentWidth + 'px';
-          iframeEl.style.height = height + 'px';
-          iframeEl.style.maxWidth = 'none';
-          iframeEl.style.position = 'relative';
-          iframeEl.style.left = '50%';
-          iframeEl.style.right = '';
-          iframeEl.style.marginLeft = '-50vw';
-          iframeEl.style.marginRight = '';
-          iframeEl.style.transform = `scale(${scale})`;
-          iframeEl.style.transformOrigin = 'top left';
-          if(iframeEl.parentElement){
-            iframeEl.parentElement.style.overflow = 'hidden';
-            iframeEl.parentElement.style.height = Math.ceil(height * scale) + 'px';
-          }
-        }else{
-          iframeEl.style.width = '100vw';
-          iframeEl.style.maxWidth = 'none';
-          iframeEl.style.position = 'relative';
-          iframeEl.style.left = '50%';
-          iframeEl.style.right = '50%';
-          iframeEl.style.marginLeft = '-50vw';
-          iframeEl.style.marginRight = '-50vw';
-          iframeEl.style.transform = '';
-          iframeEl.style.transformOrigin = '';
-          if(iframeEl.parentElement){
-            iframeEl.parentElement.style.overflow = '';
-            iframeEl.parentElement.style.height = '';
-          }
-        }
-      }else{
-        iframeEl.style.width = '100%';
-        iframeEl.style.maxWidth = '';
-        iframeEl.style.position = '';
-        iframeEl.style.left = '';
-        iframeEl.style.right = '';
-        iframeEl.style.marginLeft = '';
-        iframeEl.style.marginRight = '';
-        iframeEl.style.transform = '';
-        iframeEl.style.transformOrigin = '';
-        if(iframeEl.parentElement){
-          iframeEl.parentElement.style.overflowX = '';
-          iframeEl.parentElement.style.overflow = '';
-          iframeEl.parentElement.style.height = '';
-        };
-      }
     }catch(e){
       // 다른 출처라 접근이 막힌 경우: 기존 고정 높이(80vh)를 그대로 둔다
     }

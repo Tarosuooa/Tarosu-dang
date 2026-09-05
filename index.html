@@ -443,7 +443,7 @@ footer{
 .hero-pill-btn:active{ background:var(--wood); color:var(--paper); border-color:var(--wood); }
 
 @media (max-width:720px){
-  .hero h1{font-size:32px; min-height:calc(32px * 1.35 * 2);}
+  .hero h1{font-size:32px; min-height:0; height:calc(32px * 1.35 * 2); overflow:hidden;}
   .strings-wrap{display:none;}
   .header-inner{flex-wrap:wrap;}
   nav{order:3; width:100%; justify-content:flex-start;}

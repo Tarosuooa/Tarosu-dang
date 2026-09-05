@@ -761,7 +761,7 @@ footer{
     <div class="section-title"><h2>방명록</h2><span class="hanja-sub">留言</span></div>
     <div class="divider"></div>
     <div class="form-box">
-      <label>이름</label>
+      <label>이름 or 닉네임</label>
       <input type="text" id="gbAuthor" maxlength="20" placeholder="이름을 남겨주세요">
       <label>메시지</label>
       <textarea id="gbText" maxlength="1000" placeholder="방문해 주셔서 감사합니다! 자유롭게 적어 주세요 :)
@@ -1242,12 +1242,22 @@ const BOARD_CONFIG = {
   download:     {label:'자료', hasLink:true, hasMedia:true, hasComments:true},
 };
 
-const FAQ_CATEGORIES = ['악보 제작', '악보 업로드&다운로드', '고쟁 조율', '고쟁 조옮김', '게임', '미디어', '악기', '홈페이지', '관리자', '그 외'];
+const FAQ_CATEGORIES = ['도구', '악보 업로드&다운로드', '게임', '미디어', '악기', '홈페이지', '관리자', '그 외'];
+const FAQ_TOOL_SUBCATEGORIES = ['악보 제작', '고쟁 조율', '고쟁 조옮김', '고쟁 코드'];
+// 이전 방식(하위 카테고리 이름을 그대로 최상위 카테고리로 저장)으로 저장된 FAQ도 그대로 인식되도록,
+// 읽어들일 때 자동으로 '도구:하위카테고리' 형태로 바꿔준다. 실제 저장 데이터는 건드리지 않는다.
+function normalizeFaqCategory(c){
+  return FAQ_TOOL_SUBCATEGORIES.includes(c) ? ('도구:' + c) : c;
+}
+function faqCategoryLabel(c){
+  return c.startsWith('도구:') ? ('도구 - ' + c.slice(3)) : c;
+}
+function faqCategoryColorKey(c){
+  return c.startsWith('도구:') ? '도구' : c;
+}
 const FAQ_CATEGORY_COLORS = {
-  '악보 제작':          {bg:'#E5D9F2', text:'#5B2C82'},
+  '도구':               {bg:'#D9F2EC', text:'#2C826D'},
   '악보 업로드&다운로드': {bg:'#D9E8F2', text:'#2C5C82'},
-  '고쟁 조율':          {bg:'#D9F2EC', text:'#2C826D'},
-  '고쟁 조옮김':        {bg:'#D9E4F2', text:'#2C4F82'},
   '게임':               {bg:'#F2E6D9', text:'#8A5A2C'},
   '미디어':             {bg:'#F2E0D9', text:'#82502C'},
   '악기':               {bg:'#DFF2D9', text:'#3D7A2C'},
@@ -5226,15 +5236,20 @@ const app = {
     }
 
     const listEl = document.getElementById('faq-list');
-    const getCats = f => f.categories || (f.category ? [f.category] : []);
-    const filtered = state.data.faq.filter(f => !f.archived && (state.faqCategories.length===0 || getCats(f).some(c => state.faqCategories.includes(c))));
+    const getCats = f => (f.categories || (f.category ? [f.category] : [])).map(normalizeFaqCategory);
+    const matchesFilter = f => {
+      if(state.faqCategories.length===0) return true;
+      const cats = getCats(f);
+      return state.faqCategories.some(sel => sel==='도구' ? cats.some(c=>c.startsWith('도구:')) : cats.includes(sel));
+    };
+    const filtered = state.data.faq.filter(f => !f.archived && matchesFilter(f));
     const pinnedFaqs = state.data.faq.filter(f => f.pinned && !f.archived);
 
     const buildFaqItem = (f, idSuffix, isPinnedCopy) => {
       const cats = getCats(f);
       const badgeHtml = cats.map(c => {
-        const catColor = FAQ_CATEGORY_COLORS[c];
-        return `<span class="badge" style="background:${catColor?catColor.bg:'#eee'}; color:${catColor?catColor.text:'#333'}; font-weight:700;">${escapeHtml(c)}</span>`;
+        const catColor = FAQ_CATEGORY_COLORS[faqCategoryColorKey(c)];
+        return `<span class="badge" style="background:${catColor?catColor.bg:'#eee'}; color:${catColor?catColor.text:'#333'}; font-weight:700;">${escapeHtml(faqCategoryLabel(c))}</span>`;
       }).join(' ');
       const isFirst = filtered[0] && filtered[0].id === f.id;
       const isLast = filtered[filtered.length-1] && filtered[filtered.length-1].id === f.id;
@@ -5305,8 +5320,8 @@ const app = {
     if(!isAdminUser()) return;
     // 현재 보이는(필터링된) 목록 안에서의 순서를 기준으로 바로 위/아래 항목과 자리를 바꾼다
     const filtered = state.data.faq.filter(f => {
-      const cats = f.categories || (f.category ? [f.category] : []);
-      return state.faqCategories.length===0 || cats.some(c => state.faqCategories.includes(c));
+      const cats = (f.categories || (f.category ? [f.category] : [])).map(normalizeFaqCategory);
+      return state.faqCategories.length===0 || state.faqCategories.some(sel => sel==='도구' ? cats.some(c=>c.startsWith('도구:')) : cats.includes(sel));
     });
     const idxInFiltered = filtered.findIndex(f=>f.id===id);
     const targetIdxInFiltered = idxInFiltered + direction;
@@ -5322,17 +5337,35 @@ const app = {
   openFaqForm(editId){
     if(!isAdminUser()) return;
     const existing = editId ? state.data.faq.find(f=>f.id===editId) : null;
-    const existingCats = existing ? (existing.categories || (existing.category ? [existing.category] : [])) : [];
+    const existingCatsRaw = existing ? (existing.categories || (existing.category ? [existing.category] : [])) : [];
+    const existingCats = existingCatsRaw.map(normalizeFaqCategory);
+    const existingToolSubs = existingCats.filter(c=>c.startsWith('도구:')).map(c=>c.slice(3));
     const toolbarEl = document.getElementById('faq-toolbar');
     let form = document.getElementById('faq-form');
     if(form) form.remove();
     form = document.createElement('div');
     form.className='form-box'; form.id='faq-form';
-    const catChecks = FAQ_CATEGORIES.map(c =>
-      `<label style="display:flex; align-items:center; gap:6px; font-size:13.5px; font-family:'Noto Sans KR',sans-serif; cursor:pointer; margin:0;">
+    const catChecks = FAQ_CATEGORIES.map(c => {
+      if(c === '도구'){
+        const toolSubChecks = FAQ_TOOL_SUBCATEGORIES.map(s =>
+          `<label style="display:flex; align-items:center; gap:6px; font-size:13px; font-family:'Noto Sans KR',sans-serif; cursor:pointer; margin:0;">
+            <input type="checkbox" name="faq-f-toolcat" value="${escapeHtml(s)}" ${existingToolSubs.includes(s) ? 'checked' : ''}> ${escapeHtml(s)}
+          </label>`
+        ).join('');
+        return `
+        <div style="grid-column:1/-1; border:1px solid var(--paper-deep); border-radius:4px; padding:8px 10px; background:#fbf7ec;">
+          <div id="faq-f-tool-header" style="font-size:13.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px;" onclick="app.toggleFaqToolSubcats()">
+            <span id="faq-f-tool-arrow">${existingToolSubs.length ? '▼' : '▶'}</span> 도구 (클릭하면 하위 카테고리가 나와요)
+          </div>
+          <div id="faq-f-tool-subcats" style="display:${existingToolSubs.length ? 'grid' : 'none'}; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px; margin-top:8px; padding-top:8px; border-top:1px solid var(--paper-deep);">
+            ${toolSubChecks}
+          </div>
+        </div>`;
+      }
+      return `<label style="display:flex; align-items:center; gap:6px; font-size:13.5px; font-family:'Noto Sans KR',sans-serif; cursor:pointer; margin:0;">
         <input type="checkbox" name="faq-f-cat" value="${escapeHtml(c)}" ${existingCats.includes(c) ? 'checked' : ''}> ${escapeHtml(c)}
-      </label>`
-    ).join('');
+      </label>`;
+    }).join('');
     form.innerHTML = `
       <label>질문</label>
       <input type="text" id="faq-f-q" value="${existing?escapeHtml(existing.question):''}" maxlength="150">
@@ -5355,22 +5388,35 @@ const app = {
     // 체크할 때마다, 지금까지 선택한 카테고리들의 배지를 위에 실시간으로 보여준다
     const updateSelectedBadges = () => {
       const badgeWrap = document.getElementById('faq-f-cat-selected');
-      const checked = Array.from(form.querySelectorAll('input[name="faq-f-cat"]:checked')).map(i => i.value);
+      const checkedNormal = Array.from(form.querySelectorAll('input[name="faq-f-cat"]:checked')).map(i => i.value);
+      const checkedTool = Array.from(form.querySelectorAll('input[name="faq-f-toolcat"]:checked')).map(i => '도구:' + i.value);
+      const checked = [...checkedNormal, ...checkedTool];
       badgeWrap.innerHTML = checked.length === 0
         ? `<span class="field-hint" style="margin:0;">선택된 카테고리가 없어요</span>`
         : checked.map(c => {
-            const color = FAQ_CATEGORY_COLORS[c];
-            return `<span class="badge" style="background:${color?color.bg:'#eee'}; color:${color?color.text:'#333'}; font-weight:700;">${escapeHtml(c)}</span>`;
+            const color = FAQ_CATEGORY_COLORS[faqCategoryColorKey(c)];
+            return `<span class="badge" style="background:${color?color.bg:'#eee'}; color:${color?color.text:'#333'}; font-weight:700;">${escapeHtml(faqCategoryLabel(c))}</span>`;
           }).join('');
     };
     form.querySelectorAll('input[name="faq-f-cat"]').forEach(cb => cb.addEventListener('change', updateSelectedBadges));
+    form.querySelectorAll('input[name="faq-f-toolcat"]').forEach(cb => cb.addEventListener('change', updateSelectedBadges));
     updateSelectedBadges();
+  },
+  toggleFaqToolSubcats(){
+    const box = document.getElementById('faq-f-tool-subcats');
+    const arrow = document.getElementById('faq-f-tool-arrow');
+    if(!box) return;
+    const willShow = box.style.display === 'none';
+    box.style.display = willShow ? 'grid' : 'none';
+    if(arrow) arrow.textContent = willShow ? '▼' : '▶';
   },
   async saveFaq(editId){
     const q = document.getElementById('faq-f-q').value.trim();
     const aEl = document.getElementById('faq-f-a');
     const a = sanitizeRichHtml(aEl ? aEl.innerHTML : '');
-    const categories = Array.from(document.querySelectorAll('input[name="faq-f-cat"]:checked')).map(i => i.value);
+    const normalCats = Array.from(document.querySelectorAll('input[name="faq-f-cat"]:checked')).map(i => i.value);
+    const toolCats = Array.from(document.querySelectorAll('input[name="faq-f-toolcat"]:checked')).map(i => '도구:' + i.value);
+    const categories = [...normalCats, ...toolCats];
     if(!q || !richTextHasContent(a)){ showToast('질문과 답변을 입력해주세요'); return; }
     if(categories.length === 0){ showToast('카테고리를 하나 이상 선택해주세요'); return; }
     if(editId){

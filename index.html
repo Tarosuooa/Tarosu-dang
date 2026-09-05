@@ -520,6 +520,20 @@ footer{
   background:none; border:none; cursor:pointer; color:var(--wood); font-size:12px;
   font-family:'Noto Sans KR',sans-serif; text-decoration:underline; padding:0;
 }
+
+/* 외부 사이트(악보 제작/고쟁 조율/고쟁 조옮김/고쟁 코드/게임)를 감싸는 가로 스크롤 영역.
+   래퍼 자체를 세로로 뒤집어서 스크롤바가 아래가 아니라 위쪽에 뜨게 하고,
+   안의 iframe은 다시 뒤집어서 화면에는 정상적으로 보이게 한다. */
+.h-scroll-wrap{
+  width:100%; overflow-x:auto; overflow-y:hidden;
+  transform:scaleY(-1);
+  display:flex; justify-content:center; /* 콘텐츠가 화면보다 좁을 때 기본적으로 가운데 정렬 */
+}
+.h-scroll-wrap > iframe{
+  transform:scaleY(-1);
+  flex:none;
+  display:block;
+}
 .notif-readall-btn:disabled{ color:var(--ink-soft); text-decoration:none; cursor:default; opacity:0.6; }
 .notif-panel-footer{
   display:flex; gap:8px; padding:10px 14px; border-top:1px solid var(--paper-deep);
@@ -1522,6 +1536,17 @@ function syncIframeHeightToContent(iframeEl){
   if(!iframeEl || iframeEl.dataset.heightSyncBound) return;
   iframeEl.dataset.heightSyncBound = '1';
 
+  // 가로 스크롤이 필요할 때를 위해, iframe을 스크롤 가능한 래퍼로 한 번 감싼다.
+  // 래퍼는 세로로 뒤집어서(scaleY(-1)) 스크롤바가 아래가 아니라 위쪽에 뜨게 하고,
+  // 그 안의 iframe은 다시 한 번 뒤집어서(scaleY(-1)) 화면에는 정상적으로 보이게 한다 (널리 쓰이는 CSS 트릭).
+  let wrap = iframeEl.parentElement;
+  if(!wrap || !wrap.classList.contains('h-scroll-wrap')){
+    wrap = document.createElement('div');
+    wrap.className = 'h-scroll-wrap';
+    iframeEl.parentNode.insertBefore(wrap, iframeEl);
+    wrap.appendChild(iframeEl);
+  }
+
   function measureAndApply(){
     try{
       const doc = iframeEl.contentWindow.document;
@@ -1530,6 +1555,32 @@ function syncIframeHeightToContent(iframeEl){
         doc.body ? doc.body.scrollHeight : 0
       );
       if(height > 100){ iframeEl.style.height = height + 'px'; }
+
+      // body/documentElement 전체 너비뿐 아니라, 그 안의 개별 요소가 유독 넓은 경우까지 놓치지 않도록
+      // 페이지 안의 모든 요소를 확인해서 실제로 필요한 최대 너비를 찾는다.
+      let contentWidth = Math.max(
+        doc.documentElement ? doc.documentElement.scrollWidth : 0,
+        doc.body ? doc.body.scrollWidth : 0
+      );
+      if(doc.body){
+        const allEls = doc.body.querySelectorAll('*');
+        for(let i=0; i<allEls.length; i++){
+          const w = allEls[i].scrollWidth;
+          if(w > contentWidth) contentWidth = w;
+        }
+      }
+
+      const wrapWidth = wrap.clientWidth;
+      if(contentWidth > wrapWidth + 4){
+        // 콘텐츠가 화면보다 넓은 경우: iframe을 실제 필요한 너비로 늘려서 가로 스크롤로 전부 볼 수 있게 하고,
+        // 처음 보여줄 때는 가운데 부분이 보이도록 스크롤 위치를 잡아준다.
+        iframeEl.style.width = contentWidth + 'px';
+        requestAnimationFrame(() => { wrap.scrollLeft = (contentWidth - wrapWidth) / 2; });
+      }else{
+        // 화면 안에 다 들어가는 경우: 100% 너비로 채우고, 래퍼 안에서 가운데 정렬되게 한다.
+        iframeEl.style.width = '100%';
+        wrap.scrollLeft = 0;
+      }
     }catch(e){
       // 다른 출처라 접근이 막힌 경우: 기존 고정 높이(80vh)를 그대로 둔다
     }

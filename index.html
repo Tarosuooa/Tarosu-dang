@@ -2817,9 +2817,13 @@ function applyNavState(s){
   document.getElementById('subtab-dl').classList.toggle('active', state.sheetTab==='dl');
   document.getElementById('subtab-make').classList.toggle('active', state.sheetTab==='make');
   document.getElementById('subtab-tuning').classList.toggle('active', state.sheetTab==='tuning');
+  document.getElementById('subtab-keychange').classList.toggle('active', state.sheetTab==='keychange');
+  document.getElementById('subtab-code').classList.toggle('active', state.sheetTab==='code');
   document.getElementById('sheets-dl-view').style.display = state.sheetTab==='dl' ? '' : 'none';
   document.getElementById('sheets-make-view').style.display = state.sheetTab==='make' ? '' : 'none';
   document.getElementById('sheets-tuning-view').style.display = state.sheetTab==='tuning' ? '' : 'none';
+  document.getElementById('sheets-keychange-view').style.display = state.sheetTab==='keychange' ? '' : 'none';
+  document.getElementById('sheets-code-view').style.display = state.sheetTab==='code' ? '' : 'none';
   document.querySelectorAll('#sheetCategoryFilter .cat-btn').forEach(b=>{
     b.classList.toggle('active', b.dataset.cat === state.sheetCategory);
   });
@@ -2830,6 +2834,10 @@ function applyNavState(s){
   else app.stopScoreMakerSession(false);
   if(state.page==='sheets' && state.sheetTab==='tuning') app.startTuningSession();
   else app.stopTuningSession(false);
+  if(state.page==='sheets' && state.sheetTab==='keychange') app.startKeyChangeSession();
+  else app.stopKeyChangeSession(false);
+  if(state.page==='sheets' && state.sheetTab==='code') app.startGuzhengCodeSession();
+  else app.stopGuzhengCodeSession(false);
   if(state.page==='game') app.startGameSession();
   else app.stopGameSession(false);
 
@@ -2978,6 +2986,14 @@ const app = {
         if(state.page==='sheets' && state.sheetTab==='tuning'){
           this.stopTuningSession(false);
           this.startTuningSession();
+        }
+        if(state.page==='sheets' && state.sheetTab==='keychange'){
+          this.stopKeyChangeSession(false);
+          this.startKeyChangeSession();
+        }
+        if(state.page==='sheets' && state.sheetTab==='code'){
+          this.stopGuzhengCodeSession(false);
+          this.startGuzhengCodeSession();
         }
         if(state.page==='game'){
           this.stopGameSession(false);

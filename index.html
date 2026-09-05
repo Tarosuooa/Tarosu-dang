@@ -3237,6 +3237,7 @@ const app = {
   },
   startHeroTitleRotation(){
     this.stopHeroTitleRotation();
+    state.heroTitleIndex = 0; // 홈으로 돌아올 때마다(다른 페이지에서 복귀/새로고침) 항상 1번째 문구부터 다시 시작한다
     // 문구마다 유지 시간이 서로 다를 수 있으므로, 고정 간격 setInterval 대신
     // '보여주고 → 그 문구의 유지시간만큼 기다렸다가 → 다음 문구' 를 매번 새로 예약하는 방식을 쓴다.
     const scheduleNext = () => {

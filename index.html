@@ -135,6 +135,14 @@ main.no-hero{padding-top:44px;}
 .hero h1 em{font-style:normal; color:var(--wood); border-bottom:2px solid var(--gold);}
 .hero p.tagline{margin-top:18px; font-size:16.5px; color:var(--ink-soft); max-width:480px; white-space:pre-wrap;}
 
+/* 홈 타이틀이 다음 순서로 바뀔 때, 먹물이 화선지에 번지듯 흐릿하게 퍼져있다가 서서히 또렷해지는 효과 */
+@keyframes heroTitleInkSpread{
+  0%   { opacity:0;    filter:blur(7px); letter-spacing:5px; }
+  50%  { opacity:0.55; filter:blur(2.5px); letter-spacing:1.5px; }
+  100% { opacity:1;    filter:blur(0); letter-spacing:normal; }
+}
+.hero h1.title-flicker{ animation:heroTitleInkSpread 1.1s cubic-bezier(.2,.7,.3,1); }
+
 .strings-wrap{
   position:absolute; right:-40px; top:0; height:380px; width:56%;
   opacity:0.9;
@@ -975,11 +983,10 @@ footer{
     </div>
 
     <div class="card" id="heroTitlesCard" style="display:none;">
-      <h3 style="font-size:16px; margin-bottom:4px;">홈 타이틀 (랜덤 5개) 관리 <span class="field-hint" style="margin:0;">(관리자 전용)</span></h3>
-      <p class="field-hint" style="margin:8px 0 12px;">홈 화면에 접속할 때마다 아래 5개 중 하나가 지정한 확률로 무작위로 보여요. 문구에 '고쟁'이 들어가면 그 부분만 자동으로 갈색 밑줄로 강조돼요. 최대 2줄까지 작성할 수 있어요.</p>
+      <h3 style="font-size:16px; margin-bottom:4px;">홈 타이틀 (순서대로 5개) 관리 <span class="field-hint" style="margin:0;">(관리자 전용)</span></h3>
+      <p class="field-hint" style="margin:8px 0 12px;">홈 화면에서 5초마다 1번째부터 5번째까지 순서대로 바뀌면서 보여요 (다시 1번째로 돌아가 반복). 바뀔 때마다 먹물이 화선지에 번지듯 흐릿했다가 또렷해지는 효과가 함께 나와요. 문구에 '고쟁'이 들어가면 그 부분만 자동으로 갈색 밑줄로 강조돼요. 최대 2줄까지 작성할 수 있어요.</p>
       <div id="heroTitlesRows" style="display:flex; flex-direction:column; gap:12px;"></div>
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px; padding-top:14px; border-top:1px solid var(--paper-deep);">
-        <span id="heroTitlesSumLabel" style="font-size:13.5px; font-weight:700;">확률 합계: 100%</span>
+      <div style="display:flex; justify-content:flex-end; margin-top:14px; padding-top:14px; border-top:1px solid var(--paper-deep);">
         <button class="btn" id="heroTitlesApplyBtn" onclick="app.applyHeroTitles()">적용</button>
       </div>
     </div>
@@ -1232,11 +1239,11 @@ if(FIREBASE_CONFIGURED){
 // 홈 화면 랜덤 타이틀의 기본값 (관리자가 아직 한 번도 저장한 적 없을 때 사용).
 // '고쟁'이라는 글자는 렌더링할 때 시스템이 자동으로 강조하므로, 여기서는 일반 텍스트로만 적는다.
 const DEFAULT_HERO_TITLES = [
-  { text: '타로수가 선명하게\n고쟁을 핥고 있었다.', weight: 20 },
-  { text: '고쟁 위로\n고양이가 걸어 다닙니다.', weight: 20 },
-  { text: '고쟁~ 야~호', weight: 20 },
-  { text: '새벽 3시에 고쟁 치는\n사람이 어딨냐구!!', weight: 20 },
-  { text: '이 고쟁은 제 겁니다.', weight: 20 }
+  '타로수가 선명하게\n고쟁을 핥고 있었다.',
+  '고쟁 위로\n고양이가 걸어 다닙니다.',
+  '고쟁~ 야~호',
+  '새벽 3시에 고쟁 치는\n사람이 어딨냐구!!',
+  '이 고쟁은 제 겁니다.'
 ];
 
 const NAV_ITEMS = [
@@ -1321,7 +1328,8 @@ const state = {
   profile: { photoUrls: [], title: '', content: '' },
   homeCardOrder: null, // null이면 기본 순서 사용, 배열이면 그 순서대로 표시
   heroTaglineText: null, // null이면 기본 3줄 문구 사용
-  heroTitles: null, // null이면 DEFAULT_HERO_TITLES 사용. 관리자가 저장하면 [{text, weight}, ...] 5개
+  heroTitles: null, // null이면 DEFAULT_HERO_TITLES 사용. 관리자가 저장하면 문자열 5개 배열(순서대로 등장)
+  heroTitleIndex: 0, // 다음에 보여줄 타이틀의 순서(0~4), 바뀔 때마다 1씩 증가
   heroContactText: null, // null이면 기본 인스타그램/이메일 문구 사용
   visitStatsRange: null, // { fromDate, toDate, presetDays }
   commentCounts: {}, // postId -> 댓글 개수 (목록에 [N]으로 표시하기 위한 캐시)
@@ -2292,10 +2300,11 @@ async function loadHeroTitles(){
   if(!db){ state.heroTitles = null; return; }
   try{
     const doc = await db.collection('content').doc('heroTitles').get();
-    const titles = (doc.exists && Array.isArray(doc.data().titles) && doc.data().titles.length === 5) ? doc.data().titles : null;
-    state.heroTitles = titles;
+    const raw = (doc.exists && Array.isArray(doc.data().titles) && doc.data().titles.length === 5) ? doc.data().titles : null;
+    // 예전에는 {text, weight} 형태로 저장되어 있었으므로, 그런 데이터가 남아있어도 문자열만 뽑아서 그대로 쓴다
+    state.heroTitles = raw ? raw.map(t => (typeof t === 'string' ? t : (t && t.text) || '')) : null;
   }catch(e){
-    console.error('홈 랜덤 타이틀 로드 실패', e);
+    console.error('홈 타이틀 로드 실패', e);
     state.heroTitles = null;
   }
 }
@@ -2305,7 +2314,7 @@ async function saveHeroTitles(titles){
     await db.collection('content').doc('heroTitles').set({ titles });
     return true;
   }catch(e){
-    console.error('홈 랜덤 타이틀 저장 실패', e);
+    console.error('홈 타이틀 저장 실패', e);
     return false;
   }
 }
@@ -2784,6 +2793,7 @@ function parseDeepLinkFromHash(){
 }
 
 let isRestoringHistory = false;
+let heroTitleRotationTimer = null; // 홈 타이틀이 5초마다 순서대로 바뀌는 타이머
 function captureNavState(){
   return {
     page: state.page,
@@ -2822,7 +2832,7 @@ function applyNavState(s){
   if(navBtn) navBtn.classList.add('active');
   document.getElementById('heroSection').style.display = state.page==='home' ? '' : 'none';
   document.querySelector('main').classList.toggle('no-hero', state.page!=='home');
-  if(state.page==='home') app.pickRandomHeroTagline();
+  if(state.page==='home') app.startHeroTitleRotation(); else app.stopHeroTitleRotation();
 
   document.getElementById('subtab-dl').classList.toggle('active', state.sheetTab==='dl');
   document.getElementById('subtab-make').classList.toggle('active', state.sheetTab==='make');
@@ -3027,7 +3037,7 @@ const app = {
     await loadHomeCardOrder();
     await loadHeroTagline();
     await loadHeroTitles();
-    try{ this.pickRandomHeroTagline(); }catch(e){ console.error('pickRandomHeroTagline 오류', e); }
+    try{ if(state.page==='home') this.startHeroTitleRotation(); }catch(e){ console.error('홈 타이틀 전환 시작 오류', e); }
     await loadHeroContact();
     await loadCommentCounts();
     await loadPostViewCounts();
@@ -3173,26 +3183,31 @@ const app = {
     svg.addEventListener('touchcancel', endTouches);
   },
 
-  pickRandomHeroTagline(){
+  // 다음 순서(1→2→3→4→5→1...)의 타이틀을 먹 번짐 효과와 함께 보여준다
+  showNextHeroTagline(){
     const el = document.getElementById('heroTagline');
     if(!el) return;
-    const titles = (state.heroTitles || DEFAULT_HERO_TITLES).filter(t => t.text && t.text.trim());
+    const titles = (state.heroTitles || DEFAULT_HERO_TITLES).filter(t => t && t.trim());
     if(titles.length === 0) return;
 
-    // 각 문구에 지정된 확률(weight)에 비례해서 하나를 뽑는다
-    const totalWeight = titles.reduce((sum, t) => sum + (Number(t.weight) || 0), 0);
-    let picked = titles[titles.length - 1];
-    if(totalWeight > 0){
-      let r = Math.random() * totalWeight;
-      for(const t of titles){
-        r -= (Number(t.weight) || 0);
-        if(r <= 0){ picked = t; break; }
-      }
-    }else{
-      // 확률이 전부 0으로 저장되어 있는 예외 상황에서도, 완전 균등 확률로라도 하나는 보여준다
-      picked = titles[Math.floor(Math.random() * titles.length)];
-    }
-    el.innerHTML = renderHeroTitleHtml(picked.text);
+    const idx = (state.heroTitleIndex || 0) % titles.length;
+    const nextText = titles[idx];
+    state.heroTitleIndex = (idx + 1) % titles.length;
+
+    // 새 문구로 먼저 바꾼 뒤, 흐릿하게 번져있다가 또렷해지는 효과를 씌운다
+    el.innerHTML = renderHeroTitleHtml(nextText);
+    // 클래스를 지웠다가 다시 붙여서, 연속으로 재생해도 애니메이션이 매번 새로 시작되게 한다
+    el.classList.remove('title-flicker');
+    void el.offsetWidth; // 강제 리플로우
+    el.classList.add('title-flicker');
+  },
+  startHeroTitleRotation(){
+    this.stopHeroTitleRotation();
+    this.showNextHeroTagline();
+    heroTitleRotationTimer = setInterval(() => this.showNextHeroTagline(), 5000);
+  },
+  stopHeroTitleRotation(){
+    if(heroTitleRotationTimer){ clearInterval(heroTitleRotationTimer); heroTitleRotationTimer = null; }
   },
 
   /* ---------- 고쟁 줄 사용법 패널 (모달 아님 — 열려 있어도 뒤의 줄을 계속 클릭할 수 있다) ---------- */
@@ -3618,7 +3633,7 @@ const app = {
     if(navBtn) navBtn.classList.add('active');
     document.getElementById('heroSection').style.display = page==='home' ? '' : 'none';
     document.querySelector('main').classList.toggle('no-hero', page!=='home');
-    if(page==='home' && !skipPush) this.pickRandomHeroTagline();
+    if(page==='home') this.startHeroTitleRotation(); else this.stopHeroTitleRotation();
     state.detail.notice = null; state.detail.noticeUpdate = null; state.detail.download = null;
     state.detail.sheets = null;
     this.renderAll();
@@ -4137,25 +4152,17 @@ const app = {
   renderHeroTitlesEditor(){
     const wrap = document.getElementById('heroTitlesRows');
     if(!wrap) return;
-    const titles = (state.heroTitles || DEFAULT_HERO_TITLES).map(t => ({ text: t.text || '', weight: Number(t.weight) || 0 }));
+    const titles = (state.heroTitles || DEFAULT_HERO_TITLES).map(t => (typeof t === 'string' ? t : (t && t.text) || ''));
     // 관리자가 지금 이 편집창 중 하나에 포커스를 두고 실제로 입력 중이라면, 다시 그려서 그 입력을 덮어쓰지 않는다.
-    // (단순히 '한 번이라도 그려진 적 있는지'로만 판단하면, 로그인 직후 데이터가 아직 다 안 불려온 시점에
-    //  먼저 한 번 그려져 버린 뒤에는 실제 저장된 데이터가 나중에 도착해도 영영 반영이 안 되는 문제가 있었다)
-    if(wrap.contains(document.activeElement)){ this.updateHeroTitlesSum(); return; }
-    wrap.innerHTML = titles.map((t, i) => `
+    if(wrap.contains(document.activeElement)) return;
+    wrap.innerHTML = titles.map((text, i) => `
       <div style="display:flex; gap:10px; align-items:flex-start; border:1px solid var(--paper-deep); border-radius:4px; padding:10px 12px; background:#fbf7ec;">
-        <span style="font-size:12.5px; color:var(--ink-soft); font-weight:700; padding-top:8px;">${i+1}</span>
+        <span style="font-size:12.5px; color:var(--ink-soft); font-weight:700; padding-top:8px;">${i+1}번째</span>
         <textarea id="heroTitle-f-${i}" rows="2" maxlength="60" placeholder="문구를 입력하세요 (최대 2줄, 'Enter'로 줄바꿈)"
           style="flex:1; min-width:0; padding:8px 10px; border:1px solid var(--paper-deep); border-radius:2px; font-family:'Gowun Batang', 'Noto Serif SC', 'Noto Serif TC', serif; font-size:14px; resize:none;"
-          oninput="app.enforceHeroTitleLineLimit(${i})">${escapeHtml(t.text)}</textarea>
-        <div style="display:flex; align-items:center; gap:4px; flex:none;">
-          <input type="number" id="heroTitle-f-w-${i}" min="0" max="100" value="${t.weight}" oninput="app.updateHeroTitlesSum()"
-            style="width:58px; padding:8px 6px; border:1px solid var(--paper-deep); border-radius:2px; font-size:14px; text-align:center;">
-          <span style="font-size:13px; color:var(--ink-soft);">%</span>
-        </div>
+          oninput="app.enforceHeroTitleLineLimit(${i})">${escapeHtml(text)}</textarea>
         <button class="btn ghost small" style="flex:none;" onclick="app.deleteHeroTitle(${i})">삭제</button>
       </div>`).join('');
-    this.updateHeroTitlesSum();
   },
   // textarea에서 Enter로 줄이 2줄을 넘어가면, 초과분을 즉시 잘라내서 최대 2줄로 제한한다
   enforceHeroTitleLineLimit(idx){
@@ -4167,45 +4174,24 @@ const app = {
     }
   },
   deleteHeroTitle(idx){
-    if(!confirm('이 문구를 지울까요? (지운 뒤에는 확률을 0으로 맞추고, 남은 문구들의 확률 합이 100%가 되도록 다시 배분해주세요)')) return;
+    if(!confirm('이 문구를 지울까요?')) return;
     const textEl = document.getElementById('heroTitle-f-' + idx);
-    const weightEl = document.getElementById('heroTitle-f-w-' + idx);
     if(textEl) textEl.value = '';
-    if(weightEl) weightEl.value = '0';
-    this.updateHeroTitlesSum();
-  },
-  updateHeroTitlesSum(){
-    let sum = 0;
-    for(let i=0; i<5; i++){
-      const weightEl = document.getElementById('heroTitle-f-w-' + i);
-      if(weightEl) sum += Number(weightEl.value) || 0;
-    }
-    const sumLabel = document.getElementById('heroTitlesSumLabel');
-    const applyBtn = document.getElementById('heroTitlesApplyBtn');
-    if(sumLabel){
-      sumLabel.textContent = `확률 합계: ${sum}%`;
-      sumLabel.style.color = sum === 100 ? 'var(--jade)' : 'var(--danger)';
-    }
-    if(applyBtn) applyBtn.disabled = (sum !== 100);
   },
   async applyHeroTitles(){
     if(!isAdminUser()) return;
-    let sum = 0;
     const titles = [];
     for(let i=0; i<5; i++){
       const textEl = document.getElementById('heroTitle-f-' + i);
-      const weightEl = document.getElementById('heroTitle-f-w-' + i);
       const text = textEl ? textEl.value.replace(/\r/g, '') : '';
-      const weight = weightEl ? (Number(weightEl.value) || 0) : 0;
-      if(text.split('\n').length > 2){ showToast(`${i+1}번 문구는 최대 2줄까지만 작성할 수 있어요`); return; }
-      sum += weight;
-      titles.push({ text, weight });
+      if(text.split('\n').length > 2){ showToast(`${i+1}번째 문구는 최대 2줄까지만 작성할 수 있어요`); return; }
+      titles.push(text);
     }
-    if(sum !== 100){ showToast('5개 확률의 합이 100%가 되어야 적용할 수 있어요'); return; }
-    if(titles.every(t => !t.text.trim())){ showToast('최소 하나의 문구는 입력해주세요'); return; }
+    if(titles.every(t => !t.trim())){ showToast('최소 하나의 문구는 입력해주세요'); return; }
     const ok = await saveHeroTitles(titles);
     if(ok){
       state.heroTitles = titles;
+      state.heroTitleIndex = 0; // 순서를 새로 저장했으니, 처음(1번째)부터 다시 시작한다
       showToast('홈 타이틀이 적용되었습니다');
     }else{
       showToast('저장에 실패했습니다');
